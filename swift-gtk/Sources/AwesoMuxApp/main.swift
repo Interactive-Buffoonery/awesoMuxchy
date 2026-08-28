@@ -1,50 +1,27 @@
 import AwesoMuxCore
 import AwesoMuxTerminal
 import CGtk
+import Dispatch
 import Foundation
 import GIO
 import GLib
 import Gtk
 import Pango
 
-private final class FocusedPanePathBar {
-    let root = BoxRef(orientation: .horizontal, spacing: 8)
-    private let project = LabelRef(str: "")
-    private let path = LabelRef(str: "")
-    private let pane = LabelRef(str: "")
-
-    init() {
-        root.add(cssClass: "aw-pathbar")
-        root.setMarginStart(margin: 12)
-        root.setMarginEnd(margin: 12)
-        let folder = ImageRef(iconName: "folder-symbolic")
-        folder.add(cssClass: "aw-path-project")
-        root.append(child: folder)
-        project.add(cssClass: "aw-path-project")
-        project.setEllipsize(mode: PangoEllipsizeMode(rawValue: 3))
-        project.setMaxWidthChars(nChars: 28)
-        root.append(child: project)
-        let chevron = LabelRef(str: "›")
-        chevron.add(cssClass: "aw-path-muted")
-        root.append(child: chevron)
-        path.add(cssClass: "aw-path-location")
-        path.setEllipsize(mode: PangoEllipsizeMode(rawValue: 2))
-        path.setHexpand(expand: true)
-        path.xalign = 0
-        root.append(child: path)
-        pane.add(cssClass: "aw-path-muted")
-        root.append(child: pane)
-    }
-
-    func update(_ context: FocusedPaneContext, ordinal: Int, count: Int) {
-        project.label = context.project
-        path.label = context.path
-        path.setTooltip(text: context.copyPath)
-        pane.label = count > 1 ? "Pane \(ordinal) of \(count)" : ""
-    }
+private final class GTKMainLoopWork: @unchecked Sendable {
+    let action: () -> Void
+    init(_ action: @escaping () -> Void) { self.action = action }
 }
 
-private final class ApplicationState {
+private func performOnGTKMain(_ action: @escaping () -> Void) {
+    let pointer = Unmanaged.passRetained(GTKMainLoopWork(action)).toOpaque()
+    _ = GLib.idleAddOnce(function: { data in
+        guard let data else { return }
+        Unmanaged<GTKMainLoopWork>.fromOpaque(data).takeRetainedValue().action()
+    }, data: pointer)
+}
+
+private final class ApplicationState: @unchecked Sendable {
     private final class WorkspaceRuntime {
         let groupID: UUID
         let pageName: String
@@ -65,6 +42,8 @@ private final class ApplicationState {
     let terminalRuntime: TerminalRuntime
     private(set) var snapshot: SessionSnapshot
     private let store: SessionStore
+    private let preferencesStore: AppPreferencesStore
+    private var preferences: AppPreferences
     private(set) var isPersistencePaused = false
     private let styles = CSSProvider(from: """
       .aw-root,.aw-content{background:#1e1e2e;}.aw-titlebar{min-height:38px;background:#11111b;border-bottom:1px solid #313244;}
@@ -81,7 +60,28 @@ private final class ApplicationState {
       .aw-row-title{color:#cdd6f4;font-size:12px;font-weight:600;}.aw-row-meta{color:#7f849c;font-family:monospace;font-size:10px;}
       .aw-sidebar-footer{min-height:38px;color:#7f849c;background:#181825;border-top:1px solid #313244;font-family:monospace;font-size:10px;}
       .aw-pathbar{min-height:38px;color:#a6adc8;background:#181825;border-top:1px solid #313244;font-family:monospace;font-size:11px;}
-      .aw-path-project{color:#cdd6f4;font-weight:700;}.aw-path-location{color:#a6adc8;}.aw-path-muted{color:#6c7086;}
+      .aw-path-project{color:#cdd6f4;font-weight:700;}.aw-path-location{color:#a6adc8;}.aw-path-muted,.aw-path-divider{color:#6c7086;}
+      menubutton.aw-path-menu>button{min-height:24px;padding:2px 6px;background:rgba(205,214,244,.055);border:1px solid rgba(205,214,244,.10);border-radius:6px;}
+      menubutton.aw-path-menu>button:hover{background:rgba(205,214,244,.11);}
+      menubutton.aw-chip>button,.aw-chip-dirty,.aw-chip-remote{min-height:22px;padding:1px 7px;border:0;border-radius:6px;font-family:monospace;font-size:10px;font-weight:700;}
+      menubutton.aw-chip-branch>button{color:#fab387;background:rgba(250,179,135,.13);} .aw-chip-dirty{color:#f9e2af;background:rgba(249,226,175,.11);}
+      menubutton.aw-chip-pr>button{color:#cba6f7;background:rgba(203,166,247,.13);} menubutton.aw-chip-ci>button{color:#89dceb;background:rgba(137,220,235,.12);}
+      menubutton.aw-chip-ci-failing>button{color:#f38ba8;background:rgba(243,139,168,.13);} .aw-chip-remote{color:#89dceb;background:rgba(137,220,235,.12);}
+      popover contents{background:#252538;border:1px solid #45475a;border-radius:9px;box-shadow:0 8px 24px rgba(0,0,0,.35);}
+      .aw-popover{min-width:190px;}.aw-menu-title{padding:5px 7px;color:#cdd6f4;font-size:13px;font-weight:700;}
+      .aw-menu-heading{padding:5px 7px 2px;color:#7f849c;font-family:monospace;font-size:9px;font-weight:700;letter-spacing:1px;}
+      button.aw-menu-row{min-height:30px;padding:4px 7px;color:#cdd6f4;background:transparent;border:0;border-radius:5px;font-size:11px;}
+      button.aw-menu-row:hover{background:#3a3b4d;}.aw-menu-disabled{padding:7px;color:#6c7086;font-size:10px;}
+      menubutton.aw-icon-menu>button,button.aw-icon-button,button.aw-agent-total{min-width:22px;min-height:22px;padding:0;color:#7f849c;background:transparent;border:0;border-radius:5px;}
+      menubutton.aw-icon-menu>button:hover,button.aw-icon-button:hover,button.aw-agent-total:hover{color:#cdd6f4;background:rgba(205,214,244,.09);}
+      .aw-agent-panel{background:#181825;border-top:1px solid #313244;}.aw-agent-state{padding:1px 4px;font-family:monospace;font-size:9px;font-weight:700;}
+      .aw-agent-thinking{color:#cba6f7;}.aw-agent-output{color:#89dceb;}.aw-agent-attention{color:#f38ba8;}
+      button.aw-theme-choice{min-height:26px;padding:2px 8px;color:#a6adc8;background:#313244;border:1px solid #45475a;border-radius:5px;font-size:10px;}
+      button.aw-theme-choice.aw-selected{color:#11111b;background:#89b4fa;border-color:#89b4fa;font-weight:700;}
+      .theme-light.aw-root,.theme-light .aw-content{background:#eff1f5;}.theme-light .aw-titlebar{background:#dce0e8;border-color:#bcc0cc;}
+      .theme-light .aw-sidebar,.theme-light .aw-sidebar-footer,.theme-light .aw-pathbar,.theme-light .aw-agent-panel{background:#e6e9ef;border-color:#bcc0cc;}
+      .theme-light .aw-brand{color:#4c4f69;background:#dce0e8;border-color:#bcc0cc;}.theme-light .aw-row-title,.theme-light .aw-path-project{color:#4c4f69;}
+      .theme-light .aw-row-meta,.theme-light .aw-path-location,.theme-light .aw-window-title{color:#6c6f85;}
     """)
     var surfaces: [TerminalSurface] = []
     private(set) var focusedSurface: TerminalSurface?
@@ -100,15 +100,19 @@ private final class ApplicationState {
     private var groupNames: [UUID: String] = [:]
     private var stack: StackRef?
     private var title: LabelRef?
+    private var rootWidget: BoxRef?
+    private var sidebarFooter: SidebarStatusFooter?
     private var context = FocusedPaneContextCoordinator()
     private var actions: [GIO.SimpleAction] = []
     private var menu: GIO.Menu?
 
-    init?(snapshot: SessionSnapshot, store: SessionStore) {
+    init?(snapshot: SessionSnapshot, store: SessionStore, preferencesStore: AppPreferencesStore) {
         guard let runtime = TerminalRuntime() else { return nil }
         terminalRuntime = runtime
         self.snapshot = snapshot
         self.store = store
+        self.preferencesStore = preferencesStore
+        preferences = preferencesStore.load()
     }
 
     func installStyles(on widget: WidgetRef) {
@@ -116,7 +120,29 @@ private final class ApplicationState {
             styles.styleProvider.style_provider_ptr, UInt32(GTK_STYLE_PROVIDER_PRIORITY_APPLICATION))
     }
 
-    func attach(stack: StackRef, title: LabelRef) { self.stack = stack; self.title = title }
+    func attach(stack: StackRef, title: LabelRef, root: BoxRef, sidebarFooter: SidebarStatusFooter) {
+        self.stack = stack; self.title = title; rootWidget = root; self.sidebarFooter = sidebarFooter
+        applyTheme(); sidebarFooter.update(AgentFooterSummary(snapshot: snapshot))
+    }
+
+    func makePathBar() -> FocusedPanePathBar {
+        FocusedPanePathBar(actions: .init(
+            copy: { [weak self] in self?.copy($0) }, reveal: { [weak self] in self?.reveal($0) },
+            openEditor: { [weak self] in self?.openEditor($0, path: $1) },
+            insertCommand: { [weak self] in self?.focusedSurface?.send(text: $0) },
+            openURL: { [weak self] in self?.openURL($0) }
+        ))
+    }
+
+    func makeSidebarFooter() -> SidebarStatusFooter {
+        SidebarStatusFooter(preferences: preferences, actions: .init(
+            selectPane: { [weak self] workspace, pane in self?.select(workspace); self?.focus(pane) },
+            updatePreferences: { [weak self] in self?.updatePreferences($0) },
+            showWelcome: { [weak self] in self?.showInformation(title: "Welcome to awesoMux", body: "Workspaces live in the sidebar, splits stay inside one native window, and the focused pane owns the Git and agent context shown in the footer.") },
+            reportBug: { [weak self] in self?.openFeedback() }, suggestFeature: { [weak self] in self?.openFeedback() },
+            showSettings: { [weak self] in self?.showInformation(title: "Settings", body: "Theme and notification controls are available in Quick settings. More application settings will appear here as their features land on Linux.") }
+        ))
+    }
 
     func makeSurface(pane: PaneSnapshot, workspaceID: UUID, label: String, description: String) -> TerminalSurface? {
         guard let surface = terminalRuntime.makeSurface(workingDirectory: pane.workingDirectory,
@@ -220,11 +246,79 @@ private final class ApplicationState {
         let identity = context.begin(workspaceID: workspaceID, paneID: pane.id)
         let candidate = FocusedPaneContext.resolve(identity: identity, workingDirectory: pane.workingDirectory)
         guard context.publish(candidate) else { return }
-        let ordinal = (workspace.layout.paneIDs.firstIndex(of: pane.id) ?? 0) + 1
-        runtime.pathBar.update(candidate, ordinal: ordinal, count: workspace.layout.paneCount)
+        let isRemote = pane.ownership != .local
+        runtime.pathBar.updatePreview(candidate, isRemote: isRemote)
+        if !isRemote {
+            let pathBar = runtime.pathBar
+            DispatchQueue.global(qos: .utility).async {
+                let details = TerminalFooterResolver().resolve(candidate)
+                performOnGTKMain { pathBar.updateDetails(details) }
+            }
+        }
         let suffix = workspace.layout.paneCount > 1 ? "  ·  ▮▮ \(workspace.layout.paneCount)" : ""
         metadata[workspaceID]?.label = candidate.path + suffix
         searchText[workspaceID] = "\(workspace.name) \(candidate.project) \(candidate.path)".lowercased()
+        sidebarFooter?.update(AgentFooterSummary(snapshot: snapshot))
+    }
+
+    private func copy(_ text: String) {
+        rootWidget?.getClipboard()?.set(text: text)
+    }
+
+    private func reveal(_ path: String) {
+        openURL(URL(fileURLWithPath: path, isDirectory: true))
+    }
+
+    private func openURL(_ url: URL) {
+        guard ["https", "file"].contains(url.scheme?.lowercased() ?? "") else { return }
+        _ = try? GIO.appInfoLaunchDefaultFor(uri: url.absoluteString, context: nil as GIO.AppLaunchContextRef?)
+    }
+
+    private func openEditor(_ editor: InstalledEditor, path: String) {
+        let canonical = URL(fileURLWithPath: path, isDirectory: true).resolvingSymlinksInPath().standardized.path
+        var isDirectory: ObjCBool = false
+        guard FileManager.default.isExecutableFile(atPath: editor.executable),
+              FileManager.default.fileExists(atPath: canonical, isDirectory: &isDirectory), isDirectory.boolValue else { return }
+        DispatchQueue.global(qos: .userInitiated).async {
+            let process = Process()
+            process.executableURL = URL(fileURLWithPath: editor.executable)
+            process.arguments = [canonical]
+            process.currentDirectoryURL = URL(fileURLWithPath: canonical, isDirectory: true)
+            process.standardOutput = FileHandle.nullDevice
+            process.standardError = FileHandle.nullDevice
+            try? process.run()
+        }
+    }
+
+    private func updatePreferences(_ value: AppPreferences) {
+        preferences = value
+        try? preferencesStore.save(value)
+        applyTheme()
+    }
+
+    private func applyTheme() {
+        guard let rootWidget else { return }
+        for theme in AppTheme.allCases { rootWidget.remove(cssClass: "theme-\(theme.rawValue.lowercased())") }
+        rootWidget.add(cssClass: "theme-\(preferences.theme.rawValue.lowercased())")
+    }
+
+    private func openFeedback() {
+        openURL(URL(string: "https://github.com/Interactive-Buffoonery/awesomux/issues/new/choose")!)
+    }
+
+    private func showInformation(title: String, body: String) {
+        let window = WindowRef()
+        window.title = title
+        window.setDefaultSize(width: 520, height: 220)
+        let box = BoxRef(orientation: .vertical, spacing: 14)
+        box.setMarginStart(margin: 24); box.setMarginEnd(margin: 24)
+        box.setMarginTop(margin: 24); box.setMarginBottom(margin: 24)
+        let heading = LabelRef(str: title); heading.add(cssClass: "aw-menu-title"); heading.xalign = 0
+        let message = LabelRef(str: body); message.set(wrap: true); message.xalign = 0; message.setVexpand(expand: true)
+        let close = ButtonRef(label: "Done"); close.setHalign(align: .end)
+        close.onClicked { [window] _ in window.close() }
+        box.append(child: heading); box.append(child: message); box.append(child: close)
+        window.set(child: box); window.present()
     }
 
     private func persist() {
@@ -291,7 +385,7 @@ private final class ApplicationState {
             surfaces.removeAll { $0 === surface }
             return
         }
-        let pathBar = FocusedPanePathBar(); let page = BoxRef(orientation: .vertical, spacing: 0)
+        let pathBar = makePathBar(); let page = BoxRef(orientation: .vertical, spacing: 0)
         surface.widget.setVexpand(expand: true); page.append(child: surface.widget); page.append(child: pathBar.root)
         let pageName = workspace.id.uuidString; _ = pageName.withCString { stack.addNamed(child: page, name: $0) }
         body.append(child: makeRow(workspace: workspace, groupID: group.id)); body.set(visible: true)
@@ -331,12 +425,15 @@ private func buildWindow(for application: Gtk.ApplicationRef) {
     let paths: SessionProfilePaths
     do { paths = try SessionProfilePaths(profile: "default") } catch { fatalError("Default profile path is invalid") }
     let store = SessionStore(paths: paths)
+    let preferencesStore = AppPreferencesStore(
+        url: paths.snapshotURL.deletingLastPathComponent().appendingPathComponent("preferences.json")
+    )
     let snapshot: SessionSnapshot
     switch try? store.loadRecovering() {
     case let .restored(value), let .recoveredPrevious(value): snapshot = value
     case .missing, .resetAfterQuarantine, .none: snapshot = fallback
     }
-    guard let state = ApplicationState(snapshot: snapshot, store: store) else { fatalError("Ghostty runtime initialization failed") }
+    guard let state = ApplicationState(snapshot: snapshot, store: store, preferencesStore: preferencesStore) else { fatalError("Ghostty runtime initialization failed") }
     retainedState = state; state.installCommands(on: application)
 
     let window = ApplicationWindowRef(application: application); window.title = "awesoMux"
@@ -366,13 +463,12 @@ private func buildWindow(for application: Gtk.ApplicationRef) {
     groups.setMarginStart(margin: 10); groups.setMarginEnd(margin: 10); groups.setMarginTop(margin: 6); groups.setMarginBottom(margin: 8)
     let scroller = ScrolledWindowRef(); scroller.setPolicy(hscrollbarPolicy: .never, vscrollbarPolicy: .automatic)
     scroller.setVexpand(expand: true); scroller.set(child: groups); sidebar.append(child: scroller)
-    let footer = BoxRef(orientation: .horizontal, spacing: 0); footer.add(cssClass: "aw-sidebar-footer")
-    footer.setMarginStart(margin: 10); footer.setMarginEnd(margin: 10)
-    let spacer = BoxRef(orientation: .horizontal, spacing: 0); spacer.setHexpand(expand: true)
-    footer.append(child: spacer); footer.append(child: LabelRef(str: "0 agents")); sidebar.append(child: footer)
+    let sidebarFooter = state.makeSidebarFooter()
+    sidebar.append(child: sidebarFooter.root)
 
     let stack = StackRef(); stack.add(cssClass: "aw-content"); stack.setHexpand(expand: true); stack.setVexpand(expand: true)
-    stack.set(hhomogeneous: true); stack.set(vhomogeneous: true); state.attach(stack: stack, title: title)
+    stack.set(hhomogeneous: true); stack.set(vhomogeneous: true)
+    state.attach(stack: stack, title: title, root: root, sidebarFooter: sidebarFooter)
 
     func buildLayout(_ layout: PaneLayout, workspace: WorkspaceSnapshot) -> (WidgetRef, [TerminalSurface])? {
         switch layout {
@@ -411,7 +507,7 @@ private func buildWindow(for application: Gtk.ApplicationRef) {
         for workspace in group.workspaces where !workspace.isSoftClosed {
             guard let layout = buildLayout(workspace.layout, workspace: workspace),
                   let focused = state.surface(for: workspace.focusedPaneID) else { fatalError("Ghostty terminal surface initialization failed") }
-            let pathBar = FocusedPanePathBar(); let page = BoxRef(orientation: .vertical, spacing: 0)
+            let pathBar = state.makePathBar(); let page = BoxRef(orientation: .vertical, spacing: 0)
             page.append(child: layout.0); page.append(child: pathBar.root)
             let pageName = workspace.id.uuidString; _ = pageName.withCString { stack.addNamed(child: page, name: $0) }
             body.append(child: state.makeRow(workspace: workspace, groupID: group.id))

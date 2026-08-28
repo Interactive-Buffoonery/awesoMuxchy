@@ -1,0 +1,409 @@
+import AwesoMuxCore
+import CGtk
+import Foundation
+import Gtk
+import Pango
+
+private func menuPopover(_ content: BoxRef) -> PopoverRef {
+    let popover = PopoverRef()
+    content.add(cssClass: "aw-popover")
+    content.setMarginStart(margin: 6)
+    content.setMarginEnd(margin: 6)
+    content.setMarginTop(margin: 6)
+    content.setMarginBottom(margin: 6)
+    popover.set(child: content)
+    return popover
+}
+
+private func menuButton(_ title: String, icon: String? = nil, action: @escaping () -> Void) -> ButtonRef {
+    let button = ButtonRef()
+    button.add(cssClass: "aw-menu-row")
+    button.setHalign(align: .fill)
+    let content = BoxRef(orientation: .horizontal, spacing: 8)
+    if let icon { content.append(child: ImageRef(iconName: icon)) }
+    let label = LabelRef(str: title)
+    label.xalign = 0
+    label.setHexpand(expand: true)
+    content.append(child: label)
+    button.set(child: content)
+    button.onClicked { _ in action() }
+    return button
+}
+
+final class FocusedPanePathBar: @unchecked Sendable {
+    struct Actions {
+        let copy: (String) -> Void
+        let reveal: (String) -> Void
+        let openEditor: (InstalledEditor, String) -> Void
+        let insertCommand: (String) -> Void
+        let openURL: (URL) -> Void
+    }
+
+    let root = BoxRef(orientation: .horizontal, spacing: 8)
+    private let pathMenu = MenuButtonRef()
+    private let project = LabelRef(str: "")
+    private let path = LabelRef(str: "")
+    private let branchMenu = MenuButtonRef()
+    private let branchLabel = LabelRef(str: "")
+    private let dirty = LabelRef(str: "")
+    private let pullRequestMenu = MenuButtonRef()
+    private let pullRequestLabel = LabelRef(str: "")
+    private let ciMenu = MenuButtonRef()
+    private let ciLabel = LabelRef(str: "")
+    private let remote = LabelRef(str: "Remote")
+    private let actions: Actions
+    private var context: FocusedPaneContext?
+
+    init(actions: Actions) {
+        self.actions = actions
+        root.add(cssClass: "aw-pathbar")
+        root.setMarginStart(margin: 12)
+        root.setMarginEnd(margin: 12)
+
+        pathMenu.add(cssClass: "aw-path-menu")
+        pathMenu.set(hasFrame: false)
+        pathMenu.set(alwaysShowArrow: false)
+        pathMenu.set(canShrink: true)
+        let pathContent = BoxRef(orientation: .horizontal, spacing: 7)
+        let folder = ImageRef(iconName: "folder-symbolic")
+        folder.add(cssClass: "aw-path-project")
+        pathContent.append(child: folder)
+        project.add(cssClass: "aw-path-project")
+        project.setEllipsize(mode: PangoEllipsizeMode(rawValue: 3))
+        project.setMaxWidthChars(nChars: 28)
+        pathContent.append(child: project)
+        let divider = LabelRef(str: "│")
+        divider.add(cssClass: "aw-path-divider")
+        pathContent.append(child: divider)
+        path.add(cssClass: "aw-path-location")
+        path.setEllipsize(mode: PangoEllipsizeMode(rawValue: 2))
+        path.setMaxWidthChars(nChars: 48)
+        pathContent.append(child: path)
+        let chevron = LabelRef(str: "⌃")
+        chevron.add(cssClass: "aw-path-muted")
+        pathContent.append(child: chevron)
+        pathMenu.set(child: pathContent)
+        root.append(child: pathMenu)
+
+        let spacer = BoxRef(orientation: .horizontal, spacing: 0)
+        spacer.setHexpand(expand: true)
+        root.append(child: spacer)
+
+        configureChip(branchMenu, label: branchLabel, css: "aw-chip-branch")
+        dirty.add(cssClass: "aw-chip-dirty")
+        dirty.set(visible: false)
+        root.append(child: dirty)
+        configureChip(pullRequestMenu, label: pullRequestLabel, css: "aw-chip-pr")
+        configureChip(ciMenu, label: ciLabel, css: "aw-chip-ci")
+        remote.add(cssClass: "aw-chip-remote")
+        remote.set(visible: false)
+        root.append(child: remote)
+    }
+
+    private func configureChip(_ button: MenuButtonRef, label: LabelRef, css: String) {
+        button.add(cssClass: "aw-chip")
+        button.add(cssClass: css)
+        button.set(hasFrame: false)
+        button.set(alwaysShowArrow: false)
+        button.set(child: label)
+        button.set(visible: false)
+        root.append(child: button)
+    }
+
+    func updatePreview(_ value: FocusedPaneContext, isRemote: Bool) {
+        context = value
+        project.label = value.project
+        path.label = value.path
+        pathMenu.setTooltip(text: isRemote ? "Workspace options are unavailable for remote panes." : "Open workspace options.")
+        remote.set(visible: isRemote)
+        branchMenu.set(visible: false)
+        dirty.set(visible: false)
+        pullRequestMenu.set(visible: false)
+        ciMenu.set(visible: false)
+        guard !isRemote else {
+            pathMenu.set(sensitive: false)
+            return
+        }
+        pathMenu.set(sensitive: true)
+        pathMenu.set(popover: pathPopover(path: value.copyPath, editors: []))
+    }
+
+    func updateDetails(_ details: TerminalFooterDetails) {
+        guard context?.identity == details.context.identity else { return }
+        pathMenu.set(popover: pathPopover(path: details.repoRoot ?? details.context.copyPath, editors: details.editors))
+        if let branch = details.branch {
+            let arrows = [details.git?.ahead ?? 0 > 0 ? "↑\(capped(details.git?.ahead ?? 0))" : nil,
+                          details.git?.behind ?? 0 > 0 ? "↓\(capped(details.git?.behind ?? 0))" : nil]
+                .compactMap { $0 }.joined(separator: " ")
+            branchLabel.label = arrows.isEmpty ? "⌘ \(branch)" : "⌘ \(branch)  \(arrows)"
+            branchMenu.setTooltip(text: "Branch \(branch). Open branch options.")
+            branchMenu.set(popover: branchPopover(current: branch, branches: details.branches))
+            branchMenu.set(visible: true)
+        }
+        if let count = details.git?.dirtyCount, count > 0 {
+            dirty.label = "+\(capped(count))"
+            dirty.setTooltip(text: "\(count) changed working-copy entries")
+            dirty.set(visible: true)
+        }
+        if let pr = details.pullRequest {
+            pullRequestLabel.label = "PR #\(pr.number)"
+            pullRequestMenu.setTooltip(text: "Pull request #\(pr.number), \(pr.state == .draft ? "draft" : pr.state == .inReview ? "in review" : "open")")
+            pullRequestMenu.set(popover: pullRequestPopover(pr))
+            pullRequestMenu.set(visible: true)
+        }
+        if let ci = details.ci {
+            ciLabel.label = ci.state == .failing ? "CI ✕" : "CI …"
+            ciMenu.remove(cssClass: "aw-chip-ci-failing")
+            if ci.state == .failing { ciMenu.add(cssClass: "aw-chip-ci-failing") }
+            ciMenu.setTooltip(text: [ci.workflowName, ci.state == .failing ? "failing" : "running"].compactMap { $0 }.joined(separator: ": "))
+            ciMenu.set(popover: ciPopover(ci))
+            ciMenu.set(visible: true)
+        }
+    }
+
+    private func pathPopover(path: String, editors: [InstalledEditor]) -> PopoverRef {
+        let box = BoxRef(orientation: .vertical, spacing: 2)
+        let heading = LabelRef(str: "OPEN WITH")
+        heading.add(cssClass: "aw-menu-heading")
+        heading.xalign = 0
+        box.append(child: heading)
+        if editors.isEmpty {
+            let unavailable = LabelRef(str: "No supported editors found")
+            unavailable.add(cssClass: "aw-menu-disabled")
+            unavailable.xalign = 0
+            box.append(child: unavailable)
+        } else {
+            for editor in editors {
+                box.append(child: menuButton(editor.name, icon: "document-open-symbolic") { [weak self] in
+                    self?.actions.openEditor(editor, path); self?.pathMenu.popdown()
+                })
+            }
+        }
+        box.append(child: menuButton("Show in Files", icon: "folder-open-symbolic") { [weak self] in
+            self?.actions.reveal(path); self?.pathMenu.popdown()
+        })
+        box.append(child: menuButton("Copy Path", icon: "edit-copy-symbolic") { [weak self] in
+            self?.actions.copy(path); self?.pathMenu.popdown()
+        })
+        return menuPopover(box)
+    }
+
+    private func branchPopover(current: String, branches: [String]) -> PopoverRef {
+        let box = BoxRef(orientation: .vertical, spacing: 2)
+        box.append(child: menuButton("✓  \(current)") {})
+        for branch in branches.filter({ $0 != current }).prefix(12) {
+            box.append(child: menuButton(branch) { [weak self] in
+                self?.actions.insertCommand("git checkout \(TerminalFooterResolver.shellQuoted(branch))")
+                self?.branchMenu.popdown()
+            })
+        }
+        if branches.count > 13 {
+            let more = LabelRef(str: "+ \(branches.count - 13) more branches")
+            more.add(cssClass: "aw-menu-disabled")
+            more.xalign = 0
+            box.append(child: more)
+        }
+        box.append(child: menuButton("Copy Branch", icon: "edit-copy-symbolic") { [weak self] in
+            self?.actions.copy(current); self?.branchMenu.popdown()
+        })
+        return menuPopover(box)
+    }
+
+    private func pullRequestPopover(_ pr: PullRequestStatus) -> PopoverRef {
+        let box = BoxRef(orientation: .vertical, spacing: 2)
+        box.append(child: menuButton("Open Pull Request", icon: "web-browser-symbolic") { [weak self] in self?.actions.openURL(pr.url); self?.pullRequestMenu.popdown() })
+        box.append(child: menuButton("Copy Pull Request URL", icon: "edit-copy-symbolic") { [weak self] in self?.actions.copy(pr.url.absoluteString); self?.pullRequestMenu.popdown() })
+        box.append(child: menuButton("Check Out in Pane") { [weak self] in self?.actions.insertCommand("gh pr checkout \(pr.number)"); self?.pullRequestMenu.popdown() })
+        return menuPopover(box)
+    }
+
+    private func ciPopover(_ ci: CIStatus) -> PopoverRef {
+        let box = BoxRef(orientation: .vertical, spacing: 2)
+        box.append(child: menuButton("Open Workflow Run", icon: "web-browser-symbolic") { [weak self] in self?.actions.openURL(ci.url); self?.ciMenu.popdown() })
+        box.append(child: menuButton("Copy Workflow URL", icon: "edit-copy-symbolic") { [weak self] in self?.actions.copy(ci.url.absoluteString); self?.ciMenu.popdown() })
+        if let slug = ci.repoSlug {
+            let command = ci.state == .running
+                ? "gh run watch \(ci.runDatabaseID) --repo \(TerminalFooterResolver.shellQuoted(slug))"
+                : "gh run view \(ci.runDatabaseID) --repo \(TerminalFooterResolver.shellQuoted(slug)) --log-failed"
+            box.append(child: menuButton(ci.state == .running ? "Watch in Pane" : "Show Failure Log in Pane") { [weak self] in self?.actions.insertCommand(command); self?.ciMenu.popdown() })
+        }
+        return menuPopover(box)
+    }
+
+    private func capped(_ value: Int) -> String { value > 999 ? "999+" : String(value) }
+}
+
+final class SidebarStatusFooter {
+    struct Actions {
+        let selectPane: (UUID, UUID) -> Void
+        let updatePreferences: (AppPreferences) -> Void
+        let showWelcome: () -> Void
+        let reportBug: () -> Void
+        let suggestFeature: () -> Void
+        let showSettings: () -> Void
+    }
+
+    let root = BoxRef(orientation: .vertical, spacing: 0)
+    private let activityPanel = BoxRef(orientation: .vertical, spacing: 4)
+    private let activityRows = BoxRef(orientation: .vertical, spacing: 2)
+    private let thinking = LabelRef(str: "")
+    private let output = LabelRef(str: "")
+    private let attention = LabelRef(str: "")
+    private let total = ButtonRef()
+    private let totalLabel = LabelRef(str: "0 agents  ⌃")
+    private let quickSettings = MenuButtonRef()
+    private let actions: Actions
+    private var preferences: AppPreferences
+    private var isExpanded = false
+
+    init(preferences: AppPreferences, actions: Actions) {
+        self.preferences = preferences
+        self.actions = actions
+        activityPanel.add(cssClass: "aw-agent-panel")
+        activityPanel.setMarginStart(margin: 8)
+        activityPanel.setMarginEnd(margin: 8)
+        activityPanel.setMarginTop(margin: 6)
+        activityPanel.setMarginBottom(margin: 6)
+        let panelHeader = BoxRef(orientation: .horizontal, spacing: 4)
+        let heading = LabelRef(str: "AGENTS")
+        heading.add(cssClass: "aw-menu-heading")
+        heading.xalign = 0
+        heading.setHexpand(expand: true)
+        let close = ButtonRef(label: "×")
+        close.add(cssClass: "aw-icon-button")
+        close.setTooltip(text: "Hide agent activity")
+        close.onClicked { [weak self] _ in self?.setExpanded(false) }
+        panelHeader.append(child: heading)
+        panelHeader.append(child: close)
+        activityPanel.append(child: panelHeader)
+        let scroller = ScrolledWindowRef()
+        scroller.setPolicy(hscrollbarPolicy: .never, vscrollbarPolicy: .automatic)
+        scroller.maxContentHeight = 240
+        scroller.propagateNaturalHeight = true
+        scroller.set(child: activityRows)
+        activityPanel.append(child: scroller)
+        activityPanel.set(visible: false)
+        root.append(child: activityPanel)
+
+        let bar = BoxRef(orientation: .horizontal, spacing: 4)
+        bar.add(cssClass: "aw-sidebar-footer")
+        bar.setMarginStart(margin: 10)
+        bar.setMarginEnd(margin: 10)
+        quickSettings.add(cssClass: "aw-icon-menu")
+        quickSettings.set(hasFrame: false)
+        quickSettings.set(alwaysShowArrow: false)
+        quickSettings.set(iconName: "emblem-system-symbolic")
+        quickSettings.setTooltip(text: "Quick Settings")
+        quickSettings.set(popover: quickSettingsPopover())
+        bar.append(child: quickSettings)
+
+        let help = MenuButtonRef()
+        help.add(cssClass: "aw-icon-menu")
+        help.set(hasFrame: false)
+        help.set(alwaysShowArrow: false)
+        help.set(iconName: "help-about-symbolic")
+        help.setTooltip(text: "Help & Feedback")
+        let helpBox = BoxRef(orientation: .vertical, spacing: 2)
+        helpBox.append(child: menuButton("Show Welcome Tour") { [actions] in actions.showWelcome() })
+        helpBox.append(child: menuButton("Report a bug…") { [actions] in actions.reportBug() })
+        helpBox.append(child: menuButton("Suggest a feature…") { [actions] in actions.suggestFeature() })
+        help.set(popover: menuPopover(helpBox))
+        bar.append(child: help)
+
+        for (label, css) in [(thinking, "aw-agent-thinking"), (output, "aw-agent-output"), (attention, "aw-agent-attention")] {
+            label.add(cssClass: "aw-agent-state")
+            label.add(cssClass: css)
+            label.set(visible: false)
+            bar.append(child: label)
+        }
+        let spacer = BoxRef(orientation: .horizontal, spacing: 0)
+        spacer.setHexpand(expand: true)
+        bar.append(child: spacer)
+        total.add(cssClass: "aw-agent-total")
+        total.set(child: totalLabel)
+        total.setTooltip(text: "Show agent activity")
+        total.onClicked { [weak self] _ in self?.setExpanded(!(self?.isExpanded ?? false)) }
+        bar.append(child: total)
+        root.append(child: bar)
+    }
+
+    func update(_ summary: AgentFooterSummary) {
+        stateLabel(thinking, count: summary.thinkingCount, symbol: "●", name: "thinking")
+        stateLabel(output, count: summary.outputCount, symbol: "●", name: "output ready")
+        stateLabel(attention, count: summary.needsAttentionCount, symbol: "●", name: "needs attention")
+        totalLabel.label = "\(summary.totalCount) \(summary.totalCount == 1 ? "agent" : "agents")  \(isExpanded ? "⌄" : "⌃")"
+
+        var child = activityRows.getFirstChild()
+        while let current = child {
+            child = current.getNextSibling()
+            activityRows.remove(child: current)
+        }
+        if summary.rows.isEmpty {
+            let empty = LabelRef(str: "No agents running")
+            empty.add(cssClass: "aw-menu-disabled")
+            empty.setMarginTop(margin: 8)
+            empty.setMarginBottom(margin: 8)
+            activityRows.append(child: empty)
+        } else {
+            for row in summary.rows {
+                let title = "\(row.agent)  ·  \(row.workspace)"
+                let button = menuButton(title) { [actions] in actions.selectPane(row.workspaceID, row.paneID) }
+                button.setTooltip(text: "\(row.pane), \(row.state.rawValue)")
+                activityRows.append(child: button)
+            }
+        }
+    }
+
+    private func stateLabel(_ label: LabelRef, count: Int, symbol: String, name: String) {
+        label.label = "\(symbol) \(count)"
+        label.setTooltip(text: "\(count) \(name)")
+        label.set(visible: count > 0)
+    }
+
+    private func setExpanded(_ expanded: Bool) {
+        isExpanded = expanded
+        activityPanel.set(visible: expanded)
+        totalLabel.label = totalLabel.label.replacingOccurrences(of: expanded ? "⌃" : "⌄", with: expanded ? "⌄" : "⌃")
+        total.setTooltip(text: expanded ? "Hide agent activity" : "Show agent activity")
+    }
+
+    private func quickSettingsPopover() -> PopoverRef {
+        let box = BoxRef(orientation: .vertical, spacing: 5)
+        let title = LabelRef(str: "Quick settings")
+        title.add(cssClass: "aw-menu-title")
+        title.xalign = 0
+        box.append(child: title)
+        let themeHeading = LabelRef(str: "Theme")
+        themeHeading.add(cssClass: "aw-menu-heading")
+        themeHeading.xalign = 0
+        box.append(child: themeHeading)
+        let themes = BoxRef(orientation: .horizontal, spacing: 3)
+        for theme in AppTheme.allCases {
+            let button = ButtonRef(label: theme.rawValue)
+            button.add(cssClass: "aw-theme-choice")
+            if theme == preferences.theme { button.add(cssClass: "aw-selected") }
+            button.onClicked { [weak self] _ in
+                guard let self else { return }
+                self.preferences.theme = theme
+                self.actions.updatePreferences(self.preferences)
+                self.quickSettings.set(popover: self.quickSettingsPopover())
+            }
+            themes.append(child: button)
+        }
+        box.append(child: themes)
+        let notificationHeading = LabelRef(str: "Notifications")
+        notificationHeading.add(cssClass: "aw-menu-heading")
+        notificationHeading.xalign = 0
+        box.append(child: notificationHeading)
+        let mute = CheckButtonRef(label: "Mute notifications")
+        mute.active = preferences.notificationsMuted
+        mute.onToggled { [weak self] button in
+            guard let self else { return }
+            self.preferences.notificationsMuted = button.getActive()
+            self.actions.updatePreferences(self.preferences)
+        }
+        box.append(child: mute)
+        box.append(child: menuButton("More settings…") { [actions] in actions.showSettings() })
+        return menuPopover(box)
+    }
+}

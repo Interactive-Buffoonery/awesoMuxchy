@@ -4,7 +4,7 @@ Updated: 2026-08-28
 
 ## Current phase
 
-Viability, defensive restoration, and the first coherent sidebar/footer chrome
+Viability, defensive restoration, and the enriched sidebar/terminal footer
 milestone are complete and locally verified.
 
 ## Completed
@@ -33,7 +33,7 @@ milestone are complete and locally verified.
 - Sidebar rows switch complete workspaces through a native GTK stack. The
   Development workspace owns a two-pane split and Review owns an independent
   terminal, all without exposing Ghostty handles to application code.
-- Twenty-three state tests cover grouped snapshots, defensive limits, selection,
+- Thirty-two state tests cover grouped snapshots, defensive limits, selection,
   ordering, split/focus/close mutations, command chords, round trips,
   profile-scoped paths, owner-only persistence, quarantine, and recovery.
 - The app renders its GTK stack/sidebar directly from `SessionSnapshot`, and
@@ -47,8 +47,17 @@ milestone are complete and locally verified.
   `SessionSnapshot` state.
 - Every workspace page owns a 38-point path bar below its real Ghostty surface.
   Direct pane focus and sidebar switching update sanitized focused-pane context;
-  generation checks reject stale publication. Git/PR/actions remain absent
-  until their context is implemented truthfully.
+  generation checks reject stale publication. Validated local repositories add
+  branch, dirty/ahead/behind, PR, and failing/running CI chips plus branch,
+  browser, copy, Files, and discovered-editor actions. Remote panes suppress
+  local actions and show a remote indicator.
+- The pinned sidebar footer now includes Quick Settings, Help & Feedback,
+  state-prioritized agent counts, and an expandable activity list that returns
+  to the exact workspace/pane. System/Light/Dark and notification mute persist
+  in owner-only profile-scoped JSON.
+- Footer resolution runs concurrently off the GTK thread and publishes through
+  GLib's main context. Git/`gh` execution is non-shell, bounded, prompt-free,
+  output-capped, HTTPS-validated, and guarded against stale pane identity.
 
 ## Remaining vertical-slice hardening
 
@@ -58,6 +67,7 @@ milestone are complete and locally verified.
   clipboard teardown tests.
 - Close/recreate actions in the product UI rather than only the stress harness.
 - Arrow/Home/End list navigation, Orca state inspection, richer group actions,
-  and Git/PR path-bar enrichment remain after this chrome milestone.
+  foreground-shell detection, full settings panes, and agent runtime event
+  ingestion remain after this footer milestone.
 
 See `VIABILITY.md` for the checkpoint decision and evidence.
