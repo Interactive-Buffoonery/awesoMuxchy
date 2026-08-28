@@ -10,6 +10,16 @@ application and an awesoMux-owned Linux embedding shim around canonical
 Ghostty. This is a complete product port, not a visual mockup and not a small
 terminal demonstration.
 
+This repository deliberately contains two application tracks:
+
+- `swift-gtk/` is the active first implementation.
+- `rust-gtk/` is the prepared fallback implementation.
+
+Start with SwiftGtk4. Do not build both applications in parallel and do not
+silently switch to Rust. The shared product contract and Ghostty shim must stay
+language-neutral so verified work survives a later switch if SwiftGtk4 proves
+unsuitable.
+
 Continue through the full implementation plan. Do not stop after creating a
 window, rendering one terminal, or reproducing the broad layout. Keep an
 honest, current parity matrix and implementation-status document so another
@@ -208,7 +218,8 @@ every meaningful visual milestone:
    states where both exist.
 3. Capture screenshots at a recorded window size.
 4. Save them under
-   `artifacts/visual-qa/progress/<phase>/<descriptive-name>.png`.
+   `artifacts/visual-qa/<track>/progress/<phase>/<descriptive-name>.png`, where
+   `<track>` is `swift-gtk` or `rust-gtk`.
 5. Compare them directly with the equivalent pinned macOS reference
    screenshots.
 6. Inspect the actual image rather than assuming a successful launch means it
@@ -242,47 +253,23 @@ reproduced correctly. Record every deliberate difference in
 `PLATFORM_DIFFERENCES.md` with the reason and user effect. Do not use
 "platform-native" as a reason for broad visual drift.
 
-## Implementation architecture and language decision
+## Two-track implementation architecture
 
-The required choices are GTK4 for the native application and an awesoMux-owned
-shim around canonical Ghostty. Rust is recommended, but it is not mandatory.
+The repository has one shared product contract, one shared Ghostty shim, and
+two isolated GTK application folders. SwiftGtk4 is the active choice. Rust is a
+fallback that can use the same shim and product evidence without disrupting or
+deleting the Swift work.
 
-Before building the full application, create a short
-`docs/adr/0001-linux-language-and-gtk-binding.md` comparing the viable options
-against the real product requirements:
+Use:
 
-- Rust with `gtk4-rs`, plus a Zig/C Ghostty shim
-- Zig using GTK4's C interface directly
-- Vala
-- C++ with `gtkmm`
-- C
-- GJS/TypeScript, only if its native-library and lifecycle story is proven
-
-Python and Swift on Linux may be considered for completeness but should not be
-chosen without unusually strong evidence that they can support a production
-terminal, native callbacks, packaging, and long-term maintenance.
-
-The comparison must cover GTK API quality, Ghostty integration, memory and
-thread safety, input methods, accessibility, testing, debugging, packaging,
-developer experience, ecosystem health, and the cost of maintaining the app
-for years. Build a small lifecycle test for the leading choice: create a GTK
-surface, attach the shim, open and close it repeatedly, and verify cleanup.
-
-Default to Rust plus a narrow Zig/C shim if the evidence is close. A full Zig
-application is acceptable if the lifecycle test shows that direct Ghostty
-integration materially outweighs the extra GTK application complexity. Make
-the decision once, record it clearly, and continue; do not leave multiple
-half-built implementations.
-
-Whichever language is selected, use:
-
-- GTK4 through maintained bindings or its C interface
+- GTK4 through SwiftGtk4 in `swift-gtk/`
+- GTK4 through `gtk4-rs` in `rust-gtk/` if Sarah activates that track
 - plain GTK4 widgets with an awesoMux-owned design system and CSS
 - Libadwaita only for a narrowly justified platform facility; do not let its
   default visual language replace awesoMux's design
 - canonical Ghostty as a pinned Git submodule at `vendor/ghostty`
-- an awesoMux-owned shim named `awesomux-ghostty-gtk`
-- a narrow, explicit boundary between the Ghostty shim and application code
+- one shared, awesoMux-owned shim under `ghostty-shim/`
+- a narrow C ABI between the shared shim and either application
 - the maintained `Interactive-Buffoonery/zmx` fork, branded and invoked as
   `amx`, for persistent sessions where the macOS architecture requires it
 - SQLite or another clearly justified local store for durable application
@@ -290,29 +277,38 @@ Whichever language is selected, use:
 - structured logging without commands, terminal contents, secrets, or private
   paths leaking by default
 
-Organize the repository into clear packages, crates, or language-equivalent
-modules. For a Rust selection, a reasonable starting shape is:
+Use this repository shape:
 
 ```text
 AGENTS.md
 README.md
+AGENT_PROMPT.md
 REFERENCE_BASELINE.md
 FEATURE_PARITY_MATRIX.md
 IMPLEMENTATION_STATUS.md
 PLATFORM_DIFFERENCES.md
-Cargo.toml
-crates/
-  awesomux-app/
-  awesomux-core/
-  awesomux-ghostty-gtk/
-  awesomux-persistence/
-  awesomux-agents/
-  awesomux-ssh/
-resources/
-  css/
-  fonts/
-  icons/
-  text-baseline.json
+shared/
+  product-contract/
+  resources/
+    css/
+    fonts/
+    icons/
+    text-baseline.json
+ghostty-shim/
+  include/
+  src/
+  tests/
+swift-gtk/
+  AGENT_PROMPT.md
+  Package.swift
+  Sources/
+  Tests/
+  IMPLEMENTATION_STATUS.md
+rust-gtk/
+  AGENT_PROMPT.md
+  Cargo.toml
+  crates/
+  IMPLEMENTATION_STATUS.md
 script/
 patches/
   ghostty-linux-embedded/
@@ -322,9 +318,18 @@ vendor/
 tests/
 artifacts/
   visual-qa/
+    swift-gtk/
+    rust-gtk/
 ```
 
-Adjust this only when the working architecture provides a clear reason.
+Do not place Swift build products inside `rust-gtk/` or Rust build products
+inside `swift-gtk/`. Do not duplicate the Ghostty patch series, copied product
+text, fonts, icons, or reference screenshots between tracks. Each application
+may have a thin language-specific wrapper around the shared C ABI.
+
+Read the selected track's `AGENT_PROMPT.md` in full after this root prompt.
+Start in `swift-gtk/`. Leave `rust-gtk/` as a prompt and clean fallback until
+Sarah explicitly activates it.
 
 ## Build the shim independently
 
@@ -356,9 +361,9 @@ Keep its public interface small and stable. It should cover:
 - multiple simultaneously active surfaces
 - error reporting that does not crash the whole application
 
-Do not expose GTK or Ghostty raw pointers broadly through the application.
-Contain unsafe Rust, Zig, or C interop inside the shim module, document why each
-unsafe operation is valid, and test lifecycle boundaries.
+Do not expose GTK or Ghostty raw pointers broadly through either application.
+Contain Zig and C interop inside the shared shim and each track's thin wrapper,
+document why each unsafe operation is valid, and test lifecycle boundaries.
 
 Keep the Ghostty patch series as small as possible. Prefer a wrapper using
 existing public hooks. When a Ghostty internal change is unavoidable, place it
@@ -474,7 +479,8 @@ visual parity without actually running and inspecting the GTK application.
 
 ## Progress records
 
-Keep `IMPLEMENTATION_STATUS.md` updated with:
+Keep the root `IMPLEMENTATION_STATUS.md` and the active track's own
+`IMPLEMENTATION_STATUS.md` updated with:
 
 - current phase
 - completed work with verification evidence
@@ -489,7 +495,7 @@ inaccessible, or untested area is a coverage gap, never a successful result.
 
 ## Definition of done
 
-The project is done only when:
+The selected production track is done only when:
 
 - the Linux app is a real GTK4 application using the awesoMux-owned embedded
   Ghostty shim
@@ -510,5 +516,6 @@ The project is done only when:
 
 Begin by inspecting the machine and both reference projects, confirming the
 GitHub repository situation, recording the reference commit, and writing the
-parity matrix and implementation plan. Then proceed into implementation. Do
-not merely return a plan unless a real external blocker prevents safe progress.
+parity matrix and implementation plan. Then read `swift-gtk/AGENT_PROMPT.md`
+and proceed into the SwiftGtk4 implementation. Do not merely return a plan
+unless a real external blocker prevents safe progress.
