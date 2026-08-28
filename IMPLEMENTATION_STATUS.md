@@ -117,6 +117,10 @@ help, and agent context while preserving the compact reference geometry.
   label; the rail uses the same navigation order with distinct warning/pinned
   glyphs. Secondary-click menus provide real `New Workspace Here` and
   `Pin`/`Unpin` routes, and a real two-section fixture was inspected.
+- Workspace row actions now include sanitized rename, cross-group moves, and
+  bounded Pinned ordering. Rename refreshes regular, lifted, rail, search, and
+  persisted representations; moving preserves terminal/pane identity and
+  rebinds the row menu to its destination group.
 - A real inspected screenshot and comparison index were pushed in focused
   visual-QA commits `4149963` and `01cc8d7`.
 

@@ -8,6 +8,7 @@ public enum SessionMutationError: Error, Equatable {
     case invalidGroupName
     case duplicateGroupName
     case suspiciousGroupName
+    case invalidWorkspaceName
 }
 
 public extension PaneLayout {
@@ -183,6 +184,13 @@ public extension SessionSnapshot {
         groups[destination].workspaces.insert(workspace, at: insertion)
     }
 
+    mutating func renameWorkspace(_ workspaceID: UUID, to rawName: String) throws {
+        let name = ChromeText.sanitized(rawName, limit: 120)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !name.isEmpty else { throw SessionMutationError.invalidWorkspaceName }
+        try updateWorkspace(id: workspaceID) { $0.name = name }
+    }
+
     mutating func togglePinnedWorkspace(_ workspaceID: UUID) throws {
         guard workspaces.contains(where: { $0.id == workspaceID && !$0.isSoftClosed }) else {
             throw SessionMutationError.workspaceNotFound(workspaceID)
@@ -193,6 +201,16 @@ public extension SessionSnapshot {
             pinnedWorkspaceIDs.append(workspaceID)
             attentionWorkspaceIDs.removeAll { $0 == workspaceID }
         }
+    }
+
+    mutating func movePinnedWorkspace(_ workspaceID: UUID, offset: Int) throws {
+        guard let source = pinnedWorkspaceIDs.firstIndex(of: workspaceID) else {
+            throw SessionMutationError.workspaceNotFound(workspaceID)
+        }
+        let target = min(max(source + offset, 0), pinnedWorkspaceIDs.count - 1)
+        guard target != source else { return }
+        pinnedWorkspaceIDs.remove(at: source)
+        pinnedWorkspaceIDs.insert(workspaceID, at: target)
     }
 
     mutating func reconcileAttentionWorkspaceIDs() {

@@ -473,6 +473,38 @@ private func snapshot(_ workspaces: [WorkspaceSnapshot]) -> SessionSnapshot {
     #expect(throws: SessionValidationError.invalidSidebarProjectionIDs) { try invalid.validated() }
 }
 
+@Test func pinnedWorkspaceReorderIsBoundedAndIdentityBased() throws {
+    let first = workspace(panes: 1)
+    let second = workspace(panes: 1)
+    let third = workspace(panes: 1)
+    var value = snapshot([first, second, third])
+    value.pinnedWorkspaceIDs = [first.id, second.id, third.id]
+
+    try value.movePinnedWorkspace(second.id, offset: -1)
+    #expect(value.pinnedWorkspaceIDs == [second.id, first.id, third.id])
+    try value.movePinnedWorkspace(second.id, offset: -20)
+    #expect(value.pinnedWorkspaceIDs == [second.id, first.id, third.id])
+    try value.movePinnedWorkspace(first.id, offset: 20)
+    #expect(value.pinnedWorkspaceIDs == [second.id, third.id, first.id])
+    let unknown = UUID()
+    #expect(throws: SessionMutationError.workspaceNotFound(unknown)) {
+        try value.movePinnedWorkspace(unknown, offset: 1)
+    }
+}
+
+@Test func workspaceRenameSanitizesTextAndPreservesDuplicateIdentity() throws {
+    let first = workspace(panes: 1)
+    let second = workspace(panes: 1)
+    var value = snapshot([first, second])
+    try value.renameWorkspace(first.id, to: "  Shared\nName  ")
+    try value.renameWorkspace(second.id, to: "SharedName")
+    #expect(value.workspace(id: first.id)?.name == "SharedName")
+    #expect(value.workspace(id: second.id)?.name == "SharedName")
+    #expect(throws: SessionMutationError.invalidWorkspaceName) {
+        try value.renameWorkspace(first.id, to: " \n ")
+    }
+}
+
 @Test func sidebarPresentationPolicyMirrorsBothEdgesAndAttentionDiscovery() {
     #expect(SidebarPresentationPolicy.proximity(pointerX: 39, containerWidth: 1_000, position: .left) == .revealed)
     #expect(SidebarPresentationPolicy.proximity(pointerX: 961, containerWidth: 1_000, position: .right) == .revealed)

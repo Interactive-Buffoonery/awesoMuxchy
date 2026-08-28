@@ -30,7 +30,7 @@ private func setAccessibleLabel<T: Gtk.AccessibleProtocol>(_ accessible: T, _ la
 
 private final class ApplicationState: @unchecked Sendable {
     private final class WorkspaceRuntime {
-        let groupID: UUID
+        var groupID: UUID
         let pageName: String
         let pathBar: FocusedPanePathBar
         var focusedPaneID: UUID
@@ -113,6 +113,7 @@ private final class ApplicationState: @unchecked Sendable {
     private var rows: [UUID: ToggleButtonRef] = [:]
     private var railRows: [UUID: ToggleButtonRef] = [:]
     private var metadata: [UUID: LabelRef] = [:]
+    private var workspaceTitles: [UUID: LabelRef] = [:]
     private var workspaceIDsByGroup: [UUID: [UUID]] = [:]
     private var groupRoots: [UUID: BoxRef] = [:]
     private var groupBodies: [UUID: BoxRef] = [:]
@@ -579,7 +580,9 @@ private final class ApplicationState: @unchecked Sendable {
 
     func makeRow(workspace: WorkspaceSnapshot, groupID: UUID) -> ToggleButtonRef {
         let row = ToggleButtonRef(); row.add(cssClass: "aw-row"); row.setHalign(align: .fill)
-        let groupColor = snapshot.groups.first(where: { $0.id == groupID })?.color ?? .blue
+        let groupIndex = snapshot.groups.firstIndex(where: { $0.id == groupID }) ?? 0
+        let group = snapshot.groups[groupIndex]
+        let groupColor = SidebarTintProjection.resolvedColor(for: group, unfilteredIndex: groupIndex)
         row.add(cssClass: "aw-\(groupColor.rawValue)")
         let content = BoxRef(orientation: .horizontal, spacing: 10)
         let shell = LabelRef(str: ">_"); shell.add(cssClass: "aw-shell"); shell.setSizeRequest(width: 32, height: 32)
@@ -597,7 +600,7 @@ private final class ApplicationState: @unchecked Sendable {
         details.append(child: name); details.append(child: meta); content.append(child: details); row.set(child: content)
         row.onClicked { [weak self] _ in self?.select(workspace.id) }
         installWorkspaceContextMenu(on: row, workspaceID: workspace.id, groupID: groupID)
-        rows[workspace.id] = row; metadata[workspace.id] = meta
+        rows[workspace.id] = row; metadata[workspace.id] = meta; workspaceTitles[workspace.id] = name
         if !(workspaceIDsByGroup[groupID] ?? []).contains(workspace.id) { workspaceIDsByGroup[groupID, default: []].append(workspace.id) }
         return row
     }
@@ -645,8 +648,25 @@ private final class ApplicationState: @unchecked Sendable {
             button.onClicked { _ in run(); popover.popdown() }; box.append(child: button); return button
         }
         _ = action("New Workspace Here") { [weak self] in self?.createWorkspace(here: workspaceID, fallbackGroupID: groupID) }
+        _ = action("Rename Workspace...") { [weak self] in self?.presentWorkspaceNameDialog(workspaceID) }
         let pin = action(snapshot.pinnedWorkspaceIDs.contains(workspaceID) ? "Unpin" : "Pin") { [weak self] in
             self?.togglePinned(workspaceID)
+        }
+        if isLifted, let pinnedIndex = snapshot.pinnedWorkspaceIDs.firstIndex(of: workspaceID) {
+            if pinnedIndex > 0 {
+                _ = action("Move Workspace Up") { [weak self] in self?.movePinned(workspaceID, offset: -1) }
+            }
+            if pinnedIndex < snapshot.pinnedWorkspaceIDs.count - 1 {
+                _ = action("Move Workspace Down") { [weak self] in self?.movePinned(workspaceID, offset: 1) }
+            }
+        }
+        let otherGroups = snapshot.groups.filter { $0.id != groupID }
+        if !otherGroups.isEmpty {
+            let heading = LabelRef(str: "Move to Group…"); heading.add(cssClass: "aw-menu-heading"); heading.xalign = 0
+            box.append(child: heading)
+            for group in otherGroups {
+                _ = action(group.name) { [weak self] in self?.moveWorkspace(workspaceID, to: group.id) }
+            }
         }
         if isLifted { liftedPinActions[workspaceID] = pin } else { regularPinActions[workspaceID] = pin }
         popover.set(child: box); gtk_widget_set_parent(popover.widget_ptr, row.widget_ptr)
@@ -674,6 +694,73 @@ private final class ApplicationState: @unchecked Sendable {
         liftedPinActions[workspaceID]?.label = isPinned ? "Unpin" : "Pin"
         refreshLiftedRows()
         persist()
+    }
+
+    private func movePinned(_ workspaceID: UUID, offset: Int) {
+        guard (try? snapshot.movePinnedWorkspace(workspaceID, offset: offset)) != nil else { return }
+        refreshLiftedRows()
+        persist()
+    }
+
+    func presentWorkspaceNameDialog(_ workspaceID: UUID) {
+        guard let workspace = snapshot.workspace(id: workspaceID) else { return }
+        let window = WindowRef(); window.title = "Rename Workspace"; window.setDefaultSize(width: 420, height: 170)
+        let box = BoxRef(orientation: .vertical, spacing: 12)
+        box.setMarginStart(margin: 20); box.setMarginEnd(margin: 20)
+        box.setMarginTop(margin: 20); box.setMarginBottom(margin: 20)
+        let heading = LabelRef(str: "Rename Workspace"); heading.add(cssClass: "aw-menu-title"); heading.xalign = 0
+        let entry = EntryRef(); entry.text = workspace.name; entry.setPlaceholder(text: "Workspace name")
+        let actions = BoxRef(orientation: .horizontal, spacing: 8); actions.setHalign(align: .end)
+        let cancel = ButtonRef(label: "Cancel"); let confirm = ButtonRef(label: "Rename")
+        cancel.onClicked { [window] _ in window.close() }
+        confirm.onClicked { [weak self, window, entry] _ in
+            guard self?.renameWorkspace(workspaceID, to: entry.text ?? "") == true else { return }
+            window.close()
+        }
+        actions.append(child: cancel); actions.append(child: confirm)
+        box.append(child: heading); box.append(child: entry); box.append(child: actions)
+        window.set(child: box); window.present(); _ = entry.grabFocus()
+    }
+
+    @discardableResult private func renameWorkspace(_ workspaceID: UUID, to name: String) -> Bool {
+        guard (try? snapshot.renameWorkspace(workspaceID, to: name)) != nil,
+              let workspace = snapshot.workspace(id: workspaceID) else {
+            showInformation(title: "Rename Workspace", body: "Enter a visible workspace name.")
+            return false
+        }
+        let safeName = ChromeText.sanitized(workspace.name, limit: 120)
+        workspaceTitles[workspaceID]?.label = safeName
+        railRows[workspaceID]?.setTooltip(text: safeName)
+        refreshLiftedRows(); persist()
+        return true
+    }
+
+    private func moveWorkspace(_ workspaceID: UUID, to groupID: UUID) {
+        guard let sourceID = snapshot.groups.first(where: { $0.workspaces.contains { $0.id == workspaceID } })?.id,
+              let destination = snapshot.groups.first(where: { $0.id == groupID }),
+              (try? snapshot.moveWorkspace(workspaceID, toGroup: groupID, at: destination.workspaces.count)) != nil
+        else { return }
+        workspaceIDsByGroup[sourceID]?.removeAll { $0 == workspaceID }
+        workspaceIDsByGroup[groupID, default: []].append(workspaceID)
+        let previousDestinationRow = destination.workspaces.last.flatMap { rows[$0.id] }
+        if let row = rows[workspaceID], let body = groupBodies[groupID] {
+            if let controller = workspaceContextControllers.removeValue(forKey: workspaceID) {
+                gtk_widget_remove_controller(row.widget_ptr, controller.event_controller_ptr)
+            }
+            workspaceContextPopovers.removeValue(forKey: workspaceID)?.unparent()
+            row.unparent()
+            for color in WorkspaceGroupColor.allCases { row.remove(cssClass: "aw-\(color.rawValue)") }
+            let destinationIndex = snapshot.groups.firstIndex(where: { $0.id == groupID }) ?? 0
+            let color = SidebarTintProjection.resolvedColor(for: destination, unfilteredIndex: destinationIndex)
+            row.add(cssClass: "aw-\(color.rawValue)")
+            body.append(child: row)
+            body.reorderChildAfter(child: row, sibling: previousDestinationRow)
+            installWorkspaceContextMenu(on: row, workspaceID: workspaceID, groupID: groupID)
+        }
+        runtimes[workspaceID]?.groupID = groupID
+        groupCounts[sourceID]?.label = "\(snapshot.groups.first(where: { $0.id == sourceID })?.workspaces.filter { !$0.isSoftClosed }.count ?? 0)"
+        groupCounts[groupID]?.label = "\(snapshot.groups.first(where: { $0.id == groupID })?.workspaces.filter { !$0.isSoftClosed }.count ?? 0)"
+        refreshLiftedRows(); persist()
     }
 
     func refreshLiftedRows() {
@@ -899,6 +986,7 @@ private final class ApplicationState: @unchecked Sendable {
         let search = SearchEntryRef(); search.setPlaceholder(text: "Search workspaces and actions...")
         let results = BoxRef(orientation: .vertical, spacing: 3)
         let implemented: Set<CommandID> = [.newWorkspace, .newWorkspaceInCurrentDirectory,
+            .renameWorkspace,
             .previousWorkspace, .nextWorkspace, .previousPane, .nextPane,
             .toggleSidebarWidth, .toggleSidebarVisibility]
         var commandRows: [(String, ButtonRef)] = []
@@ -926,6 +1014,7 @@ private final class ApplicationState: @unchecked Sendable {
 
     func installCommands(on application: Gtk.ApplicationRef) {
         let implemented: Set<CommandID> = [.newWorkspace, .newWorkspaceInCurrentDirectory,
+            .renameWorkspace,
             .previousWorkspace, .nextWorkspace, .previousPane, .nextPane,
             .toggleSidebarWidth, .toggleSidebarVisibility]
         let menu = GIO.Menu()
@@ -960,6 +1049,7 @@ private final class ApplicationState: @unchecked Sendable {
         if command == .newWorkspaceInCurrentDirectory { createWorkspaceInCurrentDirectory(); return }
         guard let selected = snapshot.selectedWorkspaceID, let runtime = runtimes[selected] else { return }
         switch command {
+        case .renameWorkspace: presentWorkspaceNameDialog(selected)
         case .toggleSidebarWidth: toggleSidebarWidth()
         case .toggleSidebarVisibility: toggleSidebarVisibility()
         case .previousWorkspace: selectRelative(-1)
@@ -1178,6 +1268,7 @@ private final class ApplicationState: @unchecked Sendable {
             runtimes.removeValue(forKey: workspace.id)
             rows.removeValue(forKey: workspace.id)
             metadata.removeValue(forKey: workspace.id)
+            workspaceTitles.removeValue(forKey: workspace.id)
             regularPinActions.removeValue(forKey: workspace.id)
             if let rail = railRows.removeValue(forKey: workspace.id) { sidebarRailRows?.remove(child: rail) }
         }

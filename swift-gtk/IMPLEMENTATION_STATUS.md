@@ -107,7 +107,9 @@ geometry and state styling have also passed a real-window visual correction.
   GTK renders non-collapsible Needs Input and Pinned sections above ownership
   groups, preserves origin tint/labels, mirrors order and semantic glyphs in
   the rail, and routes selection to the authoritative workspace. Secondary
-  click exposes implemented `New Workspace Here` and `Pin`/`Unpin` actions.
+  click exposes implemented `New Workspace Here`, rename, cross-group move,
+  and `Pin`/`Unpin` actions. Pinned rows additionally expose bounded
+  identity-based `Move Workspace Up/Down`; moves retain terminal runtimes.
   Unanswered-turn ingestion, acknowledgement timing, reorder DnD, and AT-SPI
   announcements remain pending.
 
