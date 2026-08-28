@@ -237,3 +237,18 @@ private func snapshot(_ workspaces: [WorkspaceSnapshot]) -> SessionSnapshot {
         try snapshot([closed]).validated()
     }
 }
+
+@Test func addingWorkspaceSelectsItInsideRequestedGroup() throws {
+    let initial = workspace(panes: 1)
+    var value = snapshot([initial])
+    let pane = PaneSnapshot(title: "new", workingDirectory: "/tmp")
+    let added = WorkspaceSnapshot(
+        name: "Untitled Workspace",
+        focusedPaneID: pane.id,
+        layout: .pane(pane)
+    )
+    try value.addWorkspace(added, toGroup: value.groups[0].id)
+    #expect(value.groups[0].workspaces.map(\.id) == [initial.id, added.id])
+    #expect(value.selectedWorkspaceID == added.id)
+    #expect(try value.validated() == value)
+}

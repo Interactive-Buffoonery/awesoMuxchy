@@ -82,6 +82,7 @@ private final class ApplicationState {
     private var workspaces: [UUID: WorkspaceRuntime] = [:]
     private var workspaceRows: [UUID: ButtonRef] = [:]
     private var workspaceStack: StackRef?
+    private var workspaceSidebar: BoxRef?
     private var commandActions: [GIO.SimpleAction] = []
     private var commandMenu: GIO.Menu?
 
@@ -144,12 +145,23 @@ private final class ApplicationState {
         surfacesByPaneID[paneID]
     }
 
+    private func discardSurface(paneID: UUID) {
+        guard let surface = surfacesByPaneID.removeValue(forKey: paneID) else { return }
+        workspaceIDByPaneID.removeValue(forKey: paneID)
+        surfaces.removeAll { $0 === surface }
+    }
+
     func installChromeStyles(for widget: WidgetRef) {
         gtk_style_context_add_provider_for_display(
             widget.getDisplay().display_ptr,
             chromeStyles.styleProvider.style_provider_ptr,
             UInt32(GTK_STYLE_PROVIDER_PRIORITY_APPLICATION)
         )
+    }
+
+    func attachWorkspaceChrome(stack: StackRef, sidebar: BoxRef) {
+        workspaceStack = stack
+        workspaceSidebar = sidebar
     }
 
     func install(
@@ -200,6 +212,7 @@ private final class ApplicationState {
 
     func installCommands(on application: Gtk.ApplicationRef) {
         let implemented: Set<CommandID> = [
+            .newWorkspace, .newWorkspaceInCurrentDirectory,
             .previousWorkspace, .nextWorkspace, .previousPane, .nextPane,
         ]
         let menu = GIO.Menu()
@@ -259,6 +272,13 @@ private final class ApplicationState {
     }
 
     private func perform(_ command: CommandID) {
+        switch command {
+        case .newWorkspace, .newWorkspaceInCurrentDirectory:
+            createWorkspaceInCurrentDirectory()
+            return
+        default:
+            break
+        }
         guard let selectedWorkspaceID = snapshot.selectedWorkspaceID,
               let workspace = workspaces[selectedWorkspaceID]
         else { return }
@@ -274,6 +294,62 @@ private final class ApplicationState {
         default:
             break
         }
+    }
+
+    private func createWorkspaceInCurrentDirectory() {
+        guard let stack = workspaceStack,
+              let sidebar = workspaceSidebar,
+              let groupID = snapshot.groups.first?.id
+        else { return }
+        let workingDirectory = snapshot.selectedWorkspace.flatMap { workspace in
+            workspace.layout.pane(id: workspace.focusedPaneID)?.workingDirectory
+        } ?? FileManager.default.currentDirectoryPath
+        let pane = PaneSnapshot(
+            title: "Primary terminal",
+            workingDirectory: workingDirectory
+        )
+        let workspace = WorkspaceSnapshot(
+            name: "Untitled Workspace",
+            focusedPaneID: pane.id,
+            layout: .pane(pane)
+        )
+        guard let surface = makeSurface(
+            pane: pane,
+            workspaceID: workspace.id,
+            accessibleLabel: "Untitled Workspace Primary terminal",
+            accessibleDescription: "Terminal pane 1 of 1 in the Untitled Workspace workspace"
+        ) else { return }
+
+        do {
+            try snapshot.addWorkspace(workspace, toGroup: groupID)
+        } catch {
+            discardSurface(paneID: pane.id)
+            return
+        }
+        let page = BoxRef(orientation: .vertical, spacing: 0)
+        page.append(child: surface.widget)
+        let pageName = workspace.id.uuidString
+        _ = pageName.withCString { stack.addNamed(child: page, name: $0) }
+        let row = ButtonRef(label: workspace.name)
+        row.add(cssClass: "aw-workspace-row")
+        row.setHalign(align: .fill)
+        row.setMarginTop(margin: 8)
+        row.setMarginBottom(margin: 8)
+        row.onClicked { [weak self] _ in
+            self?.selectWorkspace(workspace.id)
+        }
+        sidebar.append(child: row)
+        install(
+            stack: stack,
+            workspaceID: workspace.id,
+            pageName: pageName,
+            root: WidgetRef(page),
+            surfaces: [surface],
+            focusedPaneID: pane.id,
+            focusedSurface: surface,
+            row: row
+        )
+        selectWorkspace(workspace.id)
     }
 
     private func selectRelativeWorkspace(offset: Int) {
@@ -387,6 +463,7 @@ private func buildWindow(for application: Gtk.ApplicationRef) {
     stack.setVexpand(expand: true)
     stack.set(hhomogeneous: true)
     stack.set(vhomogeneous: true)
+    state.attachWorkspaceChrome(stack: stack, sidebar: sidebar)
 
     func buildLayout(
         _ layout: PaneLayout,

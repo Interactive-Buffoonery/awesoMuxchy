@@ -60,6 +60,15 @@ public indirect enum PaneLayout: Codable, Equatable, Sendable {
         }
     }
 
+    public func pane(id: UUID) -> PaneSnapshot? {
+        switch self {
+        case let .pane(pane):
+            return pane.id == id ? pane : nil
+        case let .split(_, _, first, second):
+            return first.pane(id: id) ?? second.pane(id: id)
+        }
+    }
+
     func validateStructure(depth: Int = 0) throws {
         guard depth <= 32 else { throw SessionValidationError.layoutTooDeep }
         switch self {
