@@ -142,6 +142,57 @@ private func snapshot(_ workspaces: [WorkspaceSnapshot]) -> SessionSnapshot {
     #expect(value.groups[0].workspaces.map(\.id) == [second.id, first.id])
 }
 
+@Test func groupMutationsPreserveIdentityOrderSelectionAndSafeNames() throws {
+    let first = workspace(panes: 1)
+    let second = workspace(panes: 1)
+    var value = SessionSnapshot(
+        selectedWorkspaceID: first.id,
+        groups: [
+            WorkspaceGroupSnapshot(name: "Alpha", workspaces: [first, second]),
+            WorkspaceGroupSnapshot(name: "Beta", workspaces: [])
+        ]
+    )
+    let betaID = value.groups[1].id
+    let gammaID = try value.addGroup(named: "  Gamma\u{202E}  ", color: .teal)
+    #expect(value.groups.last?.id == gammaID)
+    #expect(value.groups.last?.name == "Gamma")
+    #expect(value.groups.last?.color == .teal)
+    #expect(throws: SessionMutationError.duplicateGroupName) { try value.addGroup(named: "gÁmma") }
+    #expect(throws: SessionMutationError.invalidGroupName) { try value.addGroup(named: "\n\t") }
+    #expect(throws: SessionMutationError.suspiciousGroupName) { try value.addGroup(named: "Lοcal") }
+
+    try value.renameGroup(betaID, to: "Delivery")
+    try value.setGroupColor(betaID, color: .mauve)
+    try value.moveGroup(gammaID, offset: -2)
+    #expect(value.groups.map(\.id) == [gammaID, value.groups[1].id, betaID])
+    #expect(value.groups.last?.name == "Delivery")
+    #expect(value.groups.last?.color == .mauve)
+
+    try value.moveWorkspace(first.id, toGroup: betaID, at: 0)
+    #expect(value.groups.last?.workspaces.map(\.id) == [first.id])
+    #expect(value.selectedWorkspaceID == first.id)
+    let removed = try value.closeGroup(betaID)
+    #expect(removed == [first.id])
+    #expect(value.selectedWorkspaceID == second.id)
+    #expect(!value.groups.contains(where: { $0.id == betaID }))
+}
+
+@Test func movingWorkspaceUsesPostRemovalIndicesAndClampsAtGroupEdges() throws {
+    let first = workspace(panes: 1)
+    let second = workspace(panes: 1)
+    let third = workspace(panes: 1)
+    let destination = WorkspaceGroupSnapshot(name: "Destination", workspaces: [])
+    var value = SessionSnapshot(
+        selectedWorkspaceID: second.id,
+        groups: [WorkspaceGroupSnapshot(name: "Source", workspaces: [first, second, third]), destination]
+    )
+    try value.moveWorkspace(first.id, toGroup: value.groups[0].id, at: 99)
+    #expect(value.groups[0].workspaces.map(\.id) == [second.id, third.id, first.id])
+    try value.moveWorkspace(third.id, toGroup: destination.id, at: -4)
+    #expect(value.groups[0].workspaces.map(\.id) == [second.id, first.id])
+    #expect(value.groups[1].workspaces.map(\.id) == [third.id])
+}
+
 @Test func profilePathsRejectTraversalAndUseXDGStateHome() throws {
     #expect(throws: SessionProfileError.invalidProfileName) {
         try SessionProfilePaths(profile: "../other")
@@ -273,6 +324,19 @@ private func snapshot(_ workspaces: [WorkspaceSnapshot]) -> SessionSnapshot {
         #expect(SidebarChromeProjection.footerMinimumHeight == 38)
         #expect(projection.groups[0].rows.count == count)
     }
+}
+
+@Test func sidebarAutomaticTintCycleReservesMauveAndPeach() {
+    let groups = (0..<9).map { WorkspaceGroupSnapshot(name: "Group \($0)", workspaces: []) }
+    let snapshot = SessionSnapshot(groups: groups)
+    let colors = SidebarChromeProjection(snapshot: snapshot).groups.compactMap(\.color)
+    #expect(colors == [.teal, .green, .blue, .pink, .yellow, .red, .gray, .teal, .green])
+    #expect(!colors.contains(.mauve))
+    #expect(!colors.contains(.peach))
+    let special = WorkspaceGroupSnapshot(name: "awesoMux", workspaces: [])
+    #expect(SidebarTintProjection.resolvedColor(for: special, unfilteredIndex: 3) == .mauve)
+    let explicit = WorkspaceGroupSnapshot(name: "Explicit", color: .peach, workspaces: [])
+    #expect(SidebarTintProjection.resolvedColor(for: explicit, unfilteredIndex: 0) == .peach)
 }
 
 @Test func sidebarWidthPolicyMatchesReferenceModesAndRestoration() {

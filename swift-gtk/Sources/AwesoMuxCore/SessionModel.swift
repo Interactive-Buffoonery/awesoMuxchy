@@ -165,6 +165,12 @@ public struct SessionSnapshot: Codable, Equatable, Sendable {
         guard Set(groupIDs).count == groupIDs.count else {
             throw SessionValidationError.duplicateGroupID
         }
+        for group in groups {
+            let name = group.name.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !name.isEmpty, group.name.utf8.count <= 512 else {
+                throw SessionValidationError.invalidGroupName(group.id)
+            }
+        }
         let workspaceIDs = workspaces.map(\.id)
         guard workspaceIDs.count <= 512 else {
             throw SessionValidationError.snapshotLimitExceeded
@@ -210,6 +216,7 @@ public enum SessionValidationError: Error, Equatable {
     case snapshotLimitExceeded
     case invalidPaneText(UUID)
     case invalidWorkspaceName(UUID)
+    case invalidGroupName(UUID)
 }
 
 public enum CloseDecision: Equatable, Sendable {

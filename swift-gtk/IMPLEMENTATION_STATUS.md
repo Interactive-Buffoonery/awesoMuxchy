@@ -90,6 +90,17 @@ geometry and state styling have also passed a real-window visual correction.
   focus to the terminal, Up/Down moves a distinct current-result outline, and
   Return selects that workspace using projection order. Substring highlight
   ranges remain pending.
+- Group mutations now cover sanitized unique create/rename, explicit color,
+  stable-ID reorder, cross-group workspace insertion, and populated close with
+  replacement selection. Native GTK group menus expose only implemented
+  routes, dynamically gate move/close during filtering, confirm destructive
+  close, and keep a creation row after each expanded group's workspaces.
+  Automatic tint cycling and the awesoMux/mauve exception are tested.
+- The expanded header now uses separate 30-point primary and 24-point options
+  segments; the collapsed rail uses a 40-point creation menu. Default versus
+  current-directory creation resolve different directory/group contexts at
+  activation and share a 400 ms duplicate guard. Quick Settings now applies
+  persisted Standard/Compact sidebar density live.
 
 ## Remaining vertical-slice hardening
 

@@ -5,6 +5,7 @@ import Dispatch
 import Foundation
 import GIO
 import GLib
+import GLibObject
 import Gtk
 import Pango
 
@@ -19,6 +20,12 @@ private func performOnGTKMain(_ action: @escaping () -> Void) {
         guard let data else { return }
         Unmanaged<GTKMainLoopWork>.fromOpaque(data).takeRetainedValue().action()
     }, data: pointer)
+}
+
+private func setAccessibleLabel<T: Gtk.AccessibleProtocol>(_ accessible: T, _ label: String) {
+    var property = GTK_ACCESSIBLE_PROPERTY_LABEL
+    let value = GLibObject.Value(label)
+    accessible.updatePropertyValue(nProperties: 1, properties: &property, values: value.value_ptr)
 }
 
 private final class ApplicationState: @unchecked Sendable {
@@ -52,11 +59,13 @@ private final class ApplicationState: @unchecked Sendable {
       entry.aw-search,.aw-search{min-height:30px;color:#cdd6f4;background-color:#313244;background-image:none;border:1px solid #45475a;border-radius:7px;font-size:11px;box-shadow:none;}
       entry.aw-search text,.aw-search text,.aw-search-text{color:#cdd6f4;background-color:#313244;background-image:none;border-color:#45475a;border-radius:7px;box-shadow:none;caret-color:#cdd6f4;}
       button.aw-add{min-width:30px;min-height:30px;padding:0;color:#a6adc8;background:#313244;border:1px solid #45475a;border-radius:7px;font-size:18px;}
-      button.aw-rail-control,button.aw-rail-row{min-width:40px;min-height:40px;padding:0;color:#a6adc8;background:transparent;border:1px solid transparent;border-radius:8px;font-family:monospace;font-size:12px;font-weight:700;}
-      button.aw-rail-control:hover,button.aw-rail-row:hover{color:#cdd6f4;background:rgba(205,214,244,.07);}button.aw-rail-row:checked{color:#cdd6f4;background:#313244;border-color:rgba(137,180,250,.55);box-shadow:inset 3px 0 #89b4fa;}
+      .aw-create-split{min-height:30px;background:#313244;border:1px solid #45475a;border-radius:7px;}button.aw-create-primary{min-width:30px;min-height:28px;padding:0;color:#a6adc8;background:transparent;border:0;border-radius:6px 0 0 6px;font-size:16px;}menubutton.aw-create-options>button{min-width:24px;min-height:28px;padding:0;color:#a6adc8;background:transparent;border:0;border-left:1px solid #45475a;border-radius:0 6px 6px 0;}
+      button.aw-rail-control,menubutton.aw-rail-control>button,button.aw-rail-row{min-width:40px;min-height:40px;padding:0;color:#a6adc8;background:transparent;border:1px solid transparent;border-radius:8px;font-family:monospace;font-size:12px;font-weight:700;}
+      button.aw-rail-control:hover,menubutton.aw-rail-control>button:hover,button.aw-rail-row:hover{color:#cdd6f4;background:rgba(205,214,244,.07);}button.aw-rail-row:checked{color:#cdd6f4;background:#313244;border-color:rgba(137,180,250,.55);box-shadow:inset 3px 0 #89b4fa;}
       .aw-rail{min-width:60px;background:#181825;border-right:1px solid #313244;}.aw-rail-footer{min-height:38px;border-top:1px solid #313244;}
       button.aw-add:hover{color:#cdd6f4;background:#3a3b4d;}button.aw-group{min-height:22px;padding:0 4px;color:#7f849c;background:transparent;border:0;font-family:monospace;font-size:10px;font-weight:700;letter-spacing:1px;}
       button.aw-group:hover{color:#a6adc8;background:transparent;}.aw-count{color:#6c7086;font-size:10px;}.aw-marker{font-size:9px;}
+      button.aw-group-options{min-width:24px;min-height:24px;padding:0;color:#7f849c;background:transparent;border:0;border-radius:5px;}button.aw-group-options:hover{color:#cdd6f4;background:rgba(205,214,244,.08);}button.aw-new-in-group{min-height:28px;padding:3px 8px;color:#7f849c;background:transparent;border:1px dashed #45475a;border-radius:7px;font-size:10px;}
       .aw-mauve{color:#cba6f7;}.aw-peach{color:#fab387;}.aw-green{color:#a6e3a1;}.aw-teal{color:#94e2d5;}.aw-blue{color:#89b4fa;}.aw-pink{color:#f5c2e7;}.aw-yellow{color:#f9e2af;}.aw-red{color:#f38ba8;}.aw-gray{color:#9399b2;}.aw-sky{color:#89dceb;}.aw-lavender{color:#b4befe;}
       button.aw-row{min-height:48px;padding:7px 8px;color:#bac2de;background:transparent;border:1px solid transparent;border-radius:8px;}
       button.aw-row:hover{background:rgba(205,214,244,.06);}button.aw-row:checked{color:#cdd6f4;background:#313244;border-color:rgba(205,214,244,.14);box-shadow:inset 3px 0 #89b4fa;}
@@ -91,6 +100,7 @@ private final class ApplicationState: @unchecked Sendable {
       .theme-light .aw-sidebar,.theme-light .aw-sidebar-footer,.theme-light .aw-pathbar,.theme-light .aw-agent-panel{background:#e6e9ef;border-color:#bcc0cc;}
       .theme-light .aw-brand{color:#4c4f69;background:#dce0e8;border-color:#bcc0cc;}.theme-light .aw-row-title,.theme-light .aw-path-project{color:#4c4f69;}
       .theme-light .aw-row-meta,.theme-light .aw-path-location,.theme-light .aw-window-title{color:#6c6f85;}
+      .density-compact button.aw-row{min-height:40px;padding-top:5px;padding-bottom:5px;}.density-compact button.aw-group{min-height:20px;}.density-compact button.aw-new-in-group{min-height:24px;}
     """)
     var surfaces: [TerminalSurface] = []
     private(set) var focusedSurface: TerminalSurface?
@@ -106,6 +116,17 @@ private final class ApplicationState: @unchecked Sendable {
     private var groupBodies: [UUID: BoxRef] = [:]
     private var groupChevrons: [UUID: LabelRef] = [:]
     private var groupCounts: [UUID: LabelRef] = [:]
+    private var groupNames: [UUID: LabelRef] = [:]
+    private var groupMarkers: [UUID: LabelRef] = [:]
+    private var groupCreateRows: [UUID: ButtonRef] = [:]
+    private var groupMoveUpActions: [UUID: ButtonRef] = [:]
+    private var groupMoveDownActions: [UUID: ButtonRef] = [:]
+    private var groupCloseActions: [UUID: ButtonRef] = [:]
+    private var groupDefaultColorActions: [UUID: ButtonRef] = [:]
+    private var groupColorActions: [UUID: [WorkspaceGroupColor: ButtonRef]] = [:]
+    private var workspaceOptionMenus: [(menu: MenuButtonRef, includesPrimary: Bool)] = []
+    private var isSidebarFiltering = false
+    private var groupsContainer: BoxRef?
     private var noMatchesRoot: BoxRef?
     private var noMatchesDescription: LabelRef?
     private var sidebarSearchEntry: SearchEntryRef?
@@ -129,6 +150,7 @@ private final class ApplicationState: @unchecked Sendable {
     private var sidebarRevealGeneration = 0
     private var sidebarMotionController: EventControllerMotion?
     private var searchKeyController: EventControllerKey?
+    private var lastWorkspaceCreateAt: ContinuousClock.Instant?
     private var context = FocusedPaneContextCoordinator()
     private var actions: [GIO.SimpleAction] = []
     private var menu: GIO.Menu?
@@ -393,12 +415,16 @@ private final class ApplicationState: @unchecked Sendable {
     }
 
     func registerGroup(_ group: SidebarGroupSection, root: BoxRef, body: BoxRef,
-                       chevron: LabelRef, count: LabelRef) {
+                       chevron: LabelRef, count: LabelRef, name: LabelRef? = nil, marker: LabelRef? = nil) {
         groupRoots[group.id] = root; groupBodies[group.id] = body; groupChevrons[group.id] = chevron
         groupCounts[group.id] = count
+        if let name { groupNames[group.id] = name }
+        if let marker { groupMarkers[group.id] = marker }
         workspaceIDsByGroup[group.id] = group.rows.map(\.id)
         body.set(visible: group.isExpanded)
     }
+
+    func attachGroupsContainer(_ groups: BoxRef) { groupsContainer = groups }
 
     func toggleGroup(_ groupID: UUID) {
         guard (try? snapshot.toggleGroupDisclosure(groupID)) != nil,
@@ -410,6 +436,7 @@ private final class ApplicationState: @unchecked Sendable {
 
     func filter(_ query: String) {
         let projection = SidebarSearchProjection.project(snapshot: snapshot, query: query)
+        isSidebarFiltering = projection.isFiltering
         searchResultIDs = projection.isFiltering ? projection.orderedWorkspaceIDs : []
         searchResultIndex = 0
         updateSearchResultHighlight()
@@ -428,6 +455,8 @@ private final class ApplicationState: @unchecked Sendable {
             let normalized = query.trimmingCharacters(in: .whitespacesAndNewlines)
             noMatchesDescription?.label = "Nothing matched \"\(ChromeText.sanitized(normalized, limit: 120))\"."
         }
+        refreshGroupTints()
+        refreshGroupActionEnablement()
     }
 
     func attachSearch(entry: SearchEntryRef, noMatches: BoxRef, description: LabelRef) {
@@ -524,6 +553,104 @@ private final class ApplicationState: @unchecked Sendable {
         return button
     }
 
+    func makeWorkspaceOptionsButton(includePrimaryAction: Bool) -> MenuButtonRef {
+        let menu = MenuButtonRef(); menu.set(alwaysShowArrow: false); menu.set(hasFrame: false)
+        menu.set(iconName: includePrimaryAction ? "list-add-symbolic" : "pan-down-symbolic")
+        menu.setTooltip(text: includePrimaryAction ? "New Workspace menu" : "New Workspace Options")
+        setAccessibleLabel(menu, includePrimaryAction ? "New Workspace menu" : "New Workspace Options")
+        workspaceOptionMenus.append((menu, includePrimaryAction))
+        configureWorkspaceOptionsButton(menu, includePrimaryAction: includePrimaryAction)
+        return menu
+    }
+
+    private func configureWorkspaceOptionsButton(_ menu: MenuButtonRef, includePrimaryAction: Bool) {
+        let box = BoxRef(orientation: .vertical, spacing: 2); box.add(cssClass: "aw-popover")
+        func row(_ label: String, run: @escaping () -> Void) {
+            let button = ButtonRef(label: label); button.add(cssClass: "aw-menu-row"); button.setHalign(align: .fill)
+            button.onClicked { _ in run(); menu.popdown() }; box.append(child: button)
+        }
+        if includePrimaryAction { row("New Workspace") { [weak self] in self?.createDefaultWorkspace() } }
+        row("New Workspace Group…") { [weak self] in self?.presentGroupNameDialog() }
+        if !snapshot.groups.isEmpty {
+            let heading = LabelRef(str: "New Workspace in…"); heading.add(cssClass: "aw-menu-heading"); heading.xalign = 0
+            box.append(child: heading)
+            for group in snapshot.groups {
+                row(group.name) { [weak self] in self?.createWorkspace(in: group.id) }
+            }
+        }
+        let popover = PopoverRef(); popover.set(child: box); menu.set(popover: popover)
+    }
+
+    private func refreshWorkspaceOptionsMenus() {
+        for entry in workspaceOptionMenus {
+            configureWorkspaceOptionsButton(entry.menu, includePrimaryAction: entry.includesPrimary)
+        }
+    }
+
+    func makeGroupSection(
+        group: WorkspaceGroupSnapshot,
+        projection: SidebarGroupSection
+    ) -> (root: BoxRef, body: BoxRef) {
+        let root = BoxRef(orientation: .vertical, spacing: 3)
+        let header = BoxRef(orientation: .horizontal, spacing: 2)
+        let disclosure = ButtonRef(); disclosure.add(cssClass: "aw-group"); disclosure.setHalign(align: .fill)
+        disclosure.setHexpand(expand: true); disclosure.setTooltip(text: "Toggle \(group.name) workspace group")
+        let content = BoxRef(orientation: .horizontal, spacing: 8)
+        let chevron = LabelRef(str: projection.isExpanded ? "⌄" : "›")
+        let marker = LabelRef(str: "●"); marker.add(cssClass: "aw-marker")
+        marker.add(cssClass: "aw-\((projection.color ?? .blue).rawValue)")
+        let name = LabelRef(str: projection.name.uppercased()); name.xalign = 0; name.setHexpand(expand: true)
+        let count = LabelRef(str: "\(projection.rows.count)"); count.add(cssClass: "aw-count")
+        content.append(child: chevron); content.append(child: marker); content.append(child: name); content.append(child: count)
+        disclosure.set(child: content); disclosure.onClicked { [weak self] _ in self?.toggleGroup(projection.id) }
+        header.append(child: disclosure)
+
+        let options = MenuButtonRef(); options.add(cssClass: "aw-group-options")
+        options.set(iconName: "view-more-symbolic"); options.set(alwaysShowArrow: false); options.set(hasFrame: false)
+        options.setTooltip(text: "Workspace group actions")
+        setAccessibleLabel(options, "Actions for \(group.name) workspace group")
+        let menuBox = BoxRef(orientation: .vertical, spacing: 2); menuBox.add(cssClass: "aw-popover")
+        @discardableResult func action(_ label: String, sensitive: Bool = true, run: @escaping () -> Void) -> ButtonRef {
+            let button = ButtonRef(label: label); button.add(cssClass: "aw-menu-row")
+            button.setHalign(align: .fill); button.set(sensitive: sensitive)
+            button.onClicked { _ in run(); options.popdown() }
+            menuBox.append(child: button)
+            return button
+        }
+        action("New Workspace in Group") { [weak self] in self?.createWorkspace(in: group.id) }
+        action("New Workspace Group…") { [weak self] in self?.presentGroupNameDialog() }
+        action("Rename Workspace Group…") { [weak self] in self?.presentGroupNameDialog(groupID: group.id) }
+        let colorHeading = LabelRef(str: "Color…"); colorHeading.add(cssClass: "aw-menu-heading"); colorHeading.xalign = 0
+        menuBox.append(child: colorHeading)
+        groupDefaultColorActions[group.id] = action("○  Default\(group.color == nil ? "  ✓" : "")") { [weak self] in self?.setGroupColor(group.id, color: nil) }
+        for color in WorkspaceGroupColor.allCases {
+            let selected = group.color == color ? "  ✓" : ""
+            groupColorActions[group.id, default: [:]][color] = action("●  \(color.rawValue.capitalized)\(selected)") { [weak self] in self?.setGroupColor(group.id, color: color) }
+        }
+        let index = snapshot.groups.firstIndex(where: { $0.id == group.id })
+        groupMoveUpActions[group.id] = action("Move Group Up", sensitive: (index ?? 0) > 0) { [weak self] in self?.moveGroup(group.id, offset: -1) }
+        groupMoveDownActions[group.id] = action("Move Group Down", sensitive: index.map { $0 < self.snapshot.groups.count - 1 } ?? false) { [weak self] in self?.moveGroup(group.id, offset: 1) }
+        groupCloseActions[group.id] = action("Close Workspace Group") { [weak self] in self?.presentCloseGroupConfirmation(group.id) }
+        let popover = PopoverRef(); popover.set(child: menuBox); options.set(popover: popover)
+        header.append(child: options); root.append(child: header)
+
+        let body = BoxRef(orientation: .vertical, spacing: 5); root.append(child: body)
+        let create = ButtonRef(label: "+  New Workspace in Group"); create.add(cssClass: "aw-new-in-group")
+        create.setHalign(align: .fill); create.onClicked { [weak self] _ in self?.createWorkspace(in: group.id) }
+        body.append(child: create)
+        groupCreateRows[group.id] = create
+        registerGroup(projection, root: root, body: body, chevron: chevron, count: count, name: name, marker: marker)
+        refreshGroupActionEnablement()
+        return (root, body)
+    }
+
+    func appendWorkspaceRow(_ row: ToggleButtonRef, to body: BoxRef, groupID: UUID) {
+        body.append(child: row)
+        if let create = groupCreateRows[groupID] {
+            body.reorderChildAfter(child: WidgetRef(create), sibling: WidgetRef(row))
+        }
+    }
+
     func select(_ workspaceID: UUID) {
         guard let runtime = runtimes[workspaceID], let stack else { return }
         try? snapshot.selectWorkspace(workspaceID)
@@ -593,6 +720,8 @@ private final class ApplicationState: @unchecked Sendable {
         guard let rootWidget else { return }
         for theme in AppTheme.allCases { rootWidget.remove(cssClass: "theme-\(theme.rawValue.lowercased())") }
         rootWidget.add(cssClass: "theme-\(preferences.theme.rawValue.lowercased())")
+        for density in SidebarDensity.allCases { rootWidget.remove(cssClass: "density-\(density.rawValue)") }
+        rootWidget.add(cssClass: "density-\(preferences.sidebarDensity.rawValue)")
     }
 
     private func openFeedback() {
@@ -681,7 +810,8 @@ private final class ApplicationState: @unchecked Sendable {
     }
 
     private func perform(_ command: CommandID) {
-        if command == .newWorkspace || command == .newWorkspaceInCurrentDirectory { createWorkspace(); return }
+        if command == .newWorkspace { createDefaultWorkspace(); return }
+        if command == .newWorkspaceInCurrentDirectory { createWorkspaceInCurrentDirectory(); return }
         guard let selected = snapshot.selectedWorkspaceID, let runtime = runtimes[selected] else { return }
         switch command {
         case .toggleSidebarWidth: toggleSidebarWidth()
@@ -694,14 +824,38 @@ private final class ApplicationState: @unchecked Sendable {
         }
     }
 
-    func createWorkspace() {
-        let selectedGroup = snapshot.groups.first(where: { group in
+    private var selectedOwningGroup: WorkspaceGroupSnapshot? {
+        snapshot.groups.first(where: { group in
             group.workspaces.contains(where: { $0.id == snapshot.selectedWorkspaceID })
         })
-        guard let stack, let group = selectedGroup ?? snapshot.groups.first,
-              let body = groupBodies[group.id] else { return }
-        let directory = snapshot.selectedWorkspace.flatMap { $0.layout.pane(id: $0.focusedPaneID)?.workingDirectory }
+    }
+
+    func createDefaultWorkspace() {
+        let groupID = snapshot.groups.first?.id ?? createGroup(named: "awesoMux")
+        createWorkspace(in: groupID, directory: FileManager.default.currentDirectoryPath)
+    }
+
+    func createWorkspaceInCurrentDirectory() {
+        let directory = snapshot.selectedWorkspace
+            .flatMap { $0.layout.pane(id: $0.focusedPaneID)?.workingDirectory }
             ?? FileManager.default.currentDirectoryPath
+        createWorkspace(in: selectedOwningGroup?.id ?? snapshot.groups.first?.id, directory: directory)
+    }
+
+    func createWorkspace(in groupID: UUID) {
+        let directory = snapshot.selectedWorkspace
+            .flatMap { $0.layout.pane(id: $0.focusedPaneID)?.workingDirectory }
+            ?? FileManager.default.currentDirectoryPath
+        createWorkspace(in: groupID, directory: directory)
+    }
+
+    private func createWorkspace(in groupID: UUID?, directory: String) {
+        let now = ContinuousClock.now
+        if let lastWorkspaceCreateAt, now - lastWorkspaceCreateAt < .milliseconds(400) { return }
+        lastWorkspaceCreateAt = now
+        guard let stack, let groupID,
+              let group = snapshot.groups.first(where: { $0.id == groupID }),
+              let body = groupBodies[group.id] else { return }
         let pane = PaneSnapshot(title: "Primary terminal", workingDirectory: directory)
         let workspace = WorkspaceSnapshot(name: "Untitled Workspace", focusedPaneID: pane.id, layout: .pane(pane))
         guard let surface = makeSurface(pane: pane, workspaceID: workspace.id,
@@ -715,11 +869,182 @@ private final class ApplicationState: @unchecked Sendable {
         let pathBar = makePathBar(); let page = BoxRef(orientation: .vertical, spacing: 0)
         surface.widget.setVexpand(expand: true); page.append(child: surface.widget); page.append(child: pathBar.root)
         let pageName = workspace.id.uuidString; _ = pageName.withCString { stack.addNamed(child: page, name: $0) }
-        body.append(child: makeRow(workspace: workspace, groupID: group.id)); body.set(visible: true)
+        appendWorkspaceRow(makeRow(workspace: workspace, groupID: group.id), to: body, groupID: group.id)
+        body.set(visible: true)
         sidebarRailRows?.append(child: makeRailRow(workspace: workspace))
         groupCounts[group.id]?.label = "\(snapshot.groups.first(where: { $0.id == group.id })?.workspaces.filter { !$0.isSoftClosed }.count ?? 0)"
         install(workspace: workspace, groupID: group.id, pageName: pageName, pathBar: pathBar, focusedSurface: surface)
         select(workspace.id)
+    }
+
+    func presentGroupNameDialog(groupID: UUID? = nil) {
+        let current = groupID.flatMap { id in snapshot.groups.first(where: { $0.id == id })?.name } ?? ""
+        let window = WindowRef(); window.title = groupID == nil ? "New Workspace Group" : "Rename Workspace Group"
+        window.setDefaultSize(width: 420, height: 170)
+        let box = BoxRef(orientation: .vertical, spacing: 12)
+        box.setMarginStart(margin: 20); box.setMarginEnd(margin: 20)
+        box.setMarginTop(margin: 20); box.setMarginBottom(margin: 20)
+        let heading = LabelRef(str: window.title ?? "Workspace Group"); heading.add(cssClass: "aw-menu-title"); heading.xalign = 0
+        let entry = EntryRef(); entry.text = current; entry.setPlaceholder(text: "Workspace group name")
+        let actions = BoxRef(orientation: .horizontal, spacing: 8); actions.setHalign(align: .end)
+        let cancel = ButtonRef(label: "Cancel"); let confirm = ButtonRef(label: groupID == nil ? "Create" : "Rename")
+        cancel.onClicked { [window] _ in window.close() }
+        confirm.onClicked { [weak self, window, entry] _ in
+            guard let self else { return }
+            if let groupID { self.renameGroup(groupID, to: entry.text ?? "") }
+            else { self.createGroup(named: entry.text ?? "") }
+            window.close()
+        }
+        actions.append(child: cancel); actions.append(child: confirm)
+        box.append(child: heading); box.append(child: entry); box.append(child: actions)
+        window.set(child: box); window.present(); _ = entry.grabFocus()
+    }
+
+    @discardableResult private func createGroup(named name: String) -> UUID? {
+        guard let groupsContainer else { return nil }
+        do {
+            let id = try snapshot.addGroup(named: name)
+            guard let group = snapshot.groups.first(where: { $0.id == id }) else { return nil }
+            let projection = SidebarGroupSection(id: group.id, name: group.name,
+                color: SidebarTintProjection.resolvedColor(for: group, unfilteredIndex: snapshot.groups.count - 1),
+                isExpanded: !group.isCollapsed, rows: [])
+            let section = makeGroupSection(group: group, projection: projection)
+            groupsContainer.append(child: section.root)
+            refreshWorkspaceOptionsMenus()
+            persist()
+            return id
+        } catch SessionMutationError.duplicateGroupName {
+            let adjusted = ChromeText.sanitized(name, limit: 120).trimmingCharacters(in: .whitespacesAndNewlines)
+            showInformation(title: "New Workspace Group", body: "\"\(adjusted)\" already exists.")
+            return nil
+        } catch SessionMutationError.suspiciousGroupName {
+            showInformation(title: "New Workspace Group", body: "Mixing Latin with Cyrillic or Greek letters isn't allowed here — use one alphabet.")
+            return nil
+        } catch {
+            showInformation(title: "New Workspace Group", body: name.isEmpty ? "Enter a group name." : "Enter a visible group name.")
+            return nil
+        }
+    }
+
+    private func renameGroup(_ groupID: UUID, to name: String) {
+        do {
+            try snapshot.renameGroup(groupID, to: name)
+            groupNames[groupID]?.label = ChromeText.sanitized(name, limit: 120).uppercased()
+            refreshWorkspaceOptionsMenus()
+            persist()
+        } catch SessionMutationError.duplicateGroupName {
+            let adjusted = ChromeText.sanitized(name, limit: 120).trimmingCharacters(in: .whitespacesAndNewlines)
+            showInformation(title: "Rename Workspace Group", body: "\"\(adjusted)\" already exists.")
+        } catch SessionMutationError.suspiciousGroupName {
+            showInformation(title: "Rename Workspace Group", body: "Mixing Latin with Cyrillic or Greek letters isn't allowed here — use one alphabet.")
+        } catch {
+            showInformation(title: "Rename Workspace Group", body: name.isEmpty ? "Enter a group name." : "Enter a visible group name.")
+        }
+    }
+
+    private func setGroupColor(_ groupID: UUID, color: WorkspaceGroupColor?) {
+        guard (try? snapshot.setGroupColor(groupID, color: color)) != nil else { return }
+        if let marker = groupMarkers[groupID] {
+            for value in WorkspaceGroupColor.allCases { marker.remove(cssClass: "aw-\(value.rawValue)") }
+            marker.add(cssClass: "aw-\((color ?? .blue).rawValue)")
+        }
+        groupDefaultColorActions[groupID]?.label = "○  Default\(color == nil ? "  ✓" : "")"
+        for value in WorkspaceGroupColor.allCases {
+            groupColorActions[groupID]?[value]?.label = "●  \(value.rawValue.capitalized)\(color == value ? "  ✓" : "")"
+        }
+        persist()
+    }
+
+    private func moveGroup(_ groupID: UUID, offset: Int) {
+        guard (try? snapshot.moveGroup(groupID, offset: offset)) != nil, let groupsContainer else { return }
+        var previous: BoxRef? = noMatchesRoot
+        for group in snapshot.groups {
+            guard let root = groupRoots[group.id] else { continue }
+            groupsContainer.reorderChildAfter(child: root, sibling: previous)
+            previous = root
+        }
+        refreshGroupActionEnablement()
+        persist()
+    }
+
+    private func refreshGroupActionEnablement() {
+        for (index, group) in snapshot.groups.enumerated() {
+            groupMoveUpActions[group.id]?.set(sensitive: !isSidebarFiltering && index > 0)
+            groupMoveDownActions[group.id]?.set(sensitive: !isSidebarFiltering && index < snapshot.groups.count - 1)
+            groupCloseActions[group.id]?.set(sensitive: !isSidebarFiltering)
+            groupCreateRows[group.id]?.set(visible: !isSidebarFiltering && !group.isCollapsed)
+        }
+    }
+
+    private func refreshGroupTints() {
+        for (index, group) in snapshot.groups.enumerated() {
+            guard let marker = groupMarkers[group.id] else { continue }
+            for value in WorkspaceGroupColor.allCases { marker.remove(cssClass: "aw-\(value.rawValue)") }
+            let color = SidebarTintProjection.resolvedColor(for: group, unfilteredIndex: index)
+            marker.add(cssClass: "aw-\(color.rawValue)")
+        }
+    }
+
+    private func presentCloseGroupConfirmation(_ groupID: UUID) {
+        guard let group = snapshot.groups.first(where: { $0.id == groupID }) else { return }
+        let riskyStates: Set<AgentState> = [.running, .waiting, .thinking, .needsAttention]
+        let riskyCount = group.workspaces.count { workspace in
+            workspace.layout.panes.contains { $0.agent != nil && riskyStates.contains($0.agentState) }
+        }
+        guard riskyCount > 0 else { closeGroup(groupID); return }
+        let safeName = ChromeText.sanitized(group.name, limit: 120)
+        let window = WindowRef(); window.title = "Close group \(safeName)?"
+        window.setDefaultSize(width: 440, height: 180)
+        let box = BoxRef(orientation: .vertical, spacing: 14)
+        box.setMarginStart(margin: 20); box.setMarginEnd(margin: 20)
+        box.setMarginTop(margin: 20); box.setMarginBottom(margin: 20)
+        let heading = LabelRef(str: "Close group \(safeName)?"); heading.add(cssClass: "aw-menu-title"); heading.xalign = 0
+        let detailText = riskyCount == 1
+            ? "1 workspace in this group has running activity that will be interrupted. Closing will terminate its running process."
+            : "\(riskyCount) workspaces in this group have running activity that will be interrupted. Closing will terminate their running processes."
+        let detail = LabelRef(str: detailText)
+        detail.xalign = 0; detail.set(wrap: true)
+        let actions = BoxRef(orientation: .horizontal, spacing: 8); actions.setHalign(align: .end)
+        let cancel = ButtonRef(label: "Cancel"); let close = ButtonRef(label: "Close Group")
+        cancel.onClicked { [window] _ in window.close() }
+        close.onClicked { [weak self, window] _ in self?.closeGroup(groupID); window.close() }
+        actions.append(child: cancel); actions.append(child: close)
+        box.append(child: heading); box.append(child: detail); box.append(child: actions)
+        window.set(child: box); window.present()
+    }
+
+    private func closeGroup(_ groupID: UUID) {
+        guard let group = snapshot.groups.first(where: { $0.id == groupID }) else { return }
+        let workspaces = group.workspaces
+        guard let removed = try? snapshot.closeGroup(groupID) else { return }
+        for workspace in workspaces {
+            let paneSurfaces = workspace.layout.paneIDs.compactMap { surfacesByPane[$0] }
+            if let child = workspace.id.uuidString.withCString({ stack?.getChildBy(name: $0) }) { stack?.remove(child: child) }
+            for paneID in workspace.layout.paneIDs {
+                surfacesByPane.removeValue(forKey: paneID)
+                workspaceByPane.removeValue(forKey: paneID)
+            }
+            surfaces.removeAll { surface in paneSurfaces.contains { $0 === surface } }
+            runtimes.removeValue(forKey: workspace.id)
+            rows.removeValue(forKey: workspace.id)
+            metadata.removeValue(forKey: workspace.id)
+            if let rail = railRows.removeValue(forKey: workspace.id) { sidebarRailRows?.remove(child: rail) }
+        }
+        if let root = groupRoots.removeValue(forKey: groupID) { groupsContainer?.remove(child: root) }
+        groupBodies.removeValue(forKey: groupID); groupChevrons.removeValue(forKey: groupID)
+        groupCounts.removeValue(forKey: groupID); groupNames.removeValue(forKey: groupID); groupMarkers.removeValue(forKey: groupID)
+        groupCreateRows.removeValue(forKey: groupID)
+        groupMoveUpActions.removeValue(forKey: groupID); groupMoveDownActions.removeValue(forKey: groupID)
+        groupCloseActions.removeValue(forKey: groupID)
+        groupDefaultColorActions.removeValue(forKey: groupID); groupColorActions.removeValue(forKey: groupID)
+        workspaceIDsByGroup.removeValue(forKey: groupID)
+        if let selected = snapshot.selectedWorkspaceID { select(selected) }
+        else { title?.label = ""; focusedPaneID = nil; focusedSurface = nil }
+        _ = removed
+        refreshGroupTints()
+        refreshGroupActionEnablement()
+        refreshWorkspaceOptionsMenus()
+        persist()
     }
 
     private func selectRelative(_ offset: Int) {
@@ -793,9 +1118,14 @@ private func buildWindow(for application: Gtk.ApplicationRef) {
     search.setPlaceholder(text: "Search sessions"); search.setSizeRequest(width: 108, height: 30)
     search.setWidthChars(nChars: 8); search.setMaxWidthChars(nChars: 8)
     search.onSearchChanged { [weak state] entry in state?.filter(entry.text ?? "") }
-    let add = ButtonRef(label: "+"); add.add(cssClass: "aw-add")
-    add.setTooltip(text: "New Workspace in Current Directory"); add.onClicked { [weak state] _ in state?.createWorkspace() }
-    header.append(child: search); header.append(child: add); expandedSidebar.append(child: header)
+    let createSplit = BoxRef(orientation: .horizontal, spacing: 0); createSplit.add(cssClass: "aw-create-split")
+    let createPrimary = ButtonRef(label: "+"); createPrimary.add(cssClass: "aw-create-primary")
+    createPrimary.setTooltip(text: "New Workspace")
+    createPrimary.onClicked { [weak state] _ in state?.createDefaultWorkspace() }
+    let createOptions = state.makeWorkspaceOptionsButton(includePrimaryAction: false)
+    createOptions.add(cssClass: "aw-create-options")
+    createSplit.append(child: createPrimary); createSplit.append(child: createOptions)
+    header.append(child: search); header.append(child: createSplit); expandedSidebar.append(child: header)
 
     let groups = BoxRef(orientation: .vertical, spacing: 14)
     groups.setMarginStart(margin: 10); groups.setMarginEnd(margin: 10); groups.setMarginTop(margin: 6); groups.setMarginBottom(margin: 8)
@@ -808,6 +1138,7 @@ private func buildWindow(for application: Gtk.ApplicationRef) {
     clearSearch.onClicked { [weak state] _ in state?.clearSidebarSearch() }
     noMatches.append(child: noMatchesTitle); noMatches.append(child: noMatchesDescription); noMatches.append(child: clearSearch)
     noMatches.set(visible: false); groups.append(child: noMatches)
+    state.attachGroupsContainer(groups)
     state.attachSearch(entry: search, noMatches: noMatches, description: noMatchesDescription)
     let searchKeys = EventControllerKey()
     searchKeys.onKeyPressed { [weak state] _, keyval, _, _ in
@@ -827,10 +1158,8 @@ private func buildWindow(for application: Gtk.ApplicationRef) {
     railSearch.add(cssClass: "aw-rail-control")
     railSearch.setTooltip(text: "Search workspaces and actions")
     railSearch.onClicked { [weak state] _ in state?.showCommandPalette() }
-    let railAdd = ButtonRef(); railAdd.set(iconName: "list-add-symbolic")
+    let railAdd = state.makeWorkspaceOptionsButton(includePrimaryAction: true)
     railAdd.add(cssClass: "aw-rail-control")
-    railAdd.setTooltip(text: "New Workspace in Current Directory")
-    railAdd.onClicked { [weak state] _ in state?.createWorkspace() }
     rail.append(child: railSearch); rail.append(child: railAdd)
     let railRows = BoxRef(orientation: .vertical, spacing: 5)
     let railScroller = ScrolledWindowRef(); railScroller.setPolicy(hscrollbarPolicy: .never, vscrollbarPolicy: .automatic)
@@ -865,19 +1194,9 @@ private func buildWindow(for application: Gtk.ApplicationRef) {
 
     for projection in SidebarChromeProjection(snapshot: snapshot).groups {
         guard let group = snapshot.groups.first(where: { $0.id == projection.id }) else { continue }
-        let groupRoot = BoxRef(orientation: .vertical, spacing: 3)
-        let disclosure = ButtonRef(); disclosure.add(cssClass: "aw-group"); disclosure.setHalign(align: .fill)
-        let disclosureContent = BoxRef(orientation: .horizontal, spacing: 8)
-        let chevron = LabelRef(str: projection.isExpanded ? "⌄" : "›")
-        let marker = LabelRef(str: "●"); marker.add(cssClass: "aw-marker")
-        marker.add(cssClass: "aw-\((projection.color ?? .blue).rawValue)")
-        let name = LabelRef(str: projection.name.uppercased()); name.xalign = 0; name.setHexpand(expand: true)
-        let count = LabelRef(str: "\(projection.rows.count)"); count.add(cssClass: "aw-count")
-        disclosureContent.append(child: chevron); disclosureContent.append(child: marker)
-        disclosureContent.append(child: name); disclosureContent.append(child: count); disclosure.set(child: disclosureContent)
-        disclosure.onClicked { [weak state] _ in state?.toggleGroup(projection.id) }; groupRoot.append(child: disclosure)
-        let body = BoxRef(orientation: .vertical, spacing: 5); groupRoot.append(child: body); groups.append(child: groupRoot)
-        state.registerGroup(projection, root: groupRoot, body: body, chevron: chevron, count: count)
+        let section = state.makeGroupSection(group: group, projection: projection)
+        groups.append(child: section.root)
+        let body = section.body
 
         for workspace in group.workspaces where !workspace.isSoftClosed {
             guard let layout = buildLayout(workspace.layout, workspace: workspace),
@@ -885,7 +1204,7 @@ private func buildWindow(for application: Gtk.ApplicationRef) {
             let pathBar = state.makePathBar(); let page = BoxRef(orientation: .vertical, spacing: 0)
             page.append(child: layout.0); page.append(child: pathBar.root)
             let pageName = workspace.id.uuidString; _ = pageName.withCString { stack.addNamed(child: page, name: $0) }
-            body.append(child: state.makeRow(workspace: workspace, groupID: group.id))
+            state.appendWorkspaceRow(state.makeRow(workspace: workspace, groupID: group.id), to: body, groupID: group.id)
             railRows.append(child: state.makeRailRow(workspace: workspace))
             state.install(workspace: workspace, groupID: group.id, pageName: pageName, pathBar: pathBar, focusedSurface: focused)
         }

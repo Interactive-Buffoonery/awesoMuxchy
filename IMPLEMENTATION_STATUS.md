@@ -97,6 +97,18 @@ help, and agent context while preserving the compact reference geometry.
 - Expanded search keyboard routing uses that same projection order: Escape
   clears or restores terminal focus, Up/Down moves a visible current-result
   outline, and Return selects and focuses the routed workspace.
+- Workspace-group state now has tested safe create/rename, explicit color,
+  stable-ID reorder, cross-group workspace movement, and populated close with
+  deterministic replacement selection. GTK headers expose the corresponding
+  truthful menus and confirmation flow (SSH remains absent), plus a persistent
+  per-group `New Workspace in Group` row that disappears while filtering.
+  Automatic unfiltered-index tint cycling reserves mauve for awesoMux and
+  peach for attention, while explicit colors remain authoritative.
+- The expanded create header is a 30-point primary plus 24-point options split
+  control, and the collapsed rail uses a 40-point menu. The default and
+  current-directory commands now have distinct group/directory semantics and
+  all pointer creation routes share a 400 ms duplicate guard. Standard and
+  compact sidebar density is selectable, persisted, and applied live.
 - A real inspected screenshot and comparison index were pushed in focused
   visual-QA commits `4149963` and `01cc8d7`.
 

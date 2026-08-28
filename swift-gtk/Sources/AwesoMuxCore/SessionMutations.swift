@@ -5,6 +5,9 @@ public enum SessionMutationError: Error, Equatable {
     case workspaceNotFound(UUID)
     case paneNotFound(UUID)
     case noSelectedWorkspace
+    case invalidGroupName
+    case duplicateGroupName
+    case suspiciousGroupName
 }
 
 public extension PaneLayout {
@@ -125,6 +128,76 @@ public extension SessionSnapshot {
         groups.append(group)
     }
 
+    @discardableResult
+    mutating func addGroup(named rawName: String, color: WorkspaceGroupColor? = nil) throws -> UUID {
+        let name = try availableGroupName(rawName)
+        let group = WorkspaceGroupSnapshot(name: name, color: color, workspaces: [])
+        groups.append(group)
+        return group.id
+    }
+
+    mutating func renameGroup(_ groupID: UUID, to rawName: String) throws {
+        guard let index = groups.firstIndex(where: { $0.id == groupID }) else {
+            throw SessionMutationError.groupNotFound(groupID)
+        }
+        let name = try availableGroupName(rawName, excluding: groupID)
+        groups[index].name = name
+    }
+
+    mutating func setGroupColor(_ groupID: UUID, color: WorkspaceGroupColor?) throws {
+        guard let index = groups.firstIndex(where: { $0.id == groupID }) else {
+            throw SessionMutationError.groupNotFound(groupID)
+        }
+        groups[index].color = color
+    }
+
+    mutating func moveGroup(_ groupID: UUID, offset: Int) throws {
+        guard let source = groups.firstIndex(where: { $0.id == groupID }) else {
+            throw SessionMutationError.groupNotFound(groupID)
+        }
+        let target = min(max(source + offset, 0), groups.count - 1)
+        guard target != source else { return }
+        let group = groups.remove(at: source)
+        groups.insert(group, at: target)
+    }
+
+    mutating func moveWorkspace(
+        _ workspaceID: UUID,
+        toGroup destinationGroupID: UUID,
+        at targetIndex: Int
+    ) throws {
+        guard let destination = groups.firstIndex(where: { $0.id == destinationGroupID }) else {
+            throw SessionMutationError.groupNotFound(destinationGroupID)
+        }
+        guard let sourceGroup = groups.firstIndex(where: { group in
+            group.workspaces.contains(where: { $0.id == workspaceID })
+        }), let sourceIndex = groups[sourceGroup].workspaces.firstIndex(where: { $0.id == workspaceID }) else {
+            throw SessionMutationError.workspaceNotFound(workspaceID)
+        }
+        let destinationCount = sourceGroup == destination
+            ? groups[destination].workspaces.count - 1
+            : groups[destination].workspaces.count
+        let insertion = min(max(targetIndex, 0), destinationCount)
+        guard sourceGroup != destination || insertion != sourceIndex else { return }
+        let workspace = groups[sourceGroup].workspaces.remove(at: sourceIndex)
+        groups[destination].workspaces.insert(workspace, at: insertion)
+    }
+
+    @discardableResult
+    mutating func closeGroup(_ groupID: UUID) throws -> [UUID] {
+        guard let index = groups.firstIndex(where: { $0.id == groupID }) else {
+            throw SessionMutationError.groupNotFound(groupID)
+        }
+        let removedWorkspaceIDs = groups[index].workspaces.map(\.id)
+        groups.remove(at: index)
+        if let selectedWorkspaceID, removedWorkspaceIDs.contains(selectedWorkspaceID) {
+            self.selectedWorkspaceID = groups.lazy
+                .flatMap(\.workspaces)
+                .first(where: { !$0.isSoftClosed })?.id
+        }
+        return removedWorkspaceIDs
+    }
+
     mutating func toggleGroupDisclosure(_ groupID: UUID) throws {
         guard let index = groups.firstIndex(where: { $0.id == groupID }) else {
             throw SessionMutationError.groupNotFound(groupID)
@@ -204,6 +277,30 @@ public extension SessionSnapshot {
             return
         }
         throw SessionMutationError.workspaceNotFound(workspaceID)
+    }
+
+    private func availableGroupName(_ rawName: String, excluding groupID: UUID? = nil) throws -> String {
+        let name = ChromeText.sanitized(rawName, limit: 120)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !name.isEmpty else { throw SessionMutationError.invalidGroupName }
+        guard !Self.hasSuspiciousScriptMixing(rawName) else { throw SessionMutationError.suspiciousGroupName }
+        guard !groups.contains(where: {
+            $0.id != groupID && $0.name.compare(name, options: [.caseInsensitive, .diacriticInsensitive]) == .orderedSame
+        }) else { throw SessionMutationError.duplicateGroupName }
+        return name
+    }
+
+    private static func hasSuspiciousScriptMixing(_ value: String) -> Bool {
+        var latin = false, greek = false, cyrillic = false
+        for scalar in value.unicodeScalars {
+            switch scalar.value {
+            case 0x0041...0x024F: latin = true
+            case 0x0370...0x03FF: greek = true
+            case 0x0400...0x052F: cyrillic = true
+            default: break
+            }
+        }
+        return (latin && (greek || cyrillic)) || (greek && cyrillic)
     }
 }
 

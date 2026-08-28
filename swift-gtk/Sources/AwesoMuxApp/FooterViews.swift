@@ -476,6 +476,25 @@ final class SidebarStatusFooter {
             themes.append(child: button)
         }
         box.append(child: themes)
+        let densityHeading = LabelRef(str: "Sidebar density")
+        densityHeading.add(cssClass: "aw-menu-heading")
+        densityHeading.xalign = 0
+        box.append(child: densityHeading)
+        let densities = BoxRef(orientation: .horizontal, spacing: 3)
+        for density in SidebarDensity.allCases {
+            let label = density == .standard ? "Standard" : "Compact"
+            let button = ButtonRef(label: label)
+            button.add(cssClass: "aw-theme-choice")
+            if density == preferences.sidebarDensity { button.add(cssClass: "aw-selected") }
+            button.onClicked { [weak self] _ in
+                guard let self else { return }
+                self.preferences.sidebarDensity = density
+                self.actions.updatePreferences(self.preferences)
+                self.quickSettings.set(popover: self.quickSettingsPopover())
+            }
+            densities.append(child: button)
+        }
+        box.append(child: densities)
         let notificationHeading = LabelRef(str: "Notifications")
         notificationHeading.add(cssClass: "aw-menu-heading")
         notificationHeading.xalign = 0

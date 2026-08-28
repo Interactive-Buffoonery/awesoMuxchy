@@ -30,6 +30,10 @@ public struct SidebarGroupSection: Equatable, Sendable {
     public let color: WorkspaceGroupColor?
     public let isExpanded: Bool
     public let rows: [SidebarWorkspaceRow]
+
+    public init(id: UUID, name: String, color: WorkspaceGroupColor?, isExpanded: Bool, rows: [SidebarWorkspaceRow]) {
+        self.id = id; self.name = name; self.color = color; self.isExpanded = isExpanded; self.rows = rows
+    }
 }
 
 public struct SidebarChromeProjection: Equatable, Sendable {
@@ -40,11 +44,11 @@ public struct SidebarChromeProjection: Equatable, Sendable {
     public let groups: [SidebarGroupSection]
 
     public init(snapshot: SessionSnapshot, homeDirectory: String = NSHomeDirectory()) {
-        groups = snapshot.groups.map { group in
+        groups = snapshot.groups.enumerated().map { index, group in
             SidebarGroupSection(
                 id: group.id,
                 name: ChromeText.sanitized(group.name, limit: 80),
-                color: group.color,
+                color: SidebarTintProjection.resolvedColor(for: group, unfilteredIndex: index),
                 isExpanded: !group.isCollapsed,
                 rows: group.workspaces.compactMap { workspace in
                     guard !workspace.isSoftClosed else { return nil }
@@ -70,6 +74,20 @@ public struct SidebarChromeProjection: Equatable, Sendable {
                 }
             )
         }
+    }
+}
+
+public enum SidebarTintProjection {
+    private static let automaticPalette: [WorkspaceGroupColor] = [.teal, .green, .blue, .pink, .yellow, .red, .gray]
+
+    public static func resolvedColor(
+        for group: WorkspaceGroupSnapshot,
+        unfilteredIndex: Int
+    ) -> WorkspaceGroupColor {
+        if let color = group.color { return color }
+        if group.name.range(of: "awesomux", options: .caseInsensitive) != nil { return .mauve }
+        let index = max(unfilteredIndex, 0) % automaticPalette.count
+        return automaticPalette[index]
     }
 }
 
