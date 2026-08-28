@@ -4,9 +4,10 @@ Updated: 2026-08-28
 
 ## Current phase
 
-SwiftGtk4 passed its language/toolkit viability checkpoint. Phase 4 terminal
-lifecycle is verified, phase 5 command/sidebar foundations are active, and
-phase 6 snapshot recovery has started.
+SwiftGtk4 passed its language/toolkit viability checkpoint. Terminal lifecycle
+and defensive snapshot recovery are verified. The permanent workspace sidebar,
+idle sidebar footer, and focused-pane path bar now form a coherent GTK chrome
+milestone awaiting product review before `amx` work begins.
 
 ## Completed evidence
 
@@ -29,7 +30,7 @@ phase 6 snapshot recovery has started.
 - Three standalone stress runs each passed 100 cycles with two concurrently
   busy, successfully realized surfaces. Peak RSS was 307,208 KiB on the first
   driver-cache warm-up and 245,056/244,844 KiB on the following runs.
-- Seventeen Swift tests cover model mutations, exact command-catalog chord
+- Twenty-three Swift tests cover model mutations, exact command-catalog chord
   uniqueness, defensive snapshot limits, XDG profile paths, owner-only writes,
   current/previous recovery, and corrupt-file quarantine.
 - Native GTK application actions and accelerators are generated from the same
@@ -39,6 +40,13 @@ phase 6 snapshot recovery has started.
   created owner-only current and previous files.
 - The release integration harness asserts both real terminal surfaces publish
   focus callbacks; the full local preflight passes after this routing change.
+- The real app now uses the reference 188-point sidebar hierarchy and shared
+  38-point footer rhythm. Search, group disclosure, new-workspace creation,
+  whole-workspace selection, focused-pane path routing, and the truthful
+  zero-agent idle state are live rather than mock controls.
+- Pure chrome projections keep fixed header/footer geometry for zero, one, and
+  many rows; focused-pane context publication is identity/generation guarded,
+  sanitized, and covered against stale results and long text.
 - A real inspected screenshot and comparison index were pushed in focused
   visual-QA commits `4149963` and `01cc8d7`.
 
@@ -57,10 +65,11 @@ phase 6 snapshot recovery has started.
 
 ## Next work
 
-1. Implement product-level split/new/close/recreate commands and teardown-race coverage.
-2. Complete sidebar group creation, ordering controls, and dynamic menu enablement.
-3. Add bounded/coalesced persistence writes, recovery UI, and forced-termination tests.
-4. Continue through the root implementation order, capturing each required
+1. Review and correct the sidebar/footer chrome against product feedback.
+2. Implement product-level split/close/recreate commands and teardown-race coverage.
+3. Complete sidebar group creation, ordering controls, and dynamic menu enablement.
+4. Add bounded/coalesced persistence writes, recovery UI, and forced-termination tests.
+5. Continue through the root implementation order, capturing each required
    visual milestone.
 
 The verified SwiftGtk4 baseline is committed locally as `260e917`. No

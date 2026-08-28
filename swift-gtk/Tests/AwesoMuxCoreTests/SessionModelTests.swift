@@ -252,3 +252,82 @@ private func snapshot(_ workspaces: [WorkspaceSnapshot]) -> SessionSnapshot {
     #expect(value.selectedWorkspaceID == added.id)
     #expect(try value.validated() == value)
 }
+
+@Test func groupDisclosureDoesNotChangeSelection() throws {
+    let selected = workspace(panes: 1)
+    var value = snapshot([selected])
+    let groupID = value.groups[0].id
+    try value.toggleGroupDisclosure(groupID)
+    #expect(value.groups[0].isCollapsed)
+    #expect(value.selectedWorkspaceID == selected.id)
+}
+
+@Test func sidebarProjectionKeepsFixedChromeAcrossWorkspaceCounts() {
+    for count in [0, 1, 40] {
+        let items = (0..<count).map { _ in workspace(panes: 1) }
+        let projection = SidebarChromeProjection(snapshot: snapshot(items))
+        #expect(SidebarChromeProjection.width == 188)
+        #expect(SidebarChromeProjection.headerMinimumHeight == 48)
+        #expect(SidebarChromeProjection.footerMinimumHeight == 38)
+        #expect(projection.groups[0].rows.count == count)
+    }
+}
+
+@Test func sidebarSelectionAndLongNamesPreserveWorkspaceIdentity() {
+    let pane = PaneSnapshot(title: "shell", workingDirectory: "/tmp")
+    let longName = String(repeating: "workspace", count: 40)
+    let selected = WorkspaceSnapshot(
+        name: longName,
+        focusedPaneID: pane.id,
+        layout: .pane(pane)
+    )
+    let projection = SidebarChromeProjection(snapshot: snapshot([selected]))
+    let row = projection.groups[0].rows[0]
+    #expect(row.id == selected.id)
+    #expect(row.isSelected)
+    #expect(row.title.count <= 120)
+    #expect(row.title.hasSuffix("…"))
+}
+
+@Test func focusedPaneContextRejectsStaleResults() {
+    let workspaceID = UUID()
+    let firstPaneID = UUID()
+    let secondPaneID = UUID()
+    var coordinator = FocusedPaneContextCoordinator()
+    let first = coordinator.begin(workspaceID: workspaceID, paneID: firstPaneID)
+    let stale = FocusedPaneContext.resolve(
+        identity: first,
+        workingDirectory: "/tmp/first",
+        homeDirectory: "/home/test"
+    )
+    let second = coordinator.begin(workspaceID: workspaceID, paneID: secondPaneID)
+    let acceptedStale = coordinator.publish(stale)
+    #expect(!acceptedStale)
+    #expect(coordinator.context == nil)
+
+    let current = FocusedPaneContext.resolve(
+        identity: second,
+        workingDirectory: "/tmp/second",
+        homeDirectory: "/home/test"
+    )
+    let acceptedCurrent = coordinator.publish(current)
+    #expect(acceptedCurrent)
+    #expect(coordinator.context?.identity.paneID == secondPaneID)
+    #expect(coordinator.context?.path == "/tmp/second")
+}
+
+@Test func pathAndSidebarTextAreSanitizedWithoutChangingIdentity() {
+    let identity = FocusedPaneIdentity(
+        workspaceID: UUID(),
+        paneID: UUID(),
+        generation: 1
+    )
+    let context = FocusedPaneContext.resolve(
+        identity: identity,
+        workingDirectory: "/home/test/project\u{202E}\nname",
+        homeDirectory: "/home/test"
+    )
+    #expect(context.identity == identity)
+    #expect(!context.path.contains("\u{202E}"))
+    #expect(!context.path.contains("\n"))
+}

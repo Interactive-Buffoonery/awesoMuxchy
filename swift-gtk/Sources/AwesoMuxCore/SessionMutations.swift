@@ -125,6 +125,13 @@ public extension SessionSnapshot {
         groups.append(group)
     }
 
+    mutating func toggleGroupDisclosure(_ groupID: UUID) throws {
+        guard let index = groups.firstIndex(where: { $0.id == groupID }) else {
+            throw SessionMutationError.groupNotFound(groupID)
+        }
+        groups[index].isCollapsed.toggle()
+    }
+
     mutating func moveWorkspace(_ workspaceID: UUID, offset: Int) throws {
         for groupIndex in groups.indices {
             guard let index = groups[groupIndex].workspaces.firstIndex(
