@@ -358,6 +358,34 @@ private func snapshot(_ workspaces: [WorkspaceSnapshot]) -> SessionSnapshot {
     #expect(missing.topMatchID == nil)
 }
 
+@Test func sidebarPresentationPolicyMirrorsBothEdgesAndAttentionDiscovery() {
+    #expect(SidebarPresentationPolicy.proximity(pointerX: 39, containerWidth: 1_000, position: .left) == .revealed)
+    #expect(SidebarPresentationPolicy.proximity(pointerX: 961, containerWidth: 1_000, position: .right) == .revealed)
+    #expect(SidebarPresentationPolicy.proximity(pointerX: 500, containerWidth: 1_000, position: .left) == .cue)
+    #expect(SidebarPresentationPolicy.proximity(pointerX: .nan, containerWidth: 1_000, position: .left) == .dormant)
+    #expect(SidebarPresentationPolicy.dividerCoordinate(sidebarWidth: 296, paneExtent: 1_440, position: .left) == 296)
+    #expect(SidebarPresentationPolicy.dividerCoordinate(sidebarWidth: 296, paneExtent: 1_440, position: .right) == 1_144)
+    #expect(SidebarPresentationPolicy.sidebarWidth(dividerCoordinate: 1_144, paneExtent: 1_440, position: .right) == 296)
+    #expect(SidebarPresentationPolicy.edgeTabStyle(
+        isPersistentlyHidden: true, proximity: .dormant, hasAttention: true
+    ) == .attention)
+    #expect(SidebarPresentationPolicy.edgeTabStyle(
+        isPersistentlyHidden: true, proximity: .cue, hasAttention: false
+    ) == .cue)
+    #expect(SidebarPresentationPolicy.edgeTabStyle(
+        isPersistentlyHidden: false, proximity: .dormant, hasAttention: true
+    ) == nil)
+
+    let quiet = PaneSnapshot(title: "Quiet", workingDirectory: "/tmp", agentState: .thinking)
+    let attention = PaneSnapshot(title: "Waiting", workingDirectory: "/tmp", agentState: .needsAttention)
+    #expect(!SidebarPresentationPolicy.hasAttention(snapshot([
+        WorkspaceSnapshot(name: "Quiet", focusedPaneID: quiet.id, layout: .pane(quiet))
+    ])))
+    #expect(SidebarPresentationPolicy.hasAttention(snapshot([
+        WorkspaceSnapshot(name: "Waiting", focusedPaneID: attention.id, layout: .pane(attention))
+    ])))
+}
+
 @Test func sidebarSelectionAndLongNamesPreserveWorkspaceIdentity() {
     let pane = PaneSnapshot(title: "shell", workingDirectory: "/tmp")
     let longName = String(repeating: "workspace", count: 40)

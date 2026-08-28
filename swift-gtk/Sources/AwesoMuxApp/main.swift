@@ -47,10 +47,10 @@ private final class ApplicationState: @unchecked Sendable {
     private(set) var isPersistencePaused = false
     private let styles = CSSProvider(from: """
       .aw-root,.aw-content{background:#1e1e2e;}.aw-titlebar{min-height:38px;background:#11111b;border-bottom:1px solid #313244;}
-      .aw-brand{min-width:60px;color:#cdd6f4;background:#181825;border-right:1px solid #313244;font-size:13px;font-weight:700;}
-      .aw-window-title{color:#a6adc8;font-size:12px;font-weight:600;}.aw-sidebar{background:#181825;border-right:1px solid #313244;}
-      searchentry.aw-search{min-height:30px;color:#cdd6f4;background-color:#313244;background-image:none;border:1px solid #45475a;border-radius:7px;font-size:11px;box-shadow:none;}
-      searchentry.aw-search > text,.aw-search-text{color:#cdd6f4;background-color:#313244;background-image:none;border-color:#45475a;border-radius:7px;box-shadow:none;caret-color:#cdd6f4;}
+      .aw-brand{min-width:60px;color:#cdd6f4;background:#181825;border-right:1px solid #313244;font-size:13px;font-weight:700;}.aw-brand.aw-right{border-right:0;border-left:1px solid #313244;}
+      .aw-window-title{color:#a6adc8;font-size:12px;font-weight:600;}.aw-sidebar{background:#181825;border-right:1px solid #313244;}.aw-sidebar.aw-right{border-right:0;border-left:1px solid #313244;}
+      entry.aw-search,.aw-search{min-height:30px;color:#cdd6f4;background-color:#313244;background-image:none;border:1px solid #45475a;border-radius:7px;font-size:11px;box-shadow:none;}
+      entry.aw-search text,.aw-search text,.aw-search-text{color:#cdd6f4;background-color:#313244;background-image:none;border-color:#45475a;border-radius:7px;box-shadow:none;caret-color:#cdd6f4;}
       button.aw-add{min-width:30px;min-height:30px;padding:0;color:#a6adc8;background:#313244;border:1px solid #45475a;border-radius:7px;font-size:18px;}
       button.aw-rail-control,button.aw-rail-row{min-width:40px;min-height:40px;padding:0;color:#a6adc8;background:transparent;border:1px solid transparent;border-radius:8px;font-family:monospace;font-size:12px;font-weight:700;}
       button.aw-rail-control:hover,button.aw-rail-row:hover{color:#cdd6f4;background:rgba(205,214,244,.07);}button.aw-rail-row:checked{color:#cdd6f4;background:#313244;border-color:rgba(137,180,250,.55);box-shadow:inset 3px 0 #89b4fa;}
@@ -80,6 +80,7 @@ private final class ApplicationState: @unchecked Sendable {
       button.aw-menu-row:hover{background:#3a3b4d;}.aw-menu-disabled{padding:7px;color:#6c7086;font-size:10px;}
       button.aw-row.aw-search-current{outline:2px solid #89b4fa;outline-offset:-2px;}
       .aw-no-matches{padding:14px;background:rgba(250,179,135,.10);border:1px dashed rgba(250,179,135,.35);border-radius:9px;}.aw-no-matches-title{color:#fab387;font-family:monospace;font-size:10px;font-weight:700;letter-spacing:1px;}.aw-no-matches-copy{color:#7f849c;font-size:11px;}button.aw-clear-search{min-height:24px;padding:4px 9px;color:#11111b;background:#fab387;border:0;border-radius:12px;font-family:monospace;font-size:10px;font-weight:700;}
+      button.aw-sidebar-edge-attention{min-width:10px;min-height:88px;padding:0;background:#f38ba8;border:0;border-radius:0 7px 7px 0;box-shadow:0 0 12px rgba(243,139,168,.55);}button.aw-sidebar-edge-attention.aw-right{border-radius:7px 0 0 7px;}
       menubutton.aw-icon-menu>button,button.aw-icon-button,button.aw-agent-total{min-width:22px;min-height:22px;padding:0;color:#7f849c;background:transparent;border:0;border-radius:5px;}
       menubutton.aw-icon-menu>button:hover,button.aw-icon-button:hover,button.aw-agent-total:hover{color:#cdd6f4;background:rgba(205,214,244,.09);}
       .aw-agent-panel{background:#181825;border-top:1px solid #313244;}.aw-agent-state{padding:1px 4px;font-family:monospace;font-size:9px;font-weight:700;}
@@ -115,12 +116,19 @@ private final class ApplicationState: @unchecked Sendable {
     private var rootWidget: BoxRef?
     private var sidebarFooter: SidebarStatusFooter?
     private var sidebarPaned: PanedRef?
+    private var sidebarHost: OverlayRef?
     private var sidebarBrand: LabelRef?
     private var sidebarWidget: BoxRef?
     private var expandedSidebarWidget: BoxRef?
     private var collapsedSidebarWidget: BoxRef?
     private var sidebarRailRows: BoxRef?
+    private var sidebarEdgeTab: ButtonRef?
     private var isApplyingSidebarWidth = false
+    private var isSidebarOverlayMounted = false
+    private var isSidebarTemporarilyRevealed = false
+    private var sidebarRevealGeneration = 0
+    private var sidebarMotionController: EventControllerMotion?
+    private var searchKeyController: EventControllerKey?
     private var context = FocusedPaneContextCoordinator()
     private var actions: [GIO.SimpleAction] = []
     private var menu: GIO.Menu?
@@ -133,6 +141,8 @@ private final class ApplicationState: @unchecked Sendable {
         self.preferencesStore = preferencesStore
         preferences = preferencesStore.load()
     }
+
+    var configuredSidebarPosition: SidebarPosition { preferences.sidebarPosition }
 
     func installStyles(on widget: WidgetRef) {
         gtk_style_context_add_provider_for_display(widget.getDisplay().display_ptr,
@@ -150,18 +160,23 @@ private final class ApplicationState: @unchecked Sendable {
         sidebar: BoxRef,
         expanded: BoxRef,
         collapsed: BoxRef,
-        railRows: BoxRef
+        railRows: BoxRef,
+        edgeTab: ButtonRef,
+        host: OverlayRef
     ) {
         sidebarPaned = paned
+        sidebarHost = host
         sidebarBrand = brand
         sidebarWidget = sidebar
         expandedSidebarWidget = expanded
         collapsedSidebarWidget = collapsed
         sidebarRailRows = railRows
-        paned.setResizeStartChild(resize: false)
-        paned.setShrinkStartChild(resize: true)
-        paned.setResizeEndChild(resize: true)
-        paned.setShrinkEndChild(resize: false)
+        sidebarEdgeTab = edgeTab
+        let isRight = preferences.sidebarPosition == .right
+        paned.setResizeStartChild(resize: isRight)
+        paned.setShrinkStartChild(resize: !isRight)
+        paned.setResizeEndChild(resize: !isRight)
+        paned.setShrinkEndChild(resize: isRight)
         applySidebarWidth(preferences.sidebarWidth, persist: false)
         updateSidebarVisibility()
         _ = paned.onNotifyPosition { [weak self] paned, _ in
@@ -171,8 +186,18 @@ private final class ApplicationState: @unchecked Sendable {
 
     private func sidebarPositionChanged(_ proposedWidth: Int) {
         guard !isApplyingSidebarWidth else { return }
-        let committed = SidebarWidthPolicy.committedWidth(for: Double(proposedWidth))
-        if committed != proposedWidth {
+        let paneExtent = sidebarPaned?.getWidth() ?? 0
+        guard paneExtent > 0 else { return }
+        let proposedSidebarWidth = SidebarPresentationPolicy.sidebarWidth(
+            dividerCoordinate: proposedWidth,
+            paneExtent: paneExtent,
+            position: preferences.sidebarPosition
+        )
+        let maximum = max(SidebarWidthPolicy.collapsedWidth, paneExtent - 480)
+        let committed = SidebarWidthPolicy.constrainedLiveWidth(
+            for: Double(proposedSidebarWidth), maximumWidth: Double(maximum)
+        )
+        if committed != proposedSidebarWidth {
             applySidebarWidth(committed, persist: true)
             return
         }
@@ -188,7 +213,21 @@ private final class ApplicationState: @unchecked Sendable {
     private func applySidebarWidth(_ width: Int, persist: Bool) {
         let committed = SidebarWidthPolicy.committedWidth(for: Double(width))
         isApplyingSidebarWidth = true
-        sidebarPaned?.set(position: committed)
+        if let sidebarPaned {
+            let paneExtent = sidebarPaned.getWidth()
+            let divider: Int
+            if preferences.sidebarPosition == .left {
+                divider = committed
+            } else {
+                let effectiveExtent = paneExtent > 0 ? paneExtent : 1_440
+                divider = SidebarPresentationPolicy.dividerCoordinate(
+                    sidebarWidth: committed,
+                    paneExtent: effectiveExtent,
+                    position: .right
+                )
+            }
+            sidebarPaned.set(position: divider)
+        }
         isApplyingSidebarWidth = false
         preferences.sidebarWidth = committed
         preferences.lastExpandedSidebarWidth = SidebarWidthPolicy.updatedLastNonCollapsedWidth(
@@ -215,8 +254,84 @@ private final class ApplicationState: @unchecked Sendable {
     }
 
     private func updateSidebarVisibility() {
+        mountSidebarOverlay(preferences.isSidebarHidden)
+        isSidebarTemporarilyRevealed = false
         sidebarWidget?.set(visible: !preferences.isSidebarHidden)
         sidebarBrand?.set(visible: !preferences.isSidebarHidden)
+        sidebarEdgeTab?.set(visible:
+            preferences.isSidebarHidden && SidebarPresentationPolicy.hasAttention(snapshot)
+        )
+    }
+
+    private func mountSidebarOverlay(_ overlay: Bool) {
+        guard overlay != isSidebarOverlayMounted,
+              let sidebarWidget, let sidebarPaned, let sidebarHost else { return }
+        _ = sidebarWidget.ref()
+        if overlay {
+            if preferences.sidebarPosition == .left { sidebarPaned.setStart() } else { sidebarPaned.setEnd() }
+            sidebarWidget.setHalign(align: preferences.sidebarPosition == .left ? .start : .end)
+            sidebarWidget.setValign(align: .fill)
+            sidebarWidget.setSizeRequest(width: preferences.sidebarWidth, height: -1)
+            sidebarHost.addOverlay(widget: sidebarWidget)
+        } else {
+            sidebarHost.removeOverlay(widget: sidebarWidget)
+            sidebarWidget.setHalign(align: .fill)
+            if preferences.sidebarPosition == .left {
+                sidebarPaned.setStart(child: sidebarWidget)
+            } else {
+                sidebarPaned.setEnd(child: sidebarWidget)
+            }
+            applySidebarWidth(preferences.sidebarWidth, persist: false)
+        }
+        sidebarWidget.unref()
+        isSidebarOverlayMounted = overlay
+    }
+
+    func sidebarPointerMoved(x: Double, width: Double) {
+        guard preferences.isSidebarHidden else { return }
+        let proximity = SidebarPresentationPolicy.proximity(
+            pointerX: x, containerWidth: width, position: preferences.sidebarPosition
+        )
+        let withinRevealedBody: Bool
+        if preferences.sidebarPosition == .left {
+            withinRevealedBody = x <= Double(preferences.sidebarWidth)
+        } else {
+            withinRevealedBody = x >= width - Double(preferences.sidebarWidth)
+        }
+        if proximity == .revealed || (isSidebarTemporarilyRevealed && withinRevealedBody) {
+            sidebarRevealGeneration += 1
+            isSidebarTemporarilyRevealed = true
+            sidebarWidget?.set(visible: true)
+            sidebarEdgeTab?.set(visible: false)
+        } else if isSidebarTemporarilyRevealed {
+            scheduleSidebarOverlayHide()
+        }
+    }
+
+    func sidebarPointerLeft() {
+        guard preferences.isSidebarHidden, isSidebarTemporarilyRevealed else { return }
+        scheduleSidebarOverlayHide()
+    }
+
+    private func scheduleSidebarOverlayHide() {
+        sidebarRevealGeneration += 1
+        let generation = sidebarRevealGeneration
+        DispatchQueue.main.asyncAfter(deadline: .now() + .milliseconds(220)) { [weak self] in
+            performOnGTKMain {
+                guard let self, self.preferences.isSidebarHidden,
+                      self.sidebarRevealGeneration == generation else { return }
+                self.isSidebarTemporarilyRevealed = false
+                self.sidebarWidget?.set(visible: false)
+                self.sidebarEdgeTab?.set(visible: SidebarPresentationPolicy.hasAttention(self.snapshot))
+            }
+        }
+    }
+
+    func showSidebarPersistently() {
+        guard preferences.isSidebarHidden else { return }
+        preferences.isSidebarHidden = false
+        updateSidebarVisibility()
+        try? preferencesStore.save(preferences)
     }
 
     private func updateSidebarGeometry(_ width: Int) {
@@ -319,6 +434,14 @@ private final class ApplicationState: @unchecked Sendable {
         sidebarSearchEntry = entry
         noMatchesRoot = noMatches
         noMatchesDescription = description
+    }
+
+    func retainSearchController(_ controller: EventControllerKey) {
+        searchKeyController = controller
+    }
+
+    func retainSidebarMotionController(_ controller: EventControllerMotion) {
+        sidebarMotionController = controller
     }
 
     func clearSidebarSearch() {
@@ -649,10 +772,16 @@ private func buildWindow(for application: Gtk.ApplicationRef) {
     let brand = LabelRef(str: ">_  awesoMux"); brand.add(cssClass: "aw-brand")
     brand.setSizeRequest(width: SidebarChromeProjection.width, height: 38)
     let title = LabelRef(str: ""); title.add(cssClass: "aw-window-title"); title.setHexpand(expand: true)
-    titlebar.append(child: brand); titlebar.append(child: title); root.append(child: titlebar)
+    if state.configuredSidebarPosition == .left {
+        titlebar.append(child: brand); titlebar.append(child: title)
+    } else {
+        titlebar.append(child: title); titlebar.append(child: brand)
+    }
+    root.append(child: titlebar)
 
     let main = BoxRef(orientation: .horizontal, spacing: 0); main.setVexpand(expand: true)
     let sidebar = BoxRef(orientation: .vertical, spacing: 0); sidebar.add(cssClass: "aw-sidebar")
+    if state.configuredSidebarPosition == .right { sidebar.add(cssClass: "aw-right"); brand.add(cssClass: "aw-right") }
     sidebar.setSizeRequest(width: SidebarWidthPolicy.collapsedWidth, height: -1); sidebar.setHexpand(expand: false)
     let sidebarModes = BoxRef(orientation: .vertical, spacing: 0)
     sidebarModes.setHexpand(expand: true); sidebarModes.setVexpand(expand: true)
@@ -684,6 +813,8 @@ private func buildWindow(for application: Gtk.ApplicationRef) {
     searchKeys.onKeyPressed { [weak state] _, keyval, _, _ in
         state?.handleSidebarSearchKey(keyval) ?? false
     }
+    _ = searchKeys.ref()
+    state.retainSearchController(searchKeys)
     gtk_widget_add_controller(search.widget_ptr, searchKeys.event_controller_ptr)
     scroller.setVexpand(expand: true); scroller.set(child: groups); expandedSidebar.append(child: scroller)
     let sidebarFooter = state.makeSidebarFooter()
@@ -763,19 +894,43 @@ private func buildWindow(for application: Gtk.ApplicationRef) {
     stack.setSizeRequest(width: 480, height: -1)
     let sidebarPaned = PanedRef(orientation: .horizontal)
     sidebarPaned.setWideHandle(wide: false)
-    sidebarPaned.setStart(child: sidebar)
-    sidebarPaned.setEnd(child: stack)
+    if state.configuredSidebarPosition == .left {
+        sidebarPaned.setStart(child: sidebar)
+        sidebarPaned.setEnd(child: stack)
+    } else {
+        sidebarPaned.setStart(child: stack)
+        sidebarPaned.setEnd(child: sidebar)
+    }
     sidebarPaned.setHexpand(expand: true)
     sidebarPaned.setVexpand(expand: true)
+    let sidebarHost = OverlayRef(); sidebarHost.set(child: sidebarPaned)
+    sidebarHost.setHexpand(expand: true); sidebarHost.setVexpand(expand: true)
+    let edgeTab = ButtonRef(); edgeTab.add(cssClass: "aw-sidebar-edge-attention")
+    edgeTab.setTooltip(text: "Show Sidebar — workspace needs input")
+    edgeTab.setHalign(align: state.configuredSidebarPosition == .left ? .start : .end)
+    edgeTab.setValign(align: .center)
+    if state.configuredSidebarPosition == .right { edgeTab.add(cssClass: "aw-right") }
+    edgeTab.onClicked { [weak state] _ in state?.showSidebarPersistently() }
+    edgeTab.set(visible: false); sidebarHost.addOverlay(widget: edgeTab)
+    let edgeMotion = EventControllerMotion()
+    edgeMotion.onMotion { [weak state, sidebarHost] _, x, _ in
+        state?.sidebarPointerMoved(x: x, width: Double(sidebarHost.getWidth()))
+    }
+    edgeMotion.onLeave { [weak state] _ in state?.sidebarPointerLeft() }
+    _ = edgeMotion.ref()
+    state.retainSidebarMotionController(edgeMotion)
+    gtk_widget_add_controller(sidebarHost.widget_ptr, edgeMotion.event_controller_ptr)
     state.attachSidebar(
         paned: sidebarPaned,
         brand: brand,
         sidebar: sidebar,
         expanded: expandedSidebar,
         collapsed: rail,
-        railRows: railRows
+        railRows: railRows,
+        edgeTab: edgeTab,
+        host: sidebarHost
     )
-    main.append(child: sidebarPaned); root.append(child: main)
+    main.append(child: sidebarHost); root.append(child: main)
     window.set(child: root); window.present()
     if let selected = snapshot.selectedWorkspaceID { state.select(selected) }
 }

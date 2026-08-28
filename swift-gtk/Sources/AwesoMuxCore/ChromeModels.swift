@@ -158,6 +158,73 @@ public enum SidebarWidthMode: Equatable, Sendable {
     case collapsed
 }
 
+public enum SidebarProximityState: Equatable, Sendable {
+    case dormant
+    case cue
+    case revealed
+}
+
+public enum SidebarEdgeTabStyle: Equatable, Sendable {
+    case cue
+    case attention
+}
+
+public enum SidebarPresentationPolicy {
+    public static let revealDistance = 40
+
+    public static func proximity(
+        pointerX: Double,
+        containerWidth: Double,
+        position: SidebarPosition
+    ) -> SidebarProximityState {
+        guard pointerX.isFinite, containerWidth.isFinite, containerWidth > 0 else { return .dormant }
+        let clampedX = min(max(pointerX, 0), containerWidth)
+        let distance = position == .left ? clampedX : containerWidth - clampedX
+        return distance <= Double(revealDistance) ? .revealed : .cue
+    }
+
+    public static func sidebarWidth(
+        dividerCoordinate: Int,
+        paneExtent: Int,
+        position: SidebarPosition
+    ) -> Int {
+        guard paneExtent > 0 else { return 0 }
+        let divider = min(max(dividerCoordinate, 0), paneExtent)
+        return position == .left ? divider : paneExtent - divider
+    }
+
+    public static func dividerCoordinate(
+        sidebarWidth: Int,
+        paneExtent: Int,
+        position: SidebarPosition
+    ) -> Int {
+        guard paneExtent > 0 else { return 0 }
+        let width = min(max(sidebarWidth, 0), paneExtent)
+        return position == .left ? width : paneExtent - width
+    }
+
+    public static func edgeTabStyle(
+        isPersistentlyHidden: Bool,
+        proximity: SidebarProximityState,
+        hasAttention: Bool
+    ) -> SidebarEdgeTabStyle? {
+        guard isPersistentlyHidden else { return nil }
+        switch proximity {
+        case .revealed: return nil
+        case .cue: return .cue
+        case .dormant: return hasAttention ? .attention : nil
+        }
+    }
+
+    public static func hasAttention(_ snapshot: SessionSnapshot) -> Bool {
+        snapshot.groups.lazy
+            .flatMap(\.workspaces)
+            .filter { !$0.isSoftClosed }
+            .flatMap { $0.layout.panes }
+            .contains { $0.agentState == .needsAttention }
+    }
+}
+
 public enum SidebarWidthPolicy {
     public static let expandedWidth = 296
     public static let collapsedWidth = 60

@@ -67,9 +67,13 @@ geometry and state styling have also passed a real-window visual correction.
   reference 296-point expanded default, 60-point collapsed settlement, and
   250-point mode threshold while reserving at least 480 points for terminal
   content. The committed width and last expanded width persist defensively and
-  legacy preference files load with reference defaults. The rail's dedicated
-  controls, edge-hover reveal, and right-side host mode are not yet
-  implemented. Collapse/Expand Sidebar and Hide/Show Sidebar are native GTK
+  legacy preference files load with reference defaults. Configured right-side
+  host mode mirrors split children, divider math, titlebar order, resize
+  ownership, and edge borders. Hidden mode reparents the live sidebar into a
+  GTK overlay so the 40-point edge reveal preserves terminal geometry, holds
+  while occupied, and dismisses after the reference 220 ms grace. Needs
+  Attention exposes a tested, side-aware dormant edge tab. Collapse/Expand
+  Sidebar and Hide/Show Sidebar are native GTK
   actions with reference Linux-mapped shortcuts; hiding restores terminal
   focus and persists the hidden state.
 - Collapsed mode now renders a dedicated 60-point GTK rail instead of a clipped

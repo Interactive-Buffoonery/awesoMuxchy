@@ -71,8 +71,13 @@ help, and agent context while preserving the compact reference geometry.
   296-point default, 60-point rail settlement, 250-point mode threshold, and a
   480-point terminal minimum. Width and last-expanded width are defensively
   normalized in the existing owner-only profile preferences, including
-  backward-compatible loading of pre-width preference files. Dedicated rail
-  contents, hover reveal, and side switching remain in progress. Native
+  backward-compatible loading of pre-width preference files. Configured
+  left/right placement mirrors titlebar/sidebar order, divider-coordinate
+  math, resize ownership, and edge borders. Persistently hidden sidebars move
+  into a GTK overlay: the 40-point edge sensor reveals without resizing the
+  terminal, sidebar occupancy holds the reveal, and exit uses the reference
+  220 ms grace. A tested dormant-state attention policy shows a side-aware
+  discovery tab for Needs Attention. Native
   Collapse/Expand Sidebar and Hide/Show Sidebar commands use the reference
   Linux-mapped shortcuts; hiding first returns focus to the active terminal.
 - The 60-point mode now owns a separate GTK rail rather than clipping expanded
@@ -113,7 +118,7 @@ help, and agent context while preserving the compact reference geometry.
 1. Add the foreground-shell capability signal needed to gate inserted Git/gh
    commands as precisely as macOS does.
 2. Implement product-level split/close/recreate commands and teardown-race coverage.
-3. Complete collapsed/hidden/right-side sidebar presentation, then group
+3. Capture hidden/revealed/right-side sidebar presentation, then complete group
    creation, ordering controls, and dynamic menu enablement.
 4. Add bounded/coalesced persistence writes, recovery UI, and forced-termination tests.
 5. Continue through the root implementation order, capturing each required
