@@ -21,6 +21,7 @@ public struct SidebarWorkspaceRow: Equatable, Sendable {
     public let location: String
     public let paneCount: Int
     public let isSelected: Bool
+    public let searchHaystack: String
 }
 
 public struct SidebarGroupSection: Equatable, Sendable {
@@ -48,6 +49,11 @@ public struct SidebarChromeProjection: Equatable, Sendable {
                 rows: group.workspaces.compactMap { workspace in
                     guard !workspace.isSoftClosed else { return nil }
                     let pane = workspace.layout.pane(id: workspace.focusedPaneID)
+                    let searchValues = [group.name, workspace.name]
+                        + workspace.layout.panes.flatMap { pane in
+                            [pane.title, pane.workingDirectory, pane.ownership.searchToken,
+                             pane.agent ?? "", pane.agentState.searchToken]
+                        }
                     return SidebarWorkspaceRow(
                         id: workspace.id,
                         title: ChromeText.sanitized(workspace.name, limit: 120),
@@ -56,10 +62,93 @@ public struct SidebarChromeProjection: Equatable, Sendable {
                             homeDirectory: homeDirectory
                         ),
                         paneCount: workspace.layout.paneCount,
-                        isSelected: workspace.id == snapshot.selectedWorkspaceID
+                        isSelected: workspace.id == snapshot.selectedWorkspaceID,
+                        searchHaystack: SidebarSearchProjection.normalized(
+                            searchValues.joined(separator: " ")
+                        )
                     )
                 }
             )
+        }
+    }
+}
+
+public struct SidebarSearchOutput: Equatable, Sendable {
+    public let groups: [SidebarGroupSection]
+    public let orderedWorkspaceIDs: [UUID]
+    public let topMatchID: UUID?
+    public let isFiltering: Bool
+
+    public var hasMatches: Bool { !orderedWorkspaceIDs.isEmpty }
+}
+
+public enum SidebarSearchProjection {
+    public static func project(
+        snapshot: SessionSnapshot,
+        query: String,
+        homeDirectory: String = NSHomeDirectory()
+    ) -> SidebarSearchOutput {
+        let source = SidebarChromeProjection(snapshot: snapshot, homeDirectory: homeDirectory)
+        let needle = normalized(query)
+        guard !needle.isEmpty else {
+            let ordered = source.groups.flatMap { $0.rows.map(\.id) }
+            return SidebarSearchOutput(
+                groups: source.groups,
+                orderedWorkspaceIDs: ordered,
+                topMatchID: nil,
+                isFiltering: false
+            )
+        }
+
+        let groups = source.groups.compactMap { group -> SidebarGroupSection? in
+            let rows = group.rows.filter { $0.searchHaystack.contains(needle) }
+            guard !rows.isEmpty else { return nil }
+            return SidebarGroupSection(
+                id: group.id,
+                name: group.name,
+                color: group.color,
+                isExpanded: true,
+                rows: rows
+            )
+        }
+        let ordered = groups.flatMap { $0.rows.map(\.id) }
+        return SidebarSearchOutput(
+            groups: groups,
+            orderedWorkspaceIDs: ordered,
+            topMatchID: ordered.first,
+            isFiltering: true
+        )
+    }
+
+    static func normalized(_ value: String) -> String {
+        ChromeText.sanitized(value, limit: 8_192)
+            .folding(options: [.caseInsensitive, .diacriticInsensitive], locale: .current)
+            .lowercased()
+            .split(whereSeparator: \.isWhitespace)
+            .joined(separator: " ")
+    }
+}
+
+private extension SessionOwnership {
+    var searchToken: String {
+        switch self {
+        case .local: "local"
+        case .remoteZmx: "remote ssh zmx"
+        }
+    }
+}
+
+private extension AgentState {
+    var searchToken: String {
+        switch self {
+        case .idle: "idle"
+        case .running: "running"
+        case .waiting: "waiting needs input"
+        case .thinking: "thinking"
+        case .output: "output ready"
+        case .needsAttention: "needs input needs attention"
+        case .done: "done completed"
+        case .error: "error failed"
         }
     }
 }

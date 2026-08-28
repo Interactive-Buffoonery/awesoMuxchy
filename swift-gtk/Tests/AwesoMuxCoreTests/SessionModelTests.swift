@@ -307,6 +307,57 @@ private func snapshot(_ workspaces: [WorkspaceSnapshot]) -> SessionSnapshot {
     #expect(normalized.lastExpandedSidebarWidth == 296)
 }
 
+@Test func sidebarSearchProjectionUsesTitlesLocationsAgentsAndStatesInStableOrder() {
+    let firstPane = PaneSnapshot(
+        title: "Build logs",
+        workingDirectory: "/work/Café",
+        agent: "Codex",
+        agentState: .thinking
+    )
+    let first = WorkspaceSnapshot(name: "Frontend", focusedPaneID: firstPane.id, layout: .pane(firstPane))
+    let secondPane = PaneSnapshot(
+        title: "Deploy",
+        workingDirectory: "/srv/production",
+        agent: "Claude Code",
+        agentState: .needsAttention,
+        ownership: .remoteZmx
+    )
+    let second = WorkspaceSnapshot(name: "Operations", focusedPaneID: secondPane.id, layout: .pane(secondPane))
+    let value = SessionSnapshot(
+        selectedWorkspaceID: first.id,
+        groups: [WorkspaceGroupSnapshot(name: "Product", workspaces: [first, second])]
+    )
+
+    for query in ["frontend", "build logs", "cafe", "codex", "thinking", "local"] {
+        let output = SidebarSearchProjection.project(snapshot: value, query: query, homeDirectory: "/home/test")
+        #expect(output.orderedWorkspaceIDs == [first.id])
+        #expect(output.topMatchID == first.id)
+        #expect(output.isFiltering)
+    }
+    for query in ["operations", "production", "claude", "needs input", "remote", "ssh"] {
+        let output = SidebarSearchProjection.project(snapshot: value, query: query, homeDirectory: "/home/test")
+        #expect(output.orderedWorkspaceIDs == [second.id])
+    }
+    let groupMatch = SidebarSearchProjection.project(snapshot: value, query: "product")
+    #expect(groupMatch.orderedWorkspaceIDs == [first.id, second.id])
+}
+
+@Test func sidebarSearchTreatsWhitespaceAsInactiveAndReportsNoMatches() {
+    let first = workspace(panes: 1)
+    let second = workspace(panes: 1)
+    let value = snapshot([first, second])
+    let inactive = SidebarSearchProjection.project(snapshot: value, query: " \n\t ")
+    #expect(!inactive.isFiltering)
+    #expect(inactive.topMatchID == nil)
+    #expect(inactive.orderedWorkspaceIDs == [first.id, second.id])
+
+    let missing = SidebarSearchProjection.project(snapshot: value, query: "definitely absent")
+    #expect(missing.isFiltering)
+    #expect(!missing.hasMatches)
+    #expect(missing.groups.isEmpty)
+    #expect(missing.topMatchID == nil)
+}
+
 @Test func sidebarSelectionAndLongNamesPreserveWorkspaceIdentity() {
     let pane = PaneSnapshot(title: "shell", workingDirectory: "/tmp")
     let longName = String(repeating: "workspace", count: 40)

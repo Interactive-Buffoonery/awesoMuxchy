@@ -78,6 +78,7 @@ private final class ApplicationState: @unchecked Sendable {
       .aw-menu-heading{padding:5px 7px 2px;color:#7f849c;font-family:monospace;font-size:9px;font-weight:700;letter-spacing:1px;}
       button.aw-menu-row{min-height:30px;padding:4px 7px;color:#cdd6f4;background:transparent;border:0;border-radius:5px;font-size:11px;}
       button.aw-menu-row:hover{background:#3a3b4d;}.aw-menu-disabled{padding:7px;color:#6c7086;font-size:10px;}
+      .aw-no-matches{padding:14px;background:rgba(250,179,135,.10);border:1px dashed rgba(250,179,135,.35);border-radius:9px;}.aw-no-matches-title{color:#fab387;font-family:monospace;font-size:10px;font-weight:700;letter-spacing:1px;}.aw-no-matches-copy{color:#7f849c;font-size:11px;}button.aw-clear-search{min-height:24px;padding:4px 9px;color:#11111b;background:#fab387;border:0;border-radius:12px;font-family:monospace;font-size:10px;font-weight:700;}
       menubutton.aw-icon-menu>button,button.aw-icon-button,button.aw-agent-total{min-width:22px;min-height:22px;padding:0;color:#7f849c;background:transparent;border:0;border-radius:5px;}
       menubutton.aw-icon-menu>button:hover,button.aw-icon-button:hover,button.aw-agent-total:hover{color:#cdd6f4;background:rgba(205,214,244,.09);}
       .aw-agent-panel{background:#181825;border-top:1px solid #313244;}.aw-agent-state{padding:1px 4px;font-family:monospace;font-size:9px;font-weight:700;}
@@ -98,13 +99,14 @@ private final class ApplicationState: @unchecked Sendable {
     private var rows: [UUID: ToggleButtonRef] = [:]
     private var railRows: [UUID: ToggleButtonRef] = [:]
     private var metadata: [UUID: LabelRef] = [:]
-    private var searchText: [UUID: String] = [:]
     private var workspaceIDsByGroup: [UUID: [UUID]] = [:]
     private var groupRoots: [UUID: BoxRef] = [:]
     private var groupBodies: [UUID: BoxRef] = [:]
     private var groupChevrons: [UUID: LabelRef] = [:]
     private var groupCounts: [UUID: LabelRef] = [:]
-    private var groupNames: [UUID: String] = [:]
+    private var noMatchesRoot: BoxRef?
+    private var noMatchesDescription: LabelRef?
+    private var sidebarSearchEntry: SearchEntryRef?
     private var stack: StackRef?
     private var title: LabelRef?
     private var rootWidget: BoxRef?
@@ -276,7 +278,7 @@ private final class ApplicationState: @unchecked Sendable {
                        chevron: LabelRef, count: LabelRef) {
         groupRoots[group.id] = root; groupBodies[group.id] = body; groupChevrons[group.id] = chevron
         groupCounts[group.id] = count
-        groupNames[group.id] = group.name.lowercased(); workspaceIDsByGroup[group.id] = group.rows.map(\.id)
+        workspaceIDsByGroup[group.id] = group.rows.map(\.id)
         body.set(visible: group.isExpanded)
     }
 
@@ -289,17 +291,33 @@ private final class ApplicationState: @unchecked Sendable {
     }
 
     func filter(_ query: String) {
-        let needle = query.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        let projection = SidebarSearchProjection.project(snapshot: snapshot, query: query)
+        let visibleWorkspaceIDs = Set(projection.orderedWorkspaceIDs)
+        let visibleGroupIDs = Set(projection.groups.map(\.id))
         for group in snapshot.groups {
-            var any = false
             for id in workspaceIDsByGroup[group.id] ?? [] {
-                let match = needle.isEmpty || searchText[id, default: ""].contains(needle)
-                rows[id]?.set(visible: match); any = any || match
+                rows[id]?.set(visible: !projection.isFiltering || visibleWorkspaceIDs.contains(id))
             }
-            let visible = needle.isEmpty || any || groupNames[group.id, default: ""].contains(needle)
-            groupRoots[group.id]?.set(visible: visible)
-            groupBodies[group.id]?.set(visible: needle.isEmpty ? !group.isCollapsed : visible)
+            groupRoots[group.id]?.set(visible: !projection.isFiltering || visibleGroupIDs.contains(group.id))
+            groupBodies[group.id]?.set(visible: projection.isFiltering ? visibleGroupIDs.contains(group.id) : !group.isCollapsed)
         }
+        let showsNoMatches = projection.isFiltering && !projection.hasMatches
+        noMatchesRoot?.set(visible: showsNoMatches)
+        if showsNoMatches {
+            let normalized = query.trimmingCharacters(in: .whitespacesAndNewlines)
+            noMatchesDescription?.label = "Nothing matched \"\(ChromeText.sanitized(normalized, limit: 120))\"."
+        }
+    }
+
+    func attachSearch(entry: SearchEntryRef, noMatches: BoxRef, description: LabelRef) {
+        sidebarSearchEntry = entry
+        noMatchesRoot = noMatches
+        noMatchesDescription = description
+    }
+
+    func clearSidebarSearch() {
+        sidebarSearchEntry?.text = ""
+        filter("")
     }
 
     func install(workspace: WorkspaceSnapshot, groupID: UUID, pageName: String,
@@ -328,7 +346,6 @@ private final class ApplicationState: @unchecked Sendable {
         details.append(child: name); details.append(child: meta); content.append(child: details); row.set(child: content)
         row.onClicked { [weak self] _ in self?.select(workspace.id) }
         rows[workspace.id] = row; metadata[workspace.id] = meta
-        searchText[workspace.id] = "\(workspace.name) \(location)".lowercased()
         if !(workspaceIDsByGroup[groupID] ?? []).contains(workspace.id) { workspaceIDsByGroup[groupID, default: []].append(workspace.id) }
         return row
     }
@@ -371,7 +388,6 @@ private final class ApplicationState: @unchecked Sendable {
         }
         let suffix = workspace.layout.paneCount > 1 ? "  ·  ▮▮ \(workspace.layout.paneCount)" : ""
         metadata[workspaceID]?.label = candidate.path + suffix
-        searchText[workspaceID] = "\(workspace.name) \(candidate.project) \(candidate.path)".lowercased()
         sidebarFooter?.update(AgentFooterSummary(snapshot: snapshot))
     }
 
@@ -615,6 +631,15 @@ private func buildWindow(for application: Gtk.ApplicationRef) {
     let groups = BoxRef(orientation: .vertical, spacing: 14)
     groups.setMarginStart(margin: 10); groups.setMarginEnd(margin: 10); groups.setMarginTop(margin: 6); groups.setMarginBottom(margin: 8)
     let scroller = ScrolledWindowRef(); scroller.setPolicy(hscrollbarPolicy: .never, vscrollbarPolicy: .automatic)
+    let noMatches = BoxRef(orientation: .vertical, spacing: 10); noMatches.add(cssClass: "aw-no-matches")
+    let noMatchesTitle = LabelRef(str: "●  NO MATCHES"); noMatchesTitle.add(cssClass: "aw-no-matches-title"); noMatchesTitle.xalign = 0
+    let noMatchesDescription = LabelRef(str: ""); noMatchesDescription.add(cssClass: "aw-no-matches-copy")
+    noMatchesDescription.xalign = 0; noMatchesDescription.set(wrap: true)
+    let clearSearch = ButtonRef(label: "Clear search"); clearSearch.add(cssClass: "aw-clear-search"); clearSearch.setHalign(align: .start)
+    clearSearch.onClicked { [weak state] _ in state?.clearSidebarSearch() }
+    noMatches.append(child: noMatchesTitle); noMatches.append(child: noMatchesDescription); noMatches.append(child: clearSearch)
+    noMatches.set(visible: false); groups.append(child: noMatches)
+    state.attachSearch(entry: search, noMatches: noMatches, description: noMatchesDescription)
     scroller.setVexpand(expand: true); scroller.set(child: groups); expandedSidebar.append(child: scroller)
     let sidebarFooter = state.makeSidebarFooter()
     expandedSidebar.append(child: sidebarFooter.root)

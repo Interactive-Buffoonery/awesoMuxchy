@@ -78,6 +78,12 @@ geometry and state styling have also passed a real-window visual correction.
   authoritative session state, and its footer cycles through live agent panes.
   The expanded search text node has an owned theme style and the exact
   `Search sessions` placeholder. Full visual acceptance remains pending.
+- Search visibility is now driven by a pure `SidebarSearchProjection` that
+  normalizes whitespace/diacritics and searches group/workspace/pane titles,
+  paths, local/remote identity, agent/provider names, and state vocabulary in
+  deterministic render order. The expanded sidebar includes the reference
+  no-matches copy and a working `Clear search` action. Highlight ranges and
+  explicit Up/Down/Return result navigation remain pending.
 
 ## Remaining vertical-slice hardening
 

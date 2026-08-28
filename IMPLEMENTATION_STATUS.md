@@ -82,6 +82,13 @@ help, and agent context while preserving the compact reference geometry.
   the exact `Search sessions` placeholder and an owned dark-theme text-node
   style. A trustworthy collapsed screenshot is still pending because the
   available raw X11 window capture does not composite client-side GTK damage.
+- Sidebar filtering now runs through a pure deterministic projection rather
+  than mutable per-row substring caches. It searches group/workspace and pane
+  titles, local and remote paths, execution identity, agent/provider identity,
+  and canonical state tokens with diacritic-insensitive normalization. Focused
+  tests cover stable ordering, whitespace-only queries, top match, remote/SSH,
+  Needs Input, and no-result behavior; the GTK sidebar now renders the exact
+  no-matches description and `Clear search` action.
 - A real inspected screenshot and comparison index were pushed in focused
   visual-QA commits `4149963` and `01cc8d7`.
 
