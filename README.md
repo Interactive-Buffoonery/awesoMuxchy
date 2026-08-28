@@ -22,6 +22,14 @@ artifacts/visual-qa/swift-gtk/
 artifacts/visual-qa/rust-gtk/
 ```
 
+## Visual QA index
+
+| Date | Track | Milestone | Evidence |
+| --- | --- | --- | --- |
+| 2026-08-28 | SwiftGtk4 | Pinned Ghostty renders two independent terminal surfaces in one native GTK4 window. Prompts are intentionally sanitized. | [Open full-resolution PNG](artifacts/visual-qa/swift-gtk/2026-08-28-terminal-integration.png) |
+
+![SwiftGtk4 terminal integration milestone](artifacts/visual-qa/swift-gtk/2026-08-28-terminal-integration.png)
+
 The macOS awesoMux project is a read-only reference. Work in this repository
 must never change it.
 
