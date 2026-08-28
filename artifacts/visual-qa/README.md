@@ -1,5 +1,31 @@
 # Visual QA
 
+## 2026-08-28 — SwiftGtk4 footer feature parity
+
+- Linux images: [focused Git footer](swift-gtk/progress/08-footer-parity/focused-git-footer-x11.png)
+  and [agent-state footer](swift-gtk/progress/08-footer-parity/agent-status-footer-x11.png).
+- Reference: awesoMux macOS at `fed33ff47c559344fc6db6fa53f16e75fcc4a116`.
+- Captured content size: 1440 × 852 on X11/GLX under XWayland.
+- Implemented terminal behavior: focused local panes expose the path/editor/
+  Files/copy menu, branch and recent-branch actions, dirty and upstream counts,
+  open PR actions, and failing/running CI actions. Resolution is bounded,
+  concurrent, prompt-free, HTTPS-validated, and stale-identity guarded.
+- Implemented sidebar behavior: Quick Settings, Help & Feedback, live
+  thinking/output/attention counts, total agents, and an expandable activity
+  list. The second image uses a profile-scoped two-agent fixture to exercise
+  thinking and needs-attention states without altering the default profile.
+- Verification: the full local preflight passed 32 Swift tests, the release
+  terminal integration harness, and 100 two-surface lifecycle cycles. Both
+  images were opened and visually inspected after the real app resolved its
+  background footer context through the GTK main loop.
+- Privacy: no terminal history, command output, credentials, clipboard data,
+  or arbitrary agent output is shown. The local repository-style path and
+  branch metadata are intentionally visible.
+- Visible differences: GTK icon/font metrics and Files/editor discovery follow
+  Linux conventions. Foreground-shell detection, full settings panes,
+  notification delivery, and live agent-runtime event ingestion remain later
+  milestones; footer actions never auto-submit inserted terminal commands.
+
 ## 2026-08-28 — SwiftGtk4 sidebar and focused-pane footer chrome
 
 - Linux images: [populated selected workspace](swift-gtk/progress/07-sidebar-footer/populated-selected-x11.png)
