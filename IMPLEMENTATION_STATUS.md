@@ -75,6 +75,13 @@ help, and agent context while preserving the compact reference geometry.
   contents, hover reveal, and side switching remain in progress. Native
   Collapse/Expand Sidebar and Hide/Show Sidebar commands use the reference
   Linux-mapped shortcuts; hiding first returns focus to the active terminal.
+- The 60-point mode now owns a separate GTK rail rather than clipping expanded
+  controls. It includes 40-point search/command-palette and creation controls,
+  live workspace selection buttons, and a collapsed footer whose total-agent
+  control cycles through the live pane roster. The expanded search field uses
+  the exact `Search sessions` placeholder and an owned dark-theme text-node
+  style. A trustworthy collapsed screenshot is still pending because the
+  available raw X11 window capture does not composite client-side GTK damage.
 - A real inspected screenshot and comparison index were pushed in focused
   visual-QA commits `4149963` and `01cc8d7`.
 

@@ -49,8 +49,12 @@ private final class ApplicationState: @unchecked Sendable {
       .aw-root,.aw-content{background:#1e1e2e;}.aw-titlebar{min-height:38px;background:#11111b;border-bottom:1px solid #313244;}
       .aw-brand{min-width:60px;color:#cdd6f4;background:#181825;border-right:1px solid #313244;font-size:13px;font-weight:700;}
       .aw-window-title{color:#a6adc8;font-size:12px;font-weight:600;}.aw-sidebar{background:#181825;border-right:1px solid #313244;}
-      searchentry.aw-search entry{min-height:30px;color:#cdd6f4;background:#313244;border:1px solid #45475a;border-radius:7px;font-size:11px;}
+      searchentry.aw-search{min-height:30px;color:#cdd6f4;background-color:#313244;background-image:none;border:1px solid #45475a;border-radius:7px;font-size:11px;box-shadow:none;}
+      searchentry.aw-search > text,.aw-search-text{color:#cdd6f4;background-color:#313244;background-image:none;border-color:#45475a;border-radius:7px;box-shadow:none;caret-color:#cdd6f4;}
       button.aw-add{min-width:30px;min-height:30px;padding:0;color:#a6adc8;background:#313244;border:1px solid #45475a;border-radius:7px;font-size:18px;}
+      button.aw-rail-control,button.aw-rail-row{min-width:40px;min-height:40px;padding:0;color:#a6adc8;background:transparent;border:1px solid transparent;border-radius:8px;font-family:monospace;font-size:12px;font-weight:700;}
+      button.aw-rail-control:hover,button.aw-rail-row:hover{color:#cdd6f4;background:rgba(205,214,244,.07);}button.aw-rail-row:checked{color:#cdd6f4;background:#313244;border-color:rgba(137,180,250,.55);box-shadow:inset 3px 0 #89b4fa;}
+      .aw-rail{min-width:60px;background:#181825;border-right:1px solid #313244;}.aw-rail-footer{min-height:38px;border-top:1px solid #313244;}
       button.aw-add:hover{color:#cdd6f4;background:#3a3b4d;}button.aw-group{min-height:22px;padding:0 4px;color:#7f849c;background:transparent;border:0;font-family:monospace;font-size:10px;font-weight:700;letter-spacing:1px;}
       button.aw-group:hover{color:#a6adc8;background:transparent;}.aw-count{color:#6c7086;font-size:10px;}.aw-marker{font-size:9px;}
       .aw-mauve{color:#cba6f7;}.aw-peach{color:#fab387;}.aw-green{color:#a6e3a1;}.aw-teal{color:#94e2d5;}.aw-blue{color:#89b4fa;}.aw-pink{color:#f5c2e7;}.aw-yellow{color:#f9e2af;}.aw-red{color:#f38ba8;}.aw-gray{color:#9399b2;}.aw-sky{color:#89dceb;}.aw-lavender{color:#b4befe;}
@@ -92,6 +96,7 @@ private final class ApplicationState: @unchecked Sendable {
     private var workspaceByPane: [UUID: UUID] = [:]
     private var runtimes: [UUID: WorkspaceRuntime] = [:]
     private var rows: [UUID: ToggleButtonRef] = [:]
+    private var railRows: [UUID: ToggleButtonRef] = [:]
     private var metadata: [UUID: LabelRef] = [:]
     private var searchText: [UUID: String] = [:]
     private var workspaceIDsByGroup: [UUID: [UUID]] = [:]
@@ -107,6 +112,9 @@ private final class ApplicationState: @unchecked Sendable {
     private var sidebarPaned: PanedRef?
     private var sidebarBrand: LabelRef?
     private var sidebarWidget: BoxRef?
+    private var expandedSidebarWidget: BoxRef?
+    private var collapsedSidebarWidget: BoxRef?
+    private var sidebarRailRows: BoxRef?
     private var isApplyingSidebarWidth = false
     private var context = FocusedPaneContextCoordinator()
     private var actions: [GIO.SimpleAction] = []
@@ -131,10 +139,20 @@ private final class ApplicationState: @unchecked Sendable {
         applyTheme(); sidebarFooter.update(AgentFooterSummary(snapshot: snapshot))
     }
 
-    func attachSidebar(paned: PanedRef, brand: LabelRef, sidebar: BoxRef) {
+    func attachSidebar(
+        paned: PanedRef,
+        brand: LabelRef,
+        sidebar: BoxRef,
+        expanded: BoxRef,
+        collapsed: BoxRef,
+        railRows: BoxRef
+    ) {
         sidebarPaned = paned
         sidebarBrand = brand
         sidebarWidget = sidebar
+        expandedSidebarWidget = expanded
+        collapsedSidebarWidget = collapsed
+        sidebarRailRows = railRows
         paned.setResizeStartChild(resize: false)
         paned.setShrinkStartChild(resize: true)
         paned.setResizeEndChild(resize: true)
@@ -200,6 +218,13 @@ private final class ApplicationState: @unchecked Sendable {
         sidebarBrand?.setSizeRequest(width: width, height: 38)
         sidebarBrand?.label = width < SidebarWidthPolicy.railThreshold ? ">_" : ">_  awesoMux"
         sidebarWidget?.setSizeRequest(width: SidebarWidthPolicy.collapsedWidth, height: -1)
+        if width < SidebarWidthPolicy.railThreshold {
+            expandedSidebarWidget?.set(visible: false)
+            collapsedSidebarWidget?.set(visible: true)
+        } else {
+            collapsedSidebarWidget?.set(visible: false)
+            expandedSidebarWidget?.set(visible: true)
+        }
     }
 
     func makePathBar() -> FocusedPanePathBar {
@@ -308,11 +333,23 @@ private final class ApplicationState: @unchecked Sendable {
         return row
     }
 
+    func makeRailRow(workspace: WorkspaceSnapshot) -> ToggleButtonRef {
+        let button = ToggleButtonRef()
+        button.set(iconName: "utilities-terminal-symbolic")
+        button.add(cssClass: "aw-rail-row")
+        button.setSizeRequest(width: 40, height: 40)
+        button.setTooltip(text: ChromeText.sanitized(workspace.name, limit: 120))
+        button.onClicked { [weak self] _ in self?.select(workspace.id) }
+        railRows[workspace.id] = button
+        return button
+    }
+
     func select(_ workspaceID: UUID) {
         guard let runtime = runtimes[workspaceID], let stack else { return }
         try? snapshot.selectWorkspace(workspaceID)
         runtime.pageName.withCString { stack.setVisibleChild(name: $0) }
         for (id, row) in rows { row.setActive(isActive: id == workspaceID) }
+        for (id, row) in railRows { row.setActive(isActive: id == workspaceID) }
         title?.label = ChromeText.sanitized(snapshot.workspace(id: workspaceID)?.name ?? "", limit: 120)
         updateChrome(workspaceID); focus(runtime.focusedPaneID); persist()
     }
@@ -398,6 +435,37 @@ private final class ApplicationState: @unchecked Sendable {
         window.set(child: box); window.present()
     }
 
+    func showCommandPalette() {
+        let window = WindowRef()
+        window.title = "Command Palette"
+        window.setDefaultSize(width: 520, height: 420)
+        let root = BoxRef(orientation: .vertical, spacing: 8)
+        root.setMarginStart(margin: 16); root.setMarginEnd(margin: 16)
+        root.setMarginTop(margin: 16); root.setMarginBottom(margin: 16)
+        let search = SearchEntryRef(); search.setPlaceholder(text: "Search workspaces and actions...")
+        let results = BoxRef(orientation: .vertical, spacing: 3)
+        let implemented: Set<CommandID> = [.newWorkspace, .newWorkspaceInCurrentDirectory,
+            .previousWorkspace, .nextWorkspace, .previousPane, .nextPane,
+            .toggleSidebarWidth, .toggleSidebarVisibility]
+        var commandRows: [(String, ButtonRef)] = []
+        for definition in CommandCatalog.definitions where implemented.contains(definition.id) {
+            let button = ButtonRef(label: definition.action)
+            button.add(cssClass: "aw-menu-row"); button.setHalign(align: .fill)
+            button.onClicked { [weak self, window] _ in
+                window.close(); self?.perform(definition.id)
+            }
+            results.append(child: button)
+            commandRows.append((definition.action.lowercased(), button))
+        }
+        search.onSearchChanged { entry in
+            let query = (entry.text ?? "").trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+            for (title, button) in commandRows { button.set(visible: query.isEmpty || title.contains(query)) }
+        }
+        let scroller = ScrolledWindowRef(); scroller.setVexpand(expand: true); scroller.set(child: results)
+        root.append(child: search); root.append(child: scroller)
+        window.set(child: root); window.present()
+    }
+
     private func persist() {
         do { try store.save(snapshot); isPersistencePaused = false } catch { isPersistencePaused = true }
     }
@@ -469,6 +537,7 @@ private final class ApplicationState: @unchecked Sendable {
         surface.widget.setVexpand(expand: true); page.append(child: surface.widget); page.append(child: pathBar.root)
         let pageName = workspace.id.uuidString; _ = pageName.withCString { stack.addNamed(child: page, name: $0) }
         body.append(child: makeRow(workspace: workspace, groupID: group.id)); body.set(visible: true)
+        sidebarRailRows?.append(child: makeRailRow(workspace: workspace))
         groupCounts[group.id]?.label = "\(snapshot.groups.first(where: { $0.id == group.id })?.workspaces.filter { !$0.isSoftClosed }.count ?? 0)"
         install(workspace: workspace, groupID: group.id, pageName: pageName, pathBar: pathBar, focusedSurface: surface)
         select(workspace.id)
@@ -529,22 +598,47 @@ private func buildWindow(for application: Gtk.ApplicationRef) {
     let main = BoxRef(orientation: .horizontal, spacing: 0); main.setVexpand(expand: true)
     let sidebar = BoxRef(orientation: .vertical, spacing: 0); sidebar.add(cssClass: "aw-sidebar")
     sidebar.setSizeRequest(width: SidebarWidthPolicy.collapsedWidth, height: -1); sidebar.setHexpand(expand: false)
+    let sidebarModes = BoxRef(orientation: .vertical, spacing: 0)
+    sidebarModes.setHexpand(expand: true); sidebarModes.setVexpand(expand: true)
+    let expandedSidebar = BoxRef(orientation: .vertical, spacing: 0)
     let header = BoxRef(orientation: .horizontal, spacing: 6)
     header.setMarginStart(margin: 10); header.setMarginEnd(margin: 10); header.setMarginTop(margin: 10); header.setMarginBottom(margin: 8)
     let search = SearchEntryRef(); search.add(cssClass: "aw-search"); search.setHexpand(expand: true)
-    search.setPlaceholder(text: "Search"); search.setSizeRequest(width: 108, height: 30)
+    search.getFirstChild()?.add(cssClass: "aw-search-text")
+    search.setPlaceholder(text: "Search sessions"); search.setSizeRequest(width: 108, height: 30)
     search.setWidthChars(nChars: 8); search.setMaxWidthChars(nChars: 8)
     search.onSearchChanged { [weak state] entry in state?.filter(entry.text ?? "") }
     let add = ButtonRef(label: "+"); add.add(cssClass: "aw-add")
     add.setTooltip(text: "New Workspace in Current Directory"); add.onClicked { [weak state] _ in state?.createWorkspace() }
-    header.append(child: search); header.append(child: add); sidebar.append(child: header)
+    header.append(child: search); header.append(child: add); expandedSidebar.append(child: header)
 
     let groups = BoxRef(orientation: .vertical, spacing: 14)
     groups.setMarginStart(margin: 10); groups.setMarginEnd(margin: 10); groups.setMarginTop(margin: 6); groups.setMarginBottom(margin: 8)
     let scroller = ScrolledWindowRef(); scroller.setPolicy(hscrollbarPolicy: .never, vscrollbarPolicy: .automatic)
-    scroller.setVexpand(expand: true); scroller.set(child: groups); sidebar.append(child: scroller)
+    scroller.setVexpand(expand: true); scroller.set(child: groups); expandedSidebar.append(child: scroller)
     let sidebarFooter = state.makeSidebarFooter()
-    sidebar.append(child: sidebarFooter.root)
+    expandedSidebar.append(child: sidebarFooter.root)
+
+    let rail = BoxRef(orientation: .vertical, spacing: 6); rail.add(cssClass: "aw-rail")
+    rail.setMarginStart(margin: 10); rail.setMarginEnd(margin: 10)
+    rail.setMarginTop(margin: 10); rail.setMarginBottom(margin: 0)
+    let railSearch = ButtonRef(); railSearch.set(iconName: "system-search-symbolic")
+    railSearch.add(cssClass: "aw-rail-control")
+    railSearch.setTooltip(text: "Search workspaces and actions")
+    railSearch.onClicked { [weak state] _ in state?.showCommandPalette() }
+    let railAdd = ButtonRef(); railAdd.set(iconName: "list-add-symbolic")
+    railAdd.add(cssClass: "aw-rail-control")
+    railAdd.setTooltip(text: "New Workspace in Current Directory")
+    railAdd.onClicked { [weak state] _ in state?.createWorkspace() }
+    rail.append(child: railSearch); rail.append(child: railAdd)
+    let railRows = BoxRef(orientation: .vertical, spacing: 5)
+    let railScroller = ScrolledWindowRef(); railScroller.setPolicy(hscrollbarPolicy: .never, vscrollbarPolicy: .automatic)
+    railScroller.setVexpand(expand: true); railScroller.set(child: railRows); rail.append(child: railScroller)
+    sidebarFooter.collapsedRoot.add(cssClass: "aw-rail-footer")
+    rail.append(child: sidebarFooter.collapsedRoot)
+    sidebarModes.append(child: expandedSidebar); sidebarModes.append(child: rail)
+    expandedSidebar.set(visible: true); rail.set(visible: false)
+    sidebar.append(child: sidebarModes)
 
     let stack = StackRef(); stack.add(cssClass: "aw-content"); stack.setHexpand(expand: true); stack.setVexpand(expand: true)
     stack.set(hhomogeneous: true); stack.set(vhomogeneous: true)
@@ -591,6 +685,7 @@ private func buildWindow(for application: Gtk.ApplicationRef) {
             page.append(child: layout.0); page.append(child: pathBar.root)
             let pageName = workspace.id.uuidString; _ = pageName.withCString { stack.addNamed(child: page, name: $0) }
             body.append(child: state.makeRow(workspace: workspace, groupID: group.id))
+            railRows.append(child: state.makeRailRow(workspace: workspace))
             state.install(workspace: workspace, groupID: group.id, pageName: pageName, pathBar: pathBar, focusedSurface: focused)
         }
     }
@@ -602,7 +697,14 @@ private func buildWindow(for application: Gtk.ApplicationRef) {
     sidebarPaned.setEnd(child: stack)
     sidebarPaned.setHexpand(expand: true)
     sidebarPaned.setVexpand(expand: true)
-    state.attachSidebar(paned: sidebarPaned, brand: brand, sidebar: sidebar)
+    state.attachSidebar(
+        paned: sidebarPaned,
+        brand: brand,
+        sidebar: sidebar,
+        expanded: expandedSidebar,
+        collapsed: rail,
+        railRows: railRows
+    )
     main.append(child: sidebarPaned); root.append(child: main)
     window.set(child: root); window.present()
     if let selected = snapshot.selectedWorkspaceID { state.select(selected) }

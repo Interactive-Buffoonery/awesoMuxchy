@@ -72,6 +72,12 @@ geometry and state styling have also passed a real-window visual correction.
   implemented. Collapse/Expand Sidebar and Hide/Show Sidebar are native GTK
   actions with reference Linux-mapped shortcuts; hiding restores terminal
   focus and persists the hidden state.
+- Collapsed mode now renders a dedicated 60-point GTK rail instead of a clipped
+  expanded hierarchy. Its 40-point search control opens a working filtered
+  command palette, its create control and workspace buttons route through the
+  authoritative session state, and its footer cycles through live agent panes.
+  The expanded search text node has an owned theme style and the exact
+  `Search sessions` placeholder. Full visual acceptance remains pending.
 
 ## Remaining vertical-slice hardening
 

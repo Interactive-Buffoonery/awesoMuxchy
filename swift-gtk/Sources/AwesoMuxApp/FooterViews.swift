@@ -295,6 +295,7 @@ final class SidebarStatusFooter {
     }
 
     let root = BoxRef(orientation: .vertical, spacing: 0)
+    let collapsedRoot = BoxRef(orientation: .horizontal, spacing: 2)
     private let activityPanel = BoxRef(orientation: .vertical, spacing: 4)
     private let activityRows = BoxRef(orientation: .vertical, spacing: 2)
     private let thinking = LabelRef(str: "")
@@ -303,9 +304,13 @@ final class SidebarStatusFooter {
     private let total = ButtonRef()
     private let totalLabel = LabelRef(str: "0 agents  ⌃")
     private let quickSettings = MenuButtonRef()
+    private let collapsedTotal = ButtonRef()
+    private let collapsedTotalLabel = LabelRef(str: "0")
     private let actions: Actions
     private var preferences: AppPreferences
     private var isExpanded = false
+    private var latestSummary = AgentFooterSummary(snapshot: SessionSnapshot())
+    private var collapsedSelectionIndex = 0
 
     init(preferences: AppPreferences, actions: Actions) {
         self.preferences = preferences
@@ -376,13 +381,34 @@ final class SidebarStatusFooter {
         total.onClicked { [weak self] _ in self?.setExpanded(!(self?.isExpanded ?? false)) }
         bar.append(child: total)
         root.append(child: bar)
+
+        collapsedRoot.add(cssClass: "aw-sidebar-footer")
+        collapsedRoot.setMarginStart(margin: 4)
+        collapsedRoot.setMarginEnd(margin: 4)
+        let collapsedSettings = MenuButtonRef()
+        collapsedSettings.add(cssClass: "aw-icon-menu")
+        collapsedSettings.set(hasFrame: false)
+        collapsedSettings.set(alwaysShowArrow: false)
+        collapsedSettings.set(iconName: "emblem-system-symbolic")
+        collapsedSettings.setTooltip(text: "Quick Settings")
+        collapsedSettings.set(popover: quickSettingsPopover())
+        collapsedRoot.append(child: collapsedSettings)
+        collapsedTotal.add(cssClass: "aw-agent-total")
+        collapsedTotal.set(child: collapsedTotalLabel)
+        collapsedTotal.setTooltip(text: "No agents running")
+        collapsedTotal.onClicked { [weak self] _ in self?.selectNextCollapsedAgent() }
+        collapsedRoot.append(child: collapsedTotal)
     }
 
     func update(_ summary: AgentFooterSummary) {
+        latestSummary = summary
         stateLabel(thinking, count: summary.thinkingCount, symbol: "●", name: "thinking")
         stateLabel(output, count: summary.outputCount, symbol: "●", name: "output ready")
         stateLabel(attention, count: summary.needsAttentionCount, symbol: "●", name: "needs attention")
         totalLabel.label = "\(summary.totalCount) \(summary.totalCount == 1 ? "agent" : "agents")  \(isExpanded ? "⌄" : "⌃")"
+        collapsedTotalLabel.label = summary.totalCount > 99 ? "99+" : String(summary.totalCount)
+        collapsedTotal.setTooltip(text: summary.rows.isEmpty ? "No agents running" : "Jump to next agent pane")
+        collapsedTotal.set(sensitive: !summary.rows.isEmpty)
 
         var child = activityRows.getFirstChild()
         while let current = child {
@@ -403,6 +429,14 @@ final class SidebarStatusFooter {
                 activityRows.append(child: button)
             }
         }
+    }
+
+    private func selectNextCollapsedAgent() {
+        guard !latestSummary.rows.isEmpty else { return }
+        let index = collapsedSelectionIndex % latestSummary.rows.count
+        let row = latestSummary.rows[index]
+        collapsedSelectionIndex = (index + 1) % latestSummary.rows.count
+        actions.selectPane(row.workspaceID, row.paneID)
     }
 
     private func stateLabel(_ label: LabelRef, count: Int, symbol: String, name: String) {
