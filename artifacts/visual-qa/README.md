@@ -1,5 +1,23 @@
 # Visual QA
 
+## 2026-08-28 — SwiftGtk4 New Workspace command
+
+- Linux image: [new-workspace-command-x11.png](swift-gtk/progress/06-workspace-commands/new-workspace-command-x11.png)
+- Reference: awesoMux macOS at `fed33ff47c559344fc6db6fa53f16e75fcc4a116`.
+- Captured content size: 1440 × 852.
+- Implemented behavior: the exported native GTK `New Workspace` action created
+  and selected an `Untitled Workspace`, inserted its sidebar row, launched a
+  distinct Ghostty surface, focused it, and atomically persisted the expanded
+  grouped snapshot.
+- Verification: the action was invoked through the application's exported
+  `org.gtk.Actions` interface, and the resulting session file remained `0600`.
+- Privacy: the terminal uses the visual-QA-only shell profile; no command,
+  repository path, history, clipboard content, or credential is visible.
+- Visible differences: rename/close controls, workspace metadata, group
+  actions, status bar, and command-palette presentation remain future work.
+- Runtime note: the inspectable capture uses X11/GLX under XWayland while the
+  recorded COSMIC/NVIDIA native Wayland OpenGL constraint remains open.
+
 ## 2026-08-28 — SwiftGtk4 workspace sidebar
 
 - Linux image: [workspace-switcher-x11.png](swift-gtk/progress/05-workspace-sidebar/workspace-switcher-x11.png)
