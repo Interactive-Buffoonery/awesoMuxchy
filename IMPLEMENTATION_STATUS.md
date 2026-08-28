@@ -89,6 +89,9 @@ help, and agent context while preserving the compact reference geometry.
   tests cover stable ordering, whitespace-only queries, top match, remote/SSH,
   Needs Input, and no-result behavior; the GTK sidebar now renders the exact
   no-matches description and `Clear search` action.
+- Expanded search keyboard routing uses that same projection order: Escape
+  clears or restores terminal focus, Up/Down moves a visible current-result
+  outline, and Return selects and focuses the routed workspace.
 - A real inspected screenshot and comparison index were pushed in focused
   visual-QA commits `4149963` and `01cc8d7`.
 

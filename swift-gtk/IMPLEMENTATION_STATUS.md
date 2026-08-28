@@ -82,8 +82,10 @@ geometry and state styling have also passed a real-window visual correction.
   normalizes whitespace/diacritics and searches group/workspace/pane titles,
   paths, local/remote identity, agent/provider names, and state vocabulary in
   deterministic render order. The expanded sidebar includes the reference
-  no-matches copy and a working `Clear search` action. Highlight ranges and
-  explicit Up/Down/Return result navigation remain pending.
+  no-matches copy and a working `Clear search` action. Escape clears or returns
+  focus to the terminal, Up/Down moves a distinct current-result outline, and
+  Return selects that workspace using projection order. Substring highlight
+  ranges remain pending.
 
 ## Remaining vertical-slice hardening
 

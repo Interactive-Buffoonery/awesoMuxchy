@@ -78,6 +78,7 @@ private final class ApplicationState: @unchecked Sendable {
       .aw-menu-heading{padding:5px 7px 2px;color:#7f849c;font-family:monospace;font-size:9px;font-weight:700;letter-spacing:1px;}
       button.aw-menu-row{min-height:30px;padding:4px 7px;color:#cdd6f4;background:transparent;border:0;border-radius:5px;font-size:11px;}
       button.aw-menu-row:hover{background:#3a3b4d;}.aw-menu-disabled{padding:7px;color:#6c7086;font-size:10px;}
+      button.aw-row.aw-search-current{outline:2px solid #89b4fa;outline-offset:-2px;}
       .aw-no-matches{padding:14px;background:rgba(250,179,135,.10);border:1px dashed rgba(250,179,135,.35);border-radius:9px;}.aw-no-matches-title{color:#fab387;font-family:monospace;font-size:10px;font-weight:700;letter-spacing:1px;}.aw-no-matches-copy{color:#7f849c;font-size:11px;}button.aw-clear-search{min-height:24px;padding:4px 9px;color:#11111b;background:#fab387;border:0;border-radius:12px;font-family:monospace;font-size:10px;font-weight:700;}
       menubutton.aw-icon-menu>button,button.aw-icon-button,button.aw-agent-total{min-width:22px;min-height:22px;padding:0;color:#7f849c;background:transparent;border:0;border-radius:5px;}
       menubutton.aw-icon-menu>button:hover,button.aw-icon-button:hover,button.aw-agent-total:hover{color:#cdd6f4;background:rgba(205,214,244,.09);}
@@ -107,6 +108,8 @@ private final class ApplicationState: @unchecked Sendable {
     private var noMatchesRoot: BoxRef?
     private var noMatchesDescription: LabelRef?
     private var sidebarSearchEntry: SearchEntryRef?
+    private var searchResultIDs: [UUID] = []
+    private var searchResultIndex = 0
     private var stack: StackRef?
     private var title: LabelRef?
     private var rootWidget: BoxRef?
@@ -292,6 +295,9 @@ private final class ApplicationState: @unchecked Sendable {
 
     func filter(_ query: String) {
         let projection = SidebarSearchProjection.project(snapshot: snapshot, query: query)
+        searchResultIDs = projection.isFiltering ? projection.orderedWorkspaceIDs : []
+        searchResultIndex = 0
+        updateSearchResultHighlight()
         let visibleWorkspaceIDs = Set(projection.orderedWorkspaceIDs)
         let visibleGroupIDs = Set(projection.groups.map(\.id))
         for group in snapshot.groups {
@@ -318,6 +324,40 @@ private final class ApplicationState: @unchecked Sendable {
     func clearSidebarSearch() {
         sidebarSearchEntry?.text = ""
         filter("")
+    }
+
+    private func updateSearchResultHighlight() {
+        for row in rows.values { row.remove(cssClass: "aw-search-current") }
+        guard searchResultIDs.indices.contains(searchResultIndex) else { return }
+        rows[searchResultIDs[searchResultIndex]]?.add(cssClass: "aw-search-current")
+    }
+
+    func handleSidebarSearchKey(_ keyval: UInt) -> Bool {
+        switch keyval {
+        case UInt(GDK_KEY_Escape):
+            if !(sidebarSearchEntry?.text ?? "").isEmpty {
+                clearSidebarSearch()
+            } else {
+                focusedSurface?.focus()
+            }
+            return true
+        case UInt(GDK_KEY_Down):
+            guard !searchResultIDs.isEmpty else { return true }
+            searchResultIndex = min(searchResultIndex + 1, searchResultIDs.count - 1)
+            updateSearchResultHighlight()
+            return true
+        case UInt(GDK_KEY_Up):
+            guard !searchResultIDs.isEmpty else { return true }
+            searchResultIndex = max(searchResultIndex - 1, 0)
+            updateSearchResultHighlight()
+            return true
+        case UInt(GDK_KEY_Return), UInt(GDK_KEY_KP_Enter):
+            guard searchResultIDs.indices.contains(searchResultIndex) else { return true }
+            select(searchResultIDs[searchResultIndex])
+            return true
+        default:
+            return false
+        }
     }
 
     func install(workspace: WorkspaceSnapshot, groupID: UUID, pageName: String,
@@ -640,6 +680,11 @@ private func buildWindow(for application: Gtk.ApplicationRef) {
     noMatches.append(child: noMatchesTitle); noMatches.append(child: noMatchesDescription); noMatches.append(child: clearSearch)
     noMatches.set(visible: false); groups.append(child: noMatches)
     state.attachSearch(entry: search, noMatches: noMatches, description: noMatchesDescription)
+    let searchKeys = EventControllerKey()
+    searchKeys.onKeyPressed { [weak state] _, keyval, _, _ in
+        state?.handleSidebarSearchKey(keyval) ?? false
+    }
+    gtk_widget_add_controller(search.widget_ptr, searchKeys.event_controller_ptr)
     scroller.setVexpand(expand: true); scroller.set(child: groups); expandedSidebar.append(child: scroller)
     let sidebarFooter = state.makeSidebarFooter()
     expandedSidebar.append(child: sidebarFooter.root)
