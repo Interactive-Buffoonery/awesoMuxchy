@@ -24,3 +24,7 @@ artifacts/visual-qa/rust-gtk/
 
 The macOS awesoMux project is a read-only reference. Work in this repository
 must never change it.
+
+This repository intentionally has no CI. All builds, tests, packaging checks,
+and visual QA run locally on i5GamingPC. Do not add GitHub Actions or another
+remote build service.

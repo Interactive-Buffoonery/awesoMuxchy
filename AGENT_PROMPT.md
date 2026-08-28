@@ -81,6 +81,12 @@ workspaces does not lose work or route an action to the wrong pane.
     the exact packages and why each is required.
 12. Do not weaken sandboxing, permissions, signing, or security boundaries to
     make development easier.
+13. Do not add or configure CI. This repository must have no GitHub Actions,
+    hosted CI, self-hosted runners, automated build services, required CI
+    checks, workflow badges, or dependency-update automation. Do not create
+    files under `.github/workflows/`. Run every build, test, lint, lifecycle,
+    packaging, license, and visual check locally on i5GamingPC. No CI does not
+    mean no testing.
 
 ## Repository state
 
@@ -459,6 +465,9 @@ that formats only owned files, runs static checks, tests, license checks,
 submodule/patch checks, and a release build. Do not use repository-wide
 formatters against vendored code.
 
+`./script/preflight.sh` is the authority for verification. Do not mirror it in
+a CI workflow or add remote automation to run it.
+
 Maintain before/after screenshots under `artifacts/visual-qa/`. Do not claim
 visual parity without actually running and inspecting the GTK application.
 
@@ -508,6 +517,8 @@ The selected production track is done only when:
 - terminal lifecycle, persistence, multi-pane use, agents, SSH, documents,
   accessibility, and packaging are verified
 - the complete automated test suite and preflight pass
+- all verification runs locally on i5GamingPC and the repository contains no
+  CI workflows or remote build automation
 - canonical Ghostty and zmx submodules remain clean and correctly pinned
 - licenses and notices are complete
 - the macOS awesoMux repository remains byte-for-byte untouched by this work

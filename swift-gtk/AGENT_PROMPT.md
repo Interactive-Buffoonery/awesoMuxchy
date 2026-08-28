@@ -43,6 +43,8 @@ Make the build reproducible:
 - record the pins and licenses in `DEPENDENCIES.md`
 - do not float on `main`, `gtk4`, or another moving branch after evaluation
 - do not suppress warnings repository-wide
+- do not add CI or GitHub Actions; all Swift and GTK verification runs locally
+  on i5GamingPC
 - treat a missing generated binding as a real integration gap
 - prefer a small local C bridge for a missing GTK function over a broad fork
 - if a SwiftGtk fork becomes necessary, document every carried change and why
@@ -152,6 +154,9 @@ package checks. The root preflight must call them. At minimum run:
 - a clean-build test with dependency pins resolved
 - the root source-license and submodule checks
 - real Wayland and X11 UI runs on i5GamingPC
+
+Do not create a workflow to run these commands remotely. Record the local
+command and result in the implementation status instead.
 
 Keep `swift-gtk/IMPLEMENTATION_STATUS.md` current throughout the work.
 

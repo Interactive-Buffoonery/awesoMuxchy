@@ -32,6 +32,9 @@ goal or discard evidence from the Swift track.
 - the shared `ghostty-shim/` through its narrow C ABI
 - canonical Ghostty pinned once at the repository root
 
+Do not add CI or GitHub Actions. All Cargo, GTK, lifecycle, packaging, and
+visual verification must run locally on i5GamingPC.
+
 Do not use Electron, xterm.js, node-pty, a separate GTK overlay window, or a
 new terminal renderer. Do not duplicate the Ghostty shim inside this folder.
 
@@ -72,7 +75,8 @@ code blindly across language boundaries.
 Provide track-local commands for formatting, linting, building, testing,
 lifecycle stress, and packaging. The root preflight must call them when this
 track is active. Use strict Clippy checks for repository-owned code and do not
-format vendored sources.
+format vendored sources. Do not create a remote workflow for these commands;
+record local results in the implementation status.
 
 Keep `rust-gtk/IMPLEMENTATION_STATUS.md` current if this track is activated.
 
