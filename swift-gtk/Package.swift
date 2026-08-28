@@ -22,8 +22,10 @@ let package = Package(
             dependencies: [
                 "AwesoMuxCore",
                 "AwesoMuxTerminal",
+                "CFontconfig",
                 .product(name: "Gtk", package: "SwiftGtk"),
-            ]
+            ],
+            resources: [.process("Resources")]
         ),
         .target(
             name: "AwesoMuxTerminal",
@@ -51,6 +53,7 @@ let package = Package(
             path: "Sources/CAwesoMuxGhostty",
             pkgConfig: "awesomux-ghostty"
         ),
+        .systemLibrary(name: "CFontconfig", pkgConfig: "fontconfig"),
         .testTarget(name: "AwesoMuxCoreTests", dependencies: ["AwesoMuxCore"]),
     ]
 )

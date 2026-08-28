@@ -126,6 +126,13 @@ help, and agent context while preserving the compact reference geometry.
   the row action acknowledge every waiting pane in that workspace immediately.
   Fast selection/focus changes invalidate the pending dwell. Per-workspace
   notification mute overrides also persist and use exact Mute/Unmute wording.
+- Sidebar and adjacent footer styling now live in an owned focused GTK
+  stylesheet with Catppuccin Mocha/Latte and high-contrast ramps derived from
+  the pinned design tokens. System appearance, explicit Light/Dark,
+  high-contrast theme overrides, reduced-motion preference, and density resolve
+  through a tested pure policy. The four pinned OFL Geist faces are packaged
+  and registered process-locally with Fontconfig; real Latte and Mocha windows
+  were run and inspected.
 - Workspace rows now expose real soft close and permanent clear actions. Soft
   close records a bounded, 24-hour recovery snapshot, removes the row from all
   projections, selects the next live workspace, and powers Ctrl-Shift-T

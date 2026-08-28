@@ -22,6 +22,8 @@ not silently select a different checkout or system library.
 | SwiftCairo | `87cd2aa586853fbeed192a42455fc43e9289b605` | MIT | SwiftGtk transitive binding |
 | SwiftPango | `1670dc5109759fe53beaaa1aac2a77e131735500` | MIT | SwiftGtk transitive binding |
 | SwiftHarfBuzz | `c699025869c261447c5ed02f6d650a1d21b81d83` | MIT | SwiftGtk transitive binding |
+| Fontconfig | system `2.15.0` | MIT-style | Process-local registration of bundled interface fonts |
+| Geist Sans | pinned macOS baseline `fed33ff47c559344fc6db6fa53f16e75fcc4a116` | SIL OFL 1.1 | Bundled Regular, Medium, SemiBold, and Bold interface faces |
 
 SwiftGtk itself is an immutable revision requirement. Its manifests use branch
 requirements for generated binding packages; SwiftPM rejects adding conflicting
@@ -35,6 +37,9 @@ awesoMux-owned and exposes no GTK or Zig implementation details to Swift.
 
 No GPL, AGPL, or unlicensed source may be copied into this repository. System
 GTK libraries remain dynamically linked under their own distribution terms.
+The exact Geist faces and OFL text live under
+`swift-gtk/Sources/AwesoMuxApp/Resources`; Fontconfig registers them only for
+the awesoMux process and does not modify the user's font installation.
 
 The approved `libgtk-4-dev` package is installed on i5GamingPC. SwiftGtk also
 requires the legacy `libatk1.0-dev` development files even though GTK4 no

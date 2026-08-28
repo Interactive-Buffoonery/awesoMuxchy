@@ -122,6 +122,13 @@ geometry and state styling have also passed a real-window visual correction.
   prunes expired snapshot data, and commits reopen only after terminal/UI
   reconstruction succeeds. Permanent clear always confirms and releases all
   pane surfaces without creating a recovery record.
+- Chrome CSS is now isolated from the application controller and covers the
+  reference Mocha/Latte ramps, state tints, focus geometry, high-contrast
+  foregrounds, system/explicit theme resolution, density, and reduced-motion
+  preference. A pure appearance policy covers GTK theme names and `GTK_THEME`
+  overrides in tests. Four exact pinned Geist weights and their OFL license are
+  SwiftPM resources registered process-locally through Fontconfig; real light
+  and dark GTK windows were inspected after registration.
 
 ## Remaining vertical-slice hardening
 
