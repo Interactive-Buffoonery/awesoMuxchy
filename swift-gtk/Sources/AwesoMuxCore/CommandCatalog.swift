@@ -13,6 +13,8 @@ public enum CommandID: String, CaseIterable, Codable, Sendable {
     case nextPane
     case commandPalette
     case keyboardShortcuts
+    case toggleSidebarWidth
+    case toggleSidebarVisibility
 }
 
 public enum ShortcutModifier: String, Codable, CaseIterable, Hashable, Sendable {
@@ -99,6 +101,10 @@ public enum CommandCatalog {
               defaultChord: chord("k", .control)),
         .init(id: .keyboardShortcuts, action: "Keyboard Shortcuts", section: .view,
               defaultChord: chord("/", .control)),
+        .init(id: .toggleSidebarWidth, action: "Collapse/Expand Sidebar", section: .view,
+              defaultChord: chord("\\", .control)),
+        .init(id: .toggleSidebarVisibility, action: "Hide/Show Sidebar", section: .view,
+              defaultChord: chord("\\", .control, .shift)),
     ]
 
     public static func definition(for id: CommandID) -> CommandDefinition {

@@ -140,6 +140,7 @@ private final class ApplicationState: @unchecked Sendable {
         paned.setResizeEndChild(resize: true)
         paned.setShrinkEndChild(resize: false)
         applySidebarWidth(preferences.sidebarWidth, persist: false)
+        updateSidebarVisibility()
         _ = paned.onNotifyPosition { [weak self] paned, _ in
             self?.sidebarPositionChanged(paned.getPosition())
         }
@@ -173,6 +174,26 @@ private final class ApplicationState: @unchecked Sendable {
         )
         updateSidebarGeometry(committed)
         if persist { try? preferencesStore.save(preferences) }
+    }
+
+    private func toggleSidebarWidth() {
+        let target = SidebarWidthPolicy.toggleWidth(
+            currentWidth: Double(preferences.sidebarWidth),
+            lastNonCollapsedWidth: Double(preferences.lastExpandedSidebarWidth)
+        )
+        applySidebarWidth(target, persist: true)
+    }
+
+    private func toggleSidebarVisibility() {
+        preferences.isSidebarHidden.toggle()
+        if preferences.isSidebarHidden { focusedSurface?.focus() }
+        updateSidebarVisibility()
+        try? preferencesStore.save(preferences)
+    }
+
+    private func updateSidebarVisibility() {
+        sidebarWidget?.set(visible: !preferences.isSidebarHidden)
+        sidebarBrand?.set(visible: !preferences.isSidebarHidden)
     }
 
     private func updateSidebarGeometry(_ width: Int) {
@@ -383,7 +404,8 @@ private final class ApplicationState: @unchecked Sendable {
 
     func installCommands(on application: Gtk.ApplicationRef) {
         let implemented: Set<CommandID> = [.newWorkspace, .newWorkspaceInCurrentDirectory,
-            .previousWorkspace, .nextWorkspace, .previousPane, .nextPane]
+            .previousWorkspace, .nextWorkspace, .previousPane, .nextPane,
+            .toggleSidebarWidth, .toggleSidebarVisibility]
         let menu = GIO.Menu()
         for section in [CommandSection.file, .view, .workspace, .pane] {
             let submenu = GIO.Menu()
@@ -403,7 +425,7 @@ private final class ApplicationState: @unchecked Sendable {
 
     private func install(_ chord: KeyChord, for command: CommandID, on application: Gtk.ApplicationRef) {
         let modifiers: [(ShortcutModifier, String)] = [(.control,"<Control>"),(.alt,"<Alt>"),(.shift,"<Shift>"),(.superKey,"<Super>")]
-        let names = ["/":"slash","[":"bracketleft","]":"bracketright","-":"minus","=":"equal"]
+        let names = ["/":"slash","[":"bracketleft","]":"bracketright","-":"minus","=":"equal","\\":"backslash"]
         let accelerator = modifiers.filter { chord.modifiers.contains($0.0) }.map(\.1).joined() + (names[chord.key] ?? chord.key)
         accelerator.withCString { pointer in
             let pointers: [UnsafePointer<CChar>?] = [pointer, nil]
@@ -415,6 +437,8 @@ private final class ApplicationState: @unchecked Sendable {
         if command == .newWorkspace || command == .newWorkspaceInCurrentDirectory { createWorkspace(); return }
         guard let selected = snapshot.selectedWorkspaceID, let runtime = runtimes[selected] else { return }
         switch command {
+        case .toggleSidebarWidth: toggleSidebarWidth()
+        case .toggleSidebarVisibility: toggleSidebarVisibility()
         case .previousWorkspace: selectRelative(-1)
         case .nextWorkspace: selectRelative(1)
         case .previousPane: focusRelative(-1, runtime)

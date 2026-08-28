@@ -72,7 +72,9 @@ help, and agent context while preserving the compact reference geometry.
   480-point terminal minimum. Width and last-expanded width are defensively
   normalized in the existing owner-only profile preferences, including
   backward-compatible loading of pre-width preference files. Dedicated rail
-  contents, hide/reveal, and side switching remain in progress.
+  contents, hover reveal, and side switching remain in progress. Native
+  Collapse/Expand Sidebar and Hide/Show Sidebar commands use the reference
+  Linux-mapped shortcuts; hiding first returns focus to the active terminal.
 - A real inspected screenshot and comparison index were pushed in focused
   visual-QA commits `4149963` and `01cc8d7`.
 

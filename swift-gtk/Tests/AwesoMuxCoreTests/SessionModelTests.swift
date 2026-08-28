@@ -114,6 +114,8 @@ private func snapshot(_ workspaces: [WorkspaceSnapshot]) -> SessionSnapshot {
     #expect(Set(chords).count == chords.count)
     #expect(CommandCatalog.definition(for: .splitRight).action == "Split Right")
     #expect(CommandCatalog.definition(for: .newWorkspaceGroup).action == "New Workspace Group…")
+    #expect(CommandCatalog.definition(for: .toggleSidebarWidth).action == "Collapse/Expand Sidebar")
+    #expect(CommandCatalog.definition(for: .toggleSidebarVisibility).action == "Hide/Show Sidebar")
 }
 
 @Test func relativeWorkspaceAndPaneNavigationWraps() throws {

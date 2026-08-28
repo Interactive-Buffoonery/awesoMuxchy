@@ -68,7 +68,10 @@ geometry and state styling have also passed a real-window visual correction.
   250-point mode threshold while reserving at least 480 points for terminal
   content. The committed width and last expanded width persist defensively and
   legacy preference files load with reference defaults. The rail's dedicated
-  controls and hidden/right-side host modes are not yet implemented.
+  controls, edge-hover reveal, and right-side host mode are not yet
+  implemented. Collapse/Expand Sidebar and Hide/Show Sidebar are native GTK
+  actions with reference Linux-mapped shortcuts; hiding restores terminal
+  focus and persists the hidden state.
 
 ## Remaining vertical-slice hardening
 
