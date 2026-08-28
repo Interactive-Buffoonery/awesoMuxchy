@@ -40,7 +40,7 @@ help, and agent context while preserving the compact reference geometry.
   created owner-only current and previous files.
 - The release integration harness asserts both real terminal surfaces publish
   focus callbacks; the full local preflight passes after this routing change.
-- The real app now uses the reference 188-point sidebar hierarchy and shared
+- The real app now uses the reference sidebar hierarchy and shared
   38-point footer rhythm. Search, group disclosure, new-workspace creation,
   whole-workspace selection, focused-pane path routing, and the truthful
   zero-agent idle state are live rather than mock controls.
@@ -67,6 +67,12 @@ help, and agent context while preserving the compact reference geometry.
   roots display the exact `repo root` wording and nested paths become
   repo-relative; a real 1440 × 860 X11 capture was inspected and pushed in the
   focused visual-QA commit `9a092c9`.
+- The sidebar host now uses a native GTK horizontal split with the reference
+  296-point default, 60-point rail settlement, 250-point mode threshold, and a
+  480-point terminal minimum. Width and last-expanded width are defensively
+  normalized in the existing owner-only profile preferences, including
+  backward-compatible loading of pre-width preference files. Dedicated rail
+  contents, hide/reveal, and side switching remain in progress.
 - A real inspected screenshot and comparison index were pushed in focused
   visual-QA commits `4149963` and `01cc8d7`.
 
@@ -88,7 +94,8 @@ help, and agent context while preserving the compact reference geometry.
 1. Add the foreground-shell capability signal needed to gate inserted Git/gh
    commands as precisely as macOS does.
 2. Implement product-level split/close/recreate commands and teardown-race coverage.
-3. Complete sidebar group creation, ordering controls, and dynamic menu enablement.
+3. Complete collapsed/hidden/right-side sidebar presentation, then group
+   creation, ordering controls, and dynamic menu enablement.
 4. Add bounded/coalesced persistence writes, recovery UI, and forced-termination tests.
 5. Continue through the root implementation order, capturing each required
    visual milestone.

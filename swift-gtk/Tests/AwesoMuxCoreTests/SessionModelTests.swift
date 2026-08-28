@@ -266,11 +266,43 @@ private func snapshot(_ workspaces: [WorkspaceSnapshot]) -> SessionSnapshot {
     for count in [0, 1, 40] {
         let items = (0..<count).map { _ in workspace(panes: 1) }
         let projection = SidebarChromeProjection(snapshot: snapshot(items))
-        #expect(SidebarChromeProjection.width == 188)
+        #expect(SidebarChromeProjection.width == 296)
         #expect(SidebarChromeProjection.headerMinimumHeight == 48)
         #expect(SidebarChromeProjection.footerMinimumHeight == 38)
         #expect(projection.groups[0].rows.count == count)
     }
+}
+
+@Test func sidebarWidthPolicyMatchesReferenceModesAndRestoration() {
+    #expect(SidebarWidthPolicy.committedWidth(for: 296) == 296)
+    #expect(SidebarWidthPolicy.committedWidth(for: 249.9) == 60)
+    #expect(SidebarWidthPolicy.committedWidth(for: 800) == 800)
+    #expect(SidebarWidthPolicy.committedWidth(for: .nan) == 296)
+    #expect(SidebarWidthPolicy.committedWidth(for: .greatestFiniteMagnitude) == Int(Int32.max))
+    #expect(SidebarWidthPolicy.constrainedLiveWidth(for: 900, maximumWidth: 640) == 640)
+    #expect(SidebarWidthPolicy.constrainedLiveWidth(for: 220, maximumWidth: 640) == 60)
+    #expect(SidebarWidthPolicy.mode(for: 250) == .expanded)
+    #expect(SidebarWidthPolicy.mode(for: 249) == .collapsed)
+    #expect(SidebarWidthPolicy.shouldRestoreExpanded(currentWidth: 60, maximumWidth: 300, userChoseRail: false))
+    #expect(!SidebarWidthPolicy.shouldRestoreExpanded(currentWidth: 60, maximumWidth: 300, userChoseRail: true))
+    #expect(SidebarWidthPolicy.toggleWidth(currentWidth: 296, lastNonCollapsedWidth: 420) == 60)
+    #expect(SidebarWidthPolicy.toggleWidth(currentWidth: 60, lastNonCollapsedWidth: 420) == 420)
+    #expect(SidebarWidthPolicy.updatedLastNonCollapsedWidth(currentWidth: 60, previousLastNonCollapsedWidth: 420) == 420)
+}
+
+@Test func appPreferencesDecodeLegacyAndNormalizeUnsafeSidebarWidths() throws {
+    let legacy = Data(#"{"theme":"Dark","notificationsMuted":true}"#.utf8)
+    let decoded = try JSONDecoder().decode(AppPreferences.self, from: legacy)
+    #expect(decoded.theme == .dark)
+    #expect(decoded.notificationsMuted)
+    #expect(decoded.sidebarWidth == 296)
+    #expect(decoded.lastExpandedSidebarWidth == 296)
+    #expect(decoded.sidebarPosition == .left)
+    #expect(decoded.sidebarDensity == .standard)
+
+    let normalized = AppPreferences(sidebarWidth: 200, lastExpandedSidebarWidth: 60)
+    #expect(normalized.sidebarWidth == 60)
+    #expect(normalized.lastExpandedSidebarWidth == 296)
 }
 
 @Test func sidebarSelectionAndLongNamesPreserveWorkspaceIdentity() {

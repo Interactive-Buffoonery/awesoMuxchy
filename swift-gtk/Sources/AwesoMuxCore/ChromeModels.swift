@@ -32,7 +32,7 @@ public struct SidebarGroupSection: Equatable, Sendable {
 }
 
 public struct SidebarChromeProjection: Equatable, Sendable {
-    public static let width = 188
+    public static let width = SidebarWidthPolicy.defaultWidth
     public static let headerMinimumHeight = 48
     public static let footerMinimumHeight = 38
 
@@ -61,6 +61,74 @@ public struct SidebarChromeProjection: Equatable, Sendable {
                 }
             )
         }
+    }
+}
+
+public enum SidebarWidthMode: Equatable, Sendable {
+    case expanded
+    case collapsed
+}
+
+public enum SidebarWidthPolicy {
+    public static let expandedWidth = 296
+    public static let collapsedWidth = 60
+    public static let defaultWidth = expandedWidth
+    public static let fallbackLastNonCollapsedWidth = expandedWidth
+    public static let railThreshold = 250
+    private static let maximumRepresentableWidth = Int(Int32.max)
+
+    public static func committedWidth(for width: Double) -> Int {
+        guard width.isFinite else { return defaultWidth }
+        let bounded = min(max(width.rounded(.down), Double(collapsedWidth)), Double(maximumRepresentableWidth))
+        let floored = Int(bounded)
+        return floored < railThreshold ? collapsedWidth : floored
+    }
+
+    public static func constrainedLiveWidth(for proposed: Double, maximumWidth: Double) -> Int {
+        guard proposed.isFinite else { return collapsedWidth }
+        let boundedMaximum = maximumWidth.isFinite
+            ? min(max(maximumWidth.rounded(.down), Double(collapsedWidth)), Double(maximumRepresentableWidth))
+            : Double(collapsedWidth)
+        let ceiling = Int(boundedMaximum)
+        let boundedProposed = min(max(proposed.rounded(.down), Double(collapsedWidth)), Double(maximumRepresentableWidth))
+        let clamped = min(Int(boundedProposed), ceiling)
+        return clamped < railThreshold ? collapsedWidth : clamped
+    }
+
+    public static func mode(for width: Double) -> SidebarWidthMode {
+        committedWidth(for: width) < railThreshold ? .collapsed : .expanded
+    }
+
+    public static func shouldRestoreExpanded(
+        currentWidth: Double,
+        maximumWidth: Double,
+        userChoseRail: Bool
+    ) -> Bool {
+        currentWidth < Double(railThreshold)
+            && maximumWidth >= Double(railThreshold)
+            && !userChoseRail
+    }
+
+    public static func normalizedLastNonCollapsedWidth(_ width: Double?) -> Int {
+        guard let width else { return fallbackLastNonCollapsedWidth }
+        let committed = committedWidth(for: width)
+        return mode(for: Double(committed)) == .collapsed ? fallbackLastNonCollapsedWidth : committed
+    }
+
+    public static func toggleWidth(currentWidth: Double, lastNonCollapsedWidth: Double?) -> Int {
+        mode(for: currentWidth) == .collapsed
+            ? normalizedLastNonCollapsedWidth(lastNonCollapsedWidth)
+            : collapsedWidth
+    }
+
+    public static func updatedLastNonCollapsedWidth(
+        currentWidth: Double,
+        previousLastNonCollapsedWidth: Double?
+    ) -> Int {
+        let committed = committedWidth(for: currentWidth)
+        return mode(for: Double(committed)) == .collapsed
+            ? normalizedLastNonCollapsedWidth(previousLastNonCollapsedWidth)
+            : committed
     }
 }
 

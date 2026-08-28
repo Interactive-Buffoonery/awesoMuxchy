@@ -47,8 +47,8 @@ private final class ApplicationState: @unchecked Sendable {
     private(set) var isPersistencePaused = false
     private let styles = CSSProvider(from: """
       .aw-root,.aw-content{background:#1e1e2e;}.aw-titlebar{min-height:38px;background:#11111b;border-bottom:1px solid #313244;}
-      .aw-brand{min-width:188px;color:#cdd6f4;background:#181825;border-right:1px solid #313244;font-size:13px;font-weight:700;}
-      .aw-window-title{color:#a6adc8;font-size:12px;font-weight:600;}.aw-sidebar{min-width:188px;background:#181825;border-right:1px solid #313244;}
+      .aw-brand{min-width:60px;color:#cdd6f4;background:#181825;border-right:1px solid #313244;font-size:13px;font-weight:700;}
+      .aw-window-title{color:#a6adc8;font-size:12px;font-weight:600;}.aw-sidebar{background:#181825;border-right:1px solid #313244;}
       searchentry.aw-search entry{min-height:30px;color:#cdd6f4;background:#313244;border:1px solid #45475a;border-radius:7px;font-size:11px;}
       button.aw-add{min-width:30px;min-height:30px;padding:0;color:#a6adc8;background:#313244;border:1px solid #45475a;border-radius:7px;font-size:18px;}
       button.aw-add:hover{color:#cdd6f4;background:#3a3b4d;}button.aw-group{min-height:22px;padding:0 4px;color:#7f849c;background:transparent;border:0;font-family:monospace;font-size:10px;font-weight:700;letter-spacing:1px;}
@@ -104,6 +104,10 @@ private final class ApplicationState: @unchecked Sendable {
     private var title: LabelRef?
     private var rootWidget: BoxRef?
     private var sidebarFooter: SidebarStatusFooter?
+    private var sidebarPaned: PanedRef?
+    private var sidebarBrand: LabelRef?
+    private var sidebarWidget: BoxRef?
+    private var isApplyingSidebarWidth = false
     private var context = FocusedPaneContextCoordinator()
     private var actions: [GIO.SimpleAction] = []
     private var menu: GIO.Menu?
@@ -125,6 +129,56 @@ private final class ApplicationState: @unchecked Sendable {
     func attach(stack: StackRef, title: LabelRef, root: BoxRef, sidebarFooter: SidebarStatusFooter) {
         self.stack = stack; self.title = title; rootWidget = root; self.sidebarFooter = sidebarFooter
         applyTheme(); sidebarFooter.update(AgentFooterSummary(snapshot: snapshot))
+    }
+
+    func attachSidebar(paned: PanedRef, brand: LabelRef, sidebar: BoxRef) {
+        sidebarPaned = paned
+        sidebarBrand = brand
+        sidebarWidget = sidebar
+        paned.setResizeStartChild(resize: false)
+        paned.setShrinkStartChild(resize: true)
+        paned.setResizeEndChild(resize: true)
+        paned.setShrinkEndChild(resize: false)
+        applySidebarWidth(preferences.sidebarWidth, persist: false)
+        _ = paned.onNotifyPosition { [weak self] paned, _ in
+            self?.sidebarPositionChanged(paned.getPosition())
+        }
+    }
+
+    private func sidebarPositionChanged(_ proposedWidth: Int) {
+        guard !isApplyingSidebarWidth else { return }
+        let committed = SidebarWidthPolicy.committedWidth(for: Double(proposedWidth))
+        if committed != proposedWidth {
+            applySidebarWidth(committed, persist: true)
+            return
+        }
+        preferences.lastExpandedSidebarWidth = SidebarWidthPolicy.updatedLastNonCollapsedWidth(
+            currentWidth: Double(committed),
+            previousLastNonCollapsedWidth: Double(preferences.lastExpandedSidebarWidth)
+        )
+        preferences.sidebarWidth = committed
+        updateSidebarGeometry(committed)
+        try? preferencesStore.save(preferences)
+    }
+
+    private func applySidebarWidth(_ width: Int, persist: Bool) {
+        let committed = SidebarWidthPolicy.committedWidth(for: Double(width))
+        isApplyingSidebarWidth = true
+        sidebarPaned?.set(position: committed)
+        isApplyingSidebarWidth = false
+        preferences.sidebarWidth = committed
+        preferences.lastExpandedSidebarWidth = SidebarWidthPolicy.updatedLastNonCollapsedWidth(
+            currentWidth: Double(committed),
+            previousLastNonCollapsedWidth: Double(preferences.lastExpandedSidebarWidth)
+        )
+        updateSidebarGeometry(committed)
+        if persist { try? preferencesStore.save(preferences) }
+    }
+
+    private func updateSidebarGeometry(_ width: Int) {
+        sidebarBrand?.setSizeRequest(width: width, height: 38)
+        sidebarBrand?.label = width < SidebarWidthPolicy.railThreshold ? ">_" : ">_  awesoMux"
+        sidebarWidget?.setSizeRequest(width: SidebarWidthPolicy.collapsedWidth, height: -1)
     }
 
     func makePathBar() -> FocusedPanePathBar {
@@ -450,7 +504,7 @@ private func buildWindow(for application: Gtk.ApplicationRef) {
 
     let main = BoxRef(orientation: .horizontal, spacing: 0); main.setVexpand(expand: true)
     let sidebar = BoxRef(orientation: .vertical, spacing: 0); sidebar.add(cssClass: "aw-sidebar")
-    sidebar.setSizeRequest(width: SidebarChromeProjection.width, height: -1); sidebar.setHexpand(expand: false)
+    sidebar.setSizeRequest(width: SidebarWidthPolicy.collapsedWidth, height: -1); sidebar.setHexpand(expand: false)
     let header = BoxRef(orientation: .horizontal, spacing: 6)
     header.setMarginStart(margin: 10); header.setMarginEnd(margin: 10); header.setMarginTop(margin: 10); header.setMarginBottom(margin: 8)
     let search = SearchEntryRef(); search.add(cssClass: "aw-search"); search.setHexpand(expand: true)
@@ -517,7 +571,15 @@ private func buildWindow(for application: Gtk.ApplicationRef) {
         }
     }
 
-    main.append(child: sidebar); main.append(child: stack); root.append(child: main)
+    stack.setSizeRequest(width: 480, height: -1)
+    let sidebarPaned = PanedRef(orientation: .horizontal)
+    sidebarPaned.setWideHandle(wide: false)
+    sidebarPaned.setStart(child: sidebar)
+    sidebarPaned.setEnd(child: stack)
+    sidebarPaned.setHexpand(expand: true)
+    sidebarPaned.setVexpand(expand: true)
+    state.attachSidebar(paned: sidebarPaned, brand: brand, sidebar: sidebar)
+    main.append(child: sidebarPaned); root.append(child: main)
     window.set(child: root); window.present()
     if let selected = snapshot.selectedWorkspaceID { state.select(selected) }
 }

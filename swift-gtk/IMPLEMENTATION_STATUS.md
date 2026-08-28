@@ -63,6 +63,12 @@ geometry and state styling have also passed a real-window visual correction.
   spacing, radii, opacity, tone-specific borders, and 10/11-point monospaced
   hierarchy. Repository roots render as `repo root`; nested directories render
   repo-relative, and disappearing Git/PR/CI state clears stale chips.
+- The fixed 188-point host has been replaced by a native GTK split using the
+  reference 296-point expanded default, 60-point collapsed settlement, and
+  250-point mode threshold while reserving at least 480 points for terminal
+  content. The committed width and last expanded width persist defensively and
+  legacy preference files load with reference defaults. The rail's dedicated
+  controls and hidden/right-side host modes are not yet implemented.
 
 ## Remaining vertical-slice hardening
 
@@ -71,7 +77,8 @@ geometry and state styling have also passed a real-window visual correction.
 - Automated pointer selection, hover, scroll, primary selection, and pending
   clipboard teardown tests.
 - Close/recreate actions in the product UI rather than only the stress harness.
-- Arrow/Home/End list navigation, Orca state inspection, richer group actions,
+- Collapsed/hidden/right-side presentation, Arrow/Home/End list navigation,
+  Orca state inspection, richer group actions,
   foreground-shell detection, full settings panes, and agent runtime event
   ingestion remain after this footer milestone.
 
