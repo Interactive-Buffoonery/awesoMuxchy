@@ -62,10 +62,12 @@ private final class ApplicationState: @unchecked Sendable {
       .aw-create-split{min-height:30px;background:#313244;border:1px solid #45475a;border-radius:7px;}button.aw-create-primary{min-width:30px;min-height:28px;padding:0;color:#a6adc8;background:transparent;border:0;border-radius:6px 0 0 6px;font-size:16px;}menubutton.aw-create-options>button{min-width:24px;min-height:28px;padding:0;color:#a6adc8;background:transparent;border:0;border-left:1px solid #45475a;border-radius:0 6px 6px 0;}
       button.aw-rail-control,menubutton.aw-rail-control>button,button.aw-rail-row{min-width:40px;min-height:40px;padding:0;color:#a6adc8;background:transparent;border:1px solid transparent;border-radius:8px;font-family:monospace;font-size:12px;font-weight:700;}
       button.aw-rail-control:hover,menubutton.aw-rail-control>button:hover,button.aw-rail-row:hover{color:#cdd6f4;background:rgba(205,214,244,.07);}button.aw-rail-row:checked{color:#cdd6f4;background:#313244;border-color:rgba(137,180,250,.55);box-shadow:inset 3px 0 #89b4fa;}
+      button.aw-rail-row.aw-lifted-attention{color:#fab387;border-color:rgba(250,179,135,.55);}button.aw-rail-row.aw-lifted-pinned{color:#cba6f7;border-color:rgba(203,166,247,.45);}
       .aw-rail{min-width:60px;background:#181825;border-right:1px solid #313244;}.aw-rail-footer{min-height:38px;border-top:1px solid #313244;}
       button.aw-add:hover{color:#cdd6f4;background:#3a3b4d;}button.aw-group{min-height:22px;padding:0 4px;color:#7f849c;background:transparent;border:0;font-family:monospace;font-size:10px;font-weight:700;letter-spacing:1px;}
       button.aw-group:hover{color:#a6adc8;background:transparent;}.aw-count{color:#6c7086;font-size:10px;}.aw-marker{font-size:9px;}
       button.aw-group-options{min-width:24px;min-height:24px;padding:0;color:#7f849c;background:transparent;border:0;border-radius:5px;}button.aw-group-options:hover{color:#cdd6f4;background:rgba(205,214,244,.08);}button.aw-new-in-group{min-height:28px;padding:3px 8px;color:#7f849c;background:transparent;border:1px dashed #45475a;border-radius:7px;font-size:10px;}
+      .aw-lifted-header{padding:0 4px;color:#a6adc8;font-family:monospace;font-size:10px;font-weight:700;letter-spacing:1px;}.aw-lifted-needs{color:#fab387;}.aw-lifted-origin{color:#6c7086;font-family:monospace;font-size:9px;}
       .aw-mauve{color:#cba6f7;}.aw-peach{color:#fab387;}.aw-green{color:#a6e3a1;}.aw-teal{color:#94e2d5;}.aw-blue{color:#89b4fa;}.aw-pink{color:#f5c2e7;}.aw-yellow{color:#f9e2af;}.aw-red{color:#f38ba8;}.aw-gray{color:#9399b2;}.aw-sky{color:#89dceb;}.aw-lavender{color:#b4befe;}
       button.aw-row{min-height:48px;padding:7px 8px;color:#bac2de;background:transparent;border:1px solid transparent;border-radius:8px;}
       button.aw-row:hover{background:rgba(205,214,244,.06);}button.aw-row:checked{color:#cdd6f4;background:#313244;border-color:rgba(205,214,244,.14);box-shadow:inset 3px 0 #89b4fa;}
@@ -126,6 +128,18 @@ private final class ApplicationState: @unchecked Sendable {
     private var groupColorActions: [UUID: [WorkspaceGroupColor: ButtonRef]] = [:]
     private var workspaceOptionMenus: [(menu: MenuButtonRef, includesPrimary: Bool)] = []
     private var isSidebarFiltering = false
+    private var attentionSectionRoot: BoxRef?
+    private var pinnedSectionRoot: BoxRef?
+    private var attentionSectionBody: BoxRef?
+    private var pinnedSectionBody: BoxRef?
+    private var attentionRows: [UUID: ToggleButtonRef] = [:]
+    private var pinnedRows: [UUID: ToggleButtonRef] = [:]
+    private var workspaceContextControllers: [UUID: GestureClick] = [:]
+    private var workspaceContextPopovers: [UUID: PopoverRef] = [:]
+    private var regularPinActions: [UUID: ButtonRef] = [:]
+    private var liftedPinActions: [UUID: ButtonRef] = [:]
+    private var liftedContextControllers: [UUID: GestureClick] = [:]
+    private var liftedContextPopovers: [UUID: PopoverRef] = [:]
     private var groupsContainer: BoxRef?
     private var noMatchesRoot: BoxRef?
     private var noMatchesDescription: LabelRef?
@@ -159,6 +173,7 @@ private final class ApplicationState: @unchecked Sendable {
         guard let runtime = TerminalRuntime() else { return nil }
         terminalRuntime = runtime
         self.snapshot = snapshot
+        self.snapshot.reconcileAttentionWorkspaceIDs()
         self.store = store
         self.preferencesStore = preferencesStore
         preferences = preferencesStore.load()
@@ -426,6 +441,11 @@ private final class ApplicationState: @unchecked Sendable {
 
     func attachGroupsContainer(_ groups: BoxRef) { groupsContainer = groups }
 
+    func attachLiftedSections(attention: (BoxRef, BoxRef), pinned: (BoxRef, BoxRef)) {
+        attentionSectionRoot = attention.0; attentionSectionBody = attention.1
+        pinnedSectionRoot = pinned.0; pinnedSectionBody = pinned.1
+    }
+
     func toggleGroup(_ groupID: UUID) {
         guard (try? snapshot.toggleGroupDisclosure(groupID)) != nil,
               let group = snapshot.groups.first(where: { $0.id == groupID }) else { return }
@@ -435,21 +455,28 @@ private final class ApplicationState: @unchecked Sendable {
     }
 
     func filter(_ query: String) {
-        let projection = SidebarSearchProjection.project(snapshot: snapshot, query: query)
+        let projection = SidebarLiftedProjection.project(snapshot: snapshot, query: query)
         isSidebarFiltering = projection.isFiltering
         searchResultIDs = projection.isFiltering ? projection.orderedWorkspaceIDs : []
         searchResultIndex = 0
         updateSearchResultHighlight()
-        let visibleWorkspaceIDs = Set(projection.orderedWorkspaceIDs)
+        let regularWorkspaceIDs = Set(projection.groups.flatMap { $0.rows.map(\.id) })
+        let attentionWorkspaceIDs = Set(projection.attention.map { $0.row.id })
+        let pinnedWorkspaceIDs = Set(projection.pinned.map { $0.row.id })
         let visibleGroupIDs = Set(projection.groups.map(\.id))
         for group in snapshot.groups {
             for id in workspaceIDsByGroup[group.id] ?? [] {
-                rows[id]?.set(visible: !projection.isFiltering || visibleWorkspaceIDs.contains(id))
+                rows[id]?.set(visible: regularWorkspaceIDs.contains(id))
             }
             groupRoots[group.id]?.set(visible: !projection.isFiltering || visibleGroupIDs.contains(group.id))
             groupBodies[group.id]?.set(visible: projection.isFiltering ? visibleGroupIDs.contains(group.id) : !group.isCollapsed)
         }
-        let showsNoMatches = projection.isFiltering && !projection.hasMatches
+        for (id, row) in attentionRows { row.set(visible: attentionWorkspaceIDs.contains(id)) }
+        for (id, row) in pinnedRows { row.set(visible: pinnedWorkspaceIDs.contains(id)) }
+        attentionSectionRoot?.set(visible: !projection.attention.isEmpty)
+        pinnedSectionRoot?.set(visible: !projection.pinned.isEmpty)
+        refreshRailProjection(projection)
+        let showsNoMatches = projection.isFiltering && projection.orderedWorkspaceIDs.isEmpty
         noMatchesRoot?.set(visible: showsNoMatches)
         if showsNoMatches {
             let normalized = query.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -457,6 +484,38 @@ private final class ApplicationState: @unchecked Sendable {
         }
         refreshGroupTints()
         refreshGroupActionEnablement()
+    }
+
+    private func refreshRailProjection(_ projection: SidebarLiftedOutput) {
+        guard let sidebarRailRows else { return }
+        let visible = Set(projection.orderedWorkspaceIDs)
+        let attention = Set(projection.attention.map { $0.row.id })
+        let pinned = Set(projection.pinned.map { $0.row.id })
+        var previous: ToggleButtonRef?
+        for id in projection.orderedWorkspaceIDs {
+            guard let row = railRows[id] else { continue }
+            row.set(visible: true)
+            row.remove(cssClass: "aw-lifted-attention"); row.remove(cssClass: "aw-lifted-pinned")
+            if attention.contains(id) {
+                row.add(cssClass: "aw-lifted-attention"); row.set(iconName: "dialog-warning-symbolic")
+                let name = snapshot.workspace(id: id)?.name ?? "Workspace"
+                row.setTooltip(text: "Needs input: \(ChromeText.sanitized(name, limit: 120))")
+            } else if pinned.contains(id) {
+                row.add(cssClass: "aw-lifted-pinned"); row.set(iconName: "emblem-favorite-symbolic")
+                let name = snapshot.workspace(id: id)?.name ?? "Workspace"
+                row.setTooltip(text: "Pinned: \(ChromeText.sanitized(name, limit: 120))")
+            } else {
+                row.set(iconName: "utilities-terminal-symbolic")
+                row.setTooltip(text: ChromeText.sanitized(snapshot.workspace(id: id)?.name ?? "Workspace", limit: 120))
+            }
+            if let previous {
+                sidebarRailRows.reorderChildAfter(child: row, sibling: previous)
+            } else {
+                sidebarRailRows.reorderChildAfter(child: WidgetRef(row), sibling: nil as WidgetRef?)
+            }
+            previous = row
+        }
+        for (id, row) in railRows where !visible.contains(id) { row.set(visible: false) }
     }
 
     func attachSearch(entry: SearchEntryRef, noMatches: BoxRef, description: LabelRef) {
@@ -537,6 +596,7 @@ private final class ApplicationState: @unchecked Sendable {
         meta.setMaxWidthChars(nChars: 13)
         details.append(child: name); details.append(child: meta); content.append(child: details); row.set(child: content)
         row.onClicked { [weak self] _ in self?.select(workspace.id) }
+        installWorkspaceContextMenu(on: row, workspaceID: workspace.id, groupID: groupID)
         rows[workspace.id] = row; metadata[workspace.id] = meta
         if !(workspaceIDsByGroup[groupID] ?? []).contains(workspace.id) { workspaceIDsByGroup[groupID, default: []].append(workspace.id) }
         return row
@@ -551,6 +611,90 @@ private final class ApplicationState: @unchecked Sendable {
         button.onClicked { [weak self] _ in self?.select(workspace.id) }
         railRows[workspace.id] = button
         return button
+    }
+
+    func makeLiftedRow(_ item: LiftedSidebarWorkspaceRow, attention: Bool) -> ToggleButtonRef? {
+        guard let workspace = snapshot.workspace(id: item.row.id) else { return nil }
+        let button = ToggleButtonRef(); button.add(cssClass: "aw-row"); button.setHalign(align: .fill)
+        button.add(cssClass: "aw-\((item.originGroupColor ?? .blue).rawValue)")
+        let content = BoxRef(orientation: .horizontal, spacing: 10)
+        let glyph = LabelRef(str: attention ? "!" : "◆"); glyph.add(cssClass: "aw-shell")
+        glyph.setSizeRequest(width: 32, height: 32)
+        if attention { glyph.add(cssClass: "aw-peach") }
+        content.append(child: glyph)
+        let details = BoxRef(orientation: .vertical, spacing: 2); details.setHexpand(expand: true)
+        let title = LabelRef(str: item.row.title); title.add(cssClass: "aw-row-title"); title.xalign = 0
+        title.setEllipsize(mode: PangoEllipsizeMode(rawValue: 3)); title.setMaxWidthChars(nChars: 13)
+        let origin = LabelRef(str: attention ? "Needs input from \(item.originGroupName)" : "Pinned from \(item.originGroupName)")
+        origin.add(cssClass: "aw-lifted-origin"); origin.xalign = 0
+        origin.setEllipsize(mode: PangoEllipsizeMode(rawValue: 3)); origin.setMaxWidthChars(nChars: 18)
+        details.append(child: title); details.append(child: origin); content.append(child: details); button.set(child: content)
+        button.setTooltip(text: origin.label ?? "")
+        button.onClicked { [weak self] _ in self?.select(workspace.id) }
+        installWorkspaceContextMenu(on: button, workspaceID: workspace.id, groupID: item.originGroupID, isLifted: true)
+        if attention { attentionRows[workspace.id] = button } else { pinnedRows[workspace.id] = button }
+        return button
+    }
+
+    private func installWorkspaceContextMenu(
+        on row: ToggleButtonRef, workspaceID: UUID, groupID: UUID, isLifted: Bool = false
+    ) {
+        let popover = PopoverRef(); let box = BoxRef(orientation: .vertical, spacing: 2); box.add(cssClass: "aw-popover")
+        func action(_ label: String, run: @escaping () -> Void) -> ButtonRef {
+            let button = ButtonRef(label: label); button.add(cssClass: "aw-menu-row"); button.setHalign(align: .fill)
+            button.onClicked { _ in run(); popover.popdown() }; box.append(child: button); return button
+        }
+        _ = action("New Workspace Here") { [weak self] in self?.createWorkspace(here: workspaceID, fallbackGroupID: groupID) }
+        let pin = action(snapshot.pinnedWorkspaceIDs.contains(workspaceID) ? "Unpin" : "Pin") { [weak self] in
+            self?.togglePinned(workspaceID)
+        }
+        if isLifted { liftedPinActions[workspaceID] = pin } else { regularPinActions[workspaceID] = pin }
+        popover.set(child: box); gtk_widget_set_parent(popover.widget_ptr, row.widget_ptr)
+        let click = GestureClick(); click.set(button: 3)
+        click.onPressed { [popover] _, _, _, _ in popover.popup() }
+        _ = click.ref()
+        if isLifted { liftedContextControllers[workspaceID] = click } else { workspaceContextControllers[workspaceID] = click }
+        gtk_widget_add_controller(row.widget_ptr, click.event_controller_ptr)
+        if isLifted { liftedContextPopovers[workspaceID] = popover } else { workspaceContextPopovers[workspaceID] = popover }
+    }
+
+    private func createWorkspace(here workspaceID: UUID, fallbackGroupID: UUID) {
+        let workspace = snapshot.workspace(id: workspaceID)
+        let directory = workspace.flatMap { $0.layout.pane(id: $0.focusedPaneID)?.workingDirectory }
+            ?? FileManager.default.currentDirectoryPath
+        let owner = snapshot.groups.first(where: { group in group.workspaces.contains { $0.id == workspaceID } })?.id
+        createWorkspace(in: owner ?? fallbackGroupID, directory: directory)
+    }
+
+    private func togglePinned(_ workspaceID: UUID) {
+        guard (try? snapshot.togglePinnedWorkspace(workspaceID)) != nil else { return }
+        snapshot.reconcileAttentionWorkspaceIDs()
+        let isPinned = snapshot.pinnedWorkspaceIDs.contains(workspaceID)
+        regularPinActions[workspaceID]?.label = isPinned ? "Unpin" : "Pin"
+        liftedPinActions[workspaceID]?.label = isPinned ? "Unpin" : "Pin"
+        refreshLiftedRows()
+        persist()
+    }
+
+    func refreshLiftedRows() {
+        for (id, row) in attentionRows {
+            if let controller = liftedContextControllers[id] { gtk_widget_remove_controller(row.widget_ptr, controller.event_controller_ptr) }
+            liftedContextPopovers[id]?.unparent(); row.unparent()
+        }
+        for (id, row) in pinnedRows {
+            if let controller = liftedContextControllers[id] { gtk_widget_remove_controller(row.widget_ptr, controller.event_controller_ptr) }
+            liftedContextPopovers[id]?.unparent(); row.unparent()
+        }
+        attentionRows.removeAll(); pinnedRows.removeAll()
+        liftedPinActions.removeAll(); liftedContextControllers.removeAll(); liftedContextPopovers.removeAll()
+        let projection = SidebarLiftedProjection.project(snapshot: snapshot, query: sidebarSearchEntry?.text ?? "")
+        for item in projection.attention {
+            if let row = makeLiftedRow(item, attention: true) { attentionSectionBody?.append(child: row) }
+        }
+        for item in projection.pinned {
+            if let row = makeLiftedRow(item, attention: false) { pinnedSectionBody?.append(child: row) }
+        }
+        filter(sidebarSearchEntry?.text ?? "")
     }
 
     func makeWorkspaceOptionsButton(includePrimaryAction: Bool) -> MenuButtonRef {
@@ -657,6 +801,8 @@ private final class ApplicationState: @unchecked Sendable {
         runtime.pageName.withCString { stack.setVisibleChild(name: $0) }
         for (id, row) in rows { row.setActive(isActive: id == workspaceID) }
         for (id, row) in railRows { row.setActive(isActive: id == workspaceID) }
+        for (id, row) in attentionRows { row.setActive(isActive: id == workspaceID) }
+        for (id, row) in pinnedRows { row.setActive(isActive: id == workspaceID) }
         title?.label = ChromeText.sanitized(snapshot.workspace(id: workspaceID)?.name ?? "", limit: 120)
         updateChrome(workspaceID); focus(runtime.focusedPaneID); persist()
     }
@@ -1019,6 +1165,10 @@ private final class ApplicationState: @unchecked Sendable {
         guard let removed = try? snapshot.closeGroup(groupID) else { return }
         for workspace in workspaces {
             let paneSurfaces = workspace.layout.paneIDs.compactMap { surfacesByPane[$0] }
+            if let row = rows[workspace.id], let controller = workspaceContextControllers.removeValue(forKey: workspace.id) {
+                gtk_widget_remove_controller(row.widget_ptr, controller.event_controller_ptr)
+            }
+            workspaceContextPopovers.removeValue(forKey: workspace.id)?.unparent()
             if let child = workspace.id.uuidString.withCString({ stack?.getChildBy(name: $0) }) { stack?.remove(child: child) }
             for paneID in workspace.layout.paneIDs {
                 surfacesByPane.removeValue(forKey: paneID)
@@ -1028,6 +1178,7 @@ private final class ApplicationState: @unchecked Sendable {
             runtimes.removeValue(forKey: workspace.id)
             rows.removeValue(forKey: workspace.id)
             metadata.removeValue(forKey: workspace.id)
+            regularPinActions.removeValue(forKey: workspace.id)
             if let rail = railRows.removeValue(forKey: workspace.id) { sidebarRailRows?.remove(child: rail) }
         }
         if let root = groupRoots.removeValue(forKey: groupID) { groupsContainer?.remove(child: root) }
@@ -1044,6 +1195,7 @@ private final class ApplicationState: @unchecked Sendable {
         refreshGroupTints()
         refreshGroupActionEnablement()
         refreshWorkspaceOptionsMenus()
+        refreshLiftedRows()
         persist()
     }
 
@@ -1130,6 +1282,18 @@ private func buildWindow(for application: Gtk.ApplicationRef) {
     let groups = BoxRef(orientation: .vertical, spacing: 14)
     groups.setMarginStart(margin: 10); groups.setMarginEnd(margin: 10); groups.setMarginTop(margin: 6); groups.setMarginBottom(margin: 8)
     let scroller = ScrolledWindowRef(); scroller.setPolicy(hscrollbarPolicy: .never, vscrollbarPolicy: .automatic)
+    func liftedSection(title: String, symbol: String, needs: Bool) -> (BoxRef, BoxRef) {
+        let root = BoxRef(orientation: .vertical, spacing: 5)
+        let header = LabelRef(str: "\(symbol)  \(title.uppercased())"); header.add(cssClass: "aw-lifted-header")
+        if needs { header.add(cssClass: "aw-lifted-needs") }
+        header.xalign = 0; root.append(child: header)
+        let body = BoxRef(orientation: .vertical, spacing: 5); root.append(child: body)
+        root.set(visible: false); groups.append(child: root)
+        return (root, body)
+    }
+    let attentionSection = liftedSection(title: "Needs Input", symbol: "!", needs: true)
+    let pinnedSection = liftedSection(title: "Pinned", symbol: "◆", needs: false)
+    state.attachLiftedSections(attention: attentionSection, pinned: pinnedSection)
     let noMatches = BoxRef(orientation: .vertical, spacing: 10); noMatches.add(cssClass: "aw-no-matches")
     let noMatchesTitle = LabelRef(str: "●  NO MATCHES"); noMatchesTitle.add(cssClass: "aw-no-matches-title"); noMatchesTitle.xalign = 0
     let noMatchesDescription = LabelRef(str: ""); noMatchesDescription.add(cssClass: "aw-no-matches-copy")
@@ -1210,6 +1374,8 @@ private func buildWindow(for application: Gtk.ApplicationRef) {
         }
     }
 
+    state.refreshLiftedRows()
+
     stack.setSizeRequest(width: 480, height: -1)
     let sidebarPaned = PanedRef(orientation: .horizontal)
     sidebarPaned.setWideHandle(wide: false)
@@ -1251,6 +1417,7 @@ private func buildWindow(for application: Gtk.ApplicationRef) {
     )
     main.append(child: sidebarHost); root.append(child: main)
     window.set(child: root); window.present()
+    state.filter("")
     if let selected = snapshot.selectedWorkspaceID { state.select(selected) }
 }
 

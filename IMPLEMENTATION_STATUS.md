@@ -109,6 +109,14 @@ help, and agent context while preserving the compact reference geometry.
   current-directory commands now have distinct group/directory semantics and
   all pointer creation routes share a 400 ms duplicate guard. Standard and
   compact sidebar density is selectable, persisted, and applied live.
+- The sidebar now chains one tested lifted-row projection after search: Needs
+  Input renders first in sticky arrival order, Pinned follows in explicit user
+  order, pinned wins deduplication, and ownership groups retain identity while
+  hiding lifted rows. Ordered IDs decode compatibly from older snapshots and
+  are rejected if duplicated or stale. Expanded rows retain origin tint and
+  label; the rail uses the same navigation order with distinct warning/pinned
+  glyphs. Secondary-click menus provide real `New Workspace Here` and
+  `Pin`/`Unpin` routes, and a real two-section fixture was inspected.
 - A real inspected screenshot and comparison index were pushed in focused
   visual-QA commits `4149963` and `01cc8d7`.
 

@@ -183,6 +183,32 @@ public extension SessionSnapshot {
         groups[destination].workspaces.insert(workspace, at: insertion)
     }
 
+    mutating func togglePinnedWorkspace(_ workspaceID: UUID) throws {
+        guard workspaces.contains(where: { $0.id == workspaceID && !$0.isSoftClosed }) else {
+            throw SessionMutationError.workspaceNotFound(workspaceID)
+        }
+        if let index = pinnedWorkspaceIDs.firstIndex(of: workspaceID) {
+            pinnedWorkspaceIDs.remove(at: index)
+        } else {
+            pinnedWorkspaceIDs.append(workspaceID)
+            attentionWorkspaceIDs.removeAll { $0 == workspaceID }
+        }
+    }
+
+    mutating func reconcileAttentionWorkspaceIDs() {
+        let eligible = workspaces.filter { workspace in
+            !workspace.isSoftClosed && workspace.layout.panes.contains { $0.agentState == .needsAttention }
+        }.map(\.id)
+        let eligibleSet = Set(eligible)
+        attentionWorkspaceIDs.removeAll {
+            !eligibleSet.contains($0) || pinnedWorkspaceIDs.contains($0)
+        }
+        let existing = Set(attentionWorkspaceIDs)
+        attentionWorkspaceIDs.append(contentsOf: eligible.filter {
+            !existing.contains($0) && !pinnedWorkspaceIDs.contains($0)
+        })
+    }
+
     @discardableResult
     mutating func closeGroup(_ groupID: UUID) throws -> [UUID] {
         guard let index = groups.firstIndex(where: { $0.id == groupID }) else {
@@ -190,6 +216,9 @@ public extension SessionSnapshot {
         }
         let removedWorkspaceIDs = groups[index].workspaces.map(\.id)
         groups.remove(at: index)
+        let removedSet = Set(removedWorkspaceIDs)
+        pinnedWorkspaceIDs.removeAll(where: removedSet.contains)
+        attentionWorkspaceIDs.removeAll(where: removedSet.contains)
         if let selectedWorkspaceID, removedWorkspaceIDs.contains(selectedWorkspaceID) {
             self.selectedWorkspaceID = groups.lazy
                 .flatMap(\.workspaces)

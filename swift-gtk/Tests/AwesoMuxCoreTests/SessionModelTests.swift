@@ -422,6 +422,57 @@ private func snapshot(_ workspaces: [WorkspaceSnapshot]) -> SessionSnapshot {
     #expect(missing.topMatchID == nil)
 }
 
+@Test func liftedSidebarProjectionOrdersAttentionThenPinnedWithoutDuplicatingOrigins() {
+    let attentionOnePane = PaneSnapshot(title: "Approve", workingDirectory: "/one", agent: "Codex", agentState: .needsAttention)
+    let attentionTwoPane = PaneSnapshot(title: "Review", workingDirectory: "/two", agent: "Claude", agentState: .needsAttention)
+    let quietPane = PaneSnapshot(title: "Shell", workingDirectory: "/quiet")
+    let attentionOne = WorkspaceSnapshot(name: "First attention", focusedPaneID: attentionOnePane.id, layout: .pane(attentionOnePane))
+    let attentionTwo = WorkspaceSnapshot(name: "Second attention", focusedPaneID: attentionTwoPane.id, layout: .pane(attentionTwoPane))
+    let quiet = WorkspaceSnapshot(name: "Pinned quiet", focusedPaneID: quietPane.id, layout: .pane(quietPane))
+    var value = SessionSnapshot(
+        selectedWorkspaceID: attentionOne.id,
+        groups: [
+            WorkspaceGroupSnapshot(name: "Alpha", workspaces: [attentionOne, quiet]),
+            WorkspaceGroupSnapshot(name: "Beta", workspaces: [attentionTwo])
+        ],
+        pinnedWorkspaceIDs: [quiet.id, attentionOne.id],
+        attentionWorkspaceIDs: [attentionTwo.id, attentionOne.id]
+    )
+    let output = SidebarLiftedProjection.project(snapshot: value, query: "")
+    #expect(output.attention.map { $0.row.id } == [attentionTwo.id])
+    #expect(output.pinned.map { $0.row.id } == [quiet.id, attentionOne.id])
+    #expect(output.groups.flatMap { $0.rows.map(\.id) }.isEmpty)
+    #expect(output.orderedWorkspaceIDs == [attentionTwo.id, quiet.id, attentionOne.id])
+    #expect(output.topMatchID == nil)
+
+    let filtered = SidebarLiftedProjection.project(snapshot: value, query: "approve")
+    #expect(filtered.attention.isEmpty)
+    #expect(filtered.pinned.map { $0.row.id } == [attentionOne.id])
+    #expect(filtered.topMatchID == attentionOne.id)
+
+    value.pinnedWorkspaceIDs.removeAll()
+    value.attentionWorkspaceIDs = [attentionTwo.id]
+    value.reconcileAttentionWorkspaceIDs()
+    #expect(value.attentionWorkspaceIDs == [attentionTwo.id, attentionOne.id])
+}
+
+@Test func sidebarProjectionListsDecodeBackwardCompatiblyAndValidateIdentity() throws {
+    let first = workspace(panes: 1)
+    let legacy = SessionSnapshot(selectedWorkspaceID: first.id, groups: [
+        WorkspaceGroupSnapshot(name: "Legacy", workspaces: [first])
+    ])
+    var object = try #require(JSONSerialization.jsonObject(with: JSONEncoder().encode(legacy)) as? [String: Any])
+    object.removeValue(forKey: "pinnedWorkspaceIDs")
+    object.removeValue(forKey: "attentionWorkspaceIDs")
+    let decoded = try JSONDecoder().decode(SessionSnapshot.self, from: JSONSerialization.data(withJSONObject: object))
+    #expect(decoded.pinnedWorkspaceIDs.isEmpty)
+    #expect(decoded.attentionWorkspaceIDs.isEmpty)
+
+    let unknown = UUID()
+    let invalid = SessionSnapshot(selectedWorkspaceID: first.id, groups: legacy.groups, pinnedWorkspaceIDs: [unknown])
+    #expect(throws: SessionValidationError.invalidSidebarProjectionIDs) { try invalid.validated() }
+}
+
 @Test func sidebarPresentationPolicyMirrorsBothEdgesAndAttentionDiscovery() {
     #expect(SidebarPresentationPolicy.proximity(pointerX: 39, containerWidth: 1_000, position: .left) == .revealed)
     #expect(SidebarPresentationPolicy.proximity(pointerX: 961, containerWidth: 1_000, position: .right) == .revealed)

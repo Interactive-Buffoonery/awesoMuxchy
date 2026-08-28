@@ -100,6 +100,85 @@ public struct SidebarSearchOutput: Equatable, Sendable {
     public var hasMatches: Bool { !orderedWorkspaceIDs.isEmpty }
 }
 
+public struct LiftedSidebarWorkspaceRow: Equatable, Sendable {
+    public let row: SidebarWorkspaceRow
+    public let originGroupID: UUID
+    public let originGroupName: String
+    public let originGroupColor: WorkspaceGroupColor?
+    public let originGroupUnfilteredIndex: Int
+}
+
+public struct SidebarLiftedOutput: Equatable, Sendable {
+    public let attention: [LiftedSidebarWorkspaceRow]
+    public let pinned: [LiftedSidebarWorkspaceRow]
+    public let groups: [SidebarGroupSection]
+    public let orderedWorkspaceIDs: [UUID]
+    public let topMatchID: UUID?
+    public let isFiltering: Bool
+}
+
+public enum SidebarLiftedProjection {
+    public static func project(
+        snapshot: SessionSnapshot,
+        query: String,
+        homeDirectory: String = NSHomeDirectory()
+    ) -> SidebarLiftedOutput {
+        let searched = SidebarSearchProjection.project(
+            snapshot: snapshot, query: query, homeDirectory: homeDirectory
+        )
+        let groupIndexByID = Dictionary(uniqueKeysWithValues: snapshot.groups.enumerated().map { ($1.id, $0) })
+        var liftedByID: [UUID: LiftedSidebarWorkspaceRow] = [:]
+        for group in searched.groups {
+            let index = groupIndexByID[group.id] ?? 0
+            for row in group.rows {
+                liftedByID[row.id] = LiftedSidebarWorkspaceRow(
+                    row: row,
+                    originGroupID: group.id,
+                    originGroupName: group.name,
+                    originGroupColor: group.color,
+                    originGroupUnfilteredIndex: index
+                )
+            }
+        }
+
+        let pinned = snapshot.pinnedWorkspaceIDs.compactMap { liftedByID[$0] }
+        let pinnedSet = Set(pinned.map { $0.row.id })
+        let eligibleAttention = snapshot.workspaces.filter { workspace in
+            !workspace.isSoftClosed
+                && !pinnedSet.contains(workspace.id)
+                && workspace.layout.panes.contains { $0.agentState == .needsAttention }
+        }.map(\.id)
+        let eligibleSet = Set(eligibleAttention)
+        var attentionOrder = snapshot.attentionWorkspaceIDs.filter {
+            eligibleSet.contains($0) && !pinnedSet.contains($0)
+        }
+        let knownAttention = Set(attentionOrder)
+        attentionOrder.append(contentsOf: eligibleAttention.filter { !knownAttention.contains($0) })
+        let attention = attentionOrder.compactMap { liftedByID[$0] }
+        let liftedSet = pinnedSet.union(attention.map { $0.row.id })
+
+        let groups = searched.groups.compactMap { group -> SidebarGroupSection? in
+            let rows = group.rows.filter { !liftedSet.contains($0.id) }
+            guard !searched.isFiltering || !rows.isEmpty else { return nil }
+            return SidebarGroupSection(
+                id: group.id, name: group.name, color: group.color,
+                isExpanded: group.isExpanded, rows: rows
+            )
+        }
+        let ordered = attention.map { $0.row.id }
+            + pinned.map { $0.row.id }
+            + groups.flatMap { $0.rows.map(\.id) }
+        return SidebarLiftedOutput(
+            attention: attention,
+            pinned: pinned,
+            groups: groups,
+            orderedWorkspaceIDs: ordered,
+            topMatchID: searched.isFiltering ? ordered.first : nil,
+            isFiltering: searched.isFiltering
+        )
+    }
+}
+
 public enum SidebarSearchProjection {
     public static func project(
         snapshot: SessionSnapshot,

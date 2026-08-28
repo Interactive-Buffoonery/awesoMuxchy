@@ -101,6 +101,15 @@ geometry and state styling have also passed a real-window visual correction.
   current-directory creation resolve different directory/group contexts at
   activation and share a 400 ms duplicate guard. Quick Settings now applies
   persisted Standard/Compact sidebar density live.
+- `SidebarLiftedProjection` now composes search, sticky Needs Input arrival
+  order, and explicit Pinned order without duplicating origin rows. The schema
+  additions decode absent legacy fields safely and validate every ordered ID.
+  GTK renders non-collapsible Needs Input and Pinned sections above ownership
+  groups, preserves origin tint/labels, mirrors order and semantic glyphs in
+  the rail, and routes selection to the authoritative workspace. Secondary
+  click exposes implemented `New Workspace Here` and `Pin`/`Unpin` actions.
+  Unanswered-turn ingestion, acknowledgement timing, reorder DnD, and AT-SPI
+  announcements remain pending.
 
 ## Remaining vertical-slice hardening
 

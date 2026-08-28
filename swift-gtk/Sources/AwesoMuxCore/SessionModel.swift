@@ -139,6 +139,8 @@ public struct SessionSnapshot: Codable, Equatable, Sendable {
     public var schemaVersion: Int
     public var selectedWorkspaceID: UUID?
     public var groups: [WorkspaceGroupSnapshot]
+    public var pinnedWorkspaceIDs: [UUID]
+    public var attentionWorkspaceIDs: [UUID]
 
     public var workspaces: [WorkspaceSnapshot] {
         groups.flatMap(\.workspaces)
@@ -147,11 +149,30 @@ public struct SessionSnapshot: Codable, Equatable, Sendable {
     public init(
         schemaVersion: Int = currentSchemaVersion,
         selectedWorkspaceID: UUID? = nil,
-        groups: [WorkspaceGroupSnapshot] = []
+        groups: [WorkspaceGroupSnapshot] = [],
+        pinnedWorkspaceIDs: [UUID] = [],
+        attentionWorkspaceIDs: [UUID] = []
     ) {
         self.schemaVersion = schemaVersion
         self.selectedWorkspaceID = selectedWorkspaceID
         self.groups = groups
+        self.pinnedWorkspaceIDs = pinnedWorkspaceIDs
+        self.attentionWorkspaceIDs = attentionWorkspaceIDs
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case schemaVersion, selectedWorkspaceID, groups, pinnedWorkspaceIDs, attentionWorkspaceIDs
+    }
+
+    public init(from decoder: Decoder) throws {
+        let values = try decoder.container(keyedBy: CodingKeys.self)
+        self.init(
+            schemaVersion: try values.decodeIfPresent(Int.self, forKey: .schemaVersion) ?? Self.currentSchemaVersion,
+            selectedWorkspaceID: try values.decodeIfPresent(UUID.self, forKey: .selectedWorkspaceID),
+            groups: try values.decodeIfPresent([WorkspaceGroupSnapshot].self, forKey: .groups) ?? [],
+            pinnedWorkspaceIDs: try values.decodeIfPresent([UUID].self, forKey: .pinnedWorkspaceIDs) ?? [],
+            attentionWorkspaceIDs: try values.decodeIfPresent([UUID].self, forKey: .attentionWorkspaceIDs) ?? []
+        )
     }
 
     public func validated() throws -> SessionSnapshot {
@@ -178,6 +199,11 @@ public struct SessionSnapshot: Codable, Equatable, Sendable {
         guard Set(workspaceIDs).count == workspaceIDs.count else {
             throw SessionValidationError.duplicateWorkspaceID
         }
+        guard Set(pinnedWorkspaceIDs).count == pinnedWorkspaceIDs.count,
+              Set(attentionWorkspaceIDs).count == attentionWorkspaceIDs.count,
+              pinnedWorkspaceIDs.allSatisfy(Set(workspaceIDs).contains),
+              attentionWorkspaceIDs.allSatisfy(Set(workspaceIDs).contains)
+        else { throw SessionValidationError.invalidSidebarProjectionIDs }
         if let selectedWorkspaceID,
            !workspaces.contains(where: {
                $0.id == selectedWorkspaceID && !$0.isSoftClosed
@@ -217,6 +243,7 @@ public enum SessionValidationError: Error, Equatable {
     case invalidPaneText(UUID)
     case invalidWorkspaceName(UUID)
     case invalidGroupName(UUID)
+    case invalidSidebarProjectionIDs
 }
 
 public enum CloseDecision: Equatable, Sendable {
