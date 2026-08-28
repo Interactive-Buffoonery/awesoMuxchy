@@ -1,5 +1,25 @@
 # Visual QA
 
+## 2026-08-28 — SwiftGtk4 workspace sidebar
+
+- Linux image: [workspace-switcher-x11.png](swift-gtk/progress/05-workspace-sidebar/workspace-switcher-x11.png)
+- Reference: awesoMux macOS at `fed33ff47c559344fc6db6fa53f16e75fcc4a116`.
+- Captured content size: 1440 × 852.
+- Implemented behavior: sidebar rows now represent workspaces rather than
+  individual panes. The selected Development workspace owns the visible
+  two-pane terminal split; Review owns a separate terminal page in the same
+  native GTK4 window.
+- Visual treatment: the sidebar uses the reference Catppuccin Mocha palette,
+  selected-row accent rail, group label, and workspace hierarchy. GTK retains
+  native controls and focus behavior.
+- Privacy: all terminal prompts use the visual-QA-only shell profile; no
+  commands, repository paths, history, clipboard data, or credentials appear.
+- Visible differences: group actions, workspace status metadata, close
+  affordances, bottom status bar, and command palette remain future milestones.
+- Runtime note: this inspectable capture uses X11/GLX under XWayland because
+  the current COSMIC/NVIDIA native Wayland path cannot create Ghostty's
+  required desktop OpenGL context.
+
 ## 2026-08-28 — SwiftGtk4 terminal integration
 
 - Linux image: [real-terminal-split-x11.png](swift-gtk/progress/04-terminal-lifecycle/real-terminal-split-x11.png)
