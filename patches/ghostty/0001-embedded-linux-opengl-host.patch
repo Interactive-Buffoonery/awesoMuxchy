@@ -1,0 +1,128 @@
+From 3ae4f95849d2901b5da3789533dd67099c93962a Mon Sep 17 00:00:00 2001
+From: awesoMux Linux <noreply@awesomux.local>
+Date: Thu, 27 Aug 2026 00:00:00 -0400
+Subject: [PATCH] embedded: support a Linux-owned OpenGL context
+
+Permit the existing internal embedder API to be hosted by a Linux UI toolkit.
+The host must make its OpenGL context current before surface creation, draw,
+and destruction. GPU work is redirected to the application thread, matching
+Ghostty's native GTK runtime.
+---
+ include/ghostty.h          |  6 ++++++
+ src/apprt/embedded.zig     | 21 +++++++++++++++++++++
+ src/renderer/OpenGL.zig    |  7 +++++--
+ 3 files changed, 32 insertions(+), 2 deletions(-)
+
+diff --git a/include/ghostty.h b/include/ghostty.h
+index 8e6da7e4d..ad9b80e58 100644
+--- a/include/ghostty.h
++++ b/include/ghostty.h
+@@ -69,6 +69,7 @@ typedef enum {
+   GHOSTTY_PLATFORM_INVALID,
+   GHOSTTY_PLATFORM_MACOS,
+   GHOSTTY_PLATFORM_IOS,
++  GHOSTTY_PLATFORM_LINUX,
+ } ghostty_platform_e;
+
+ typedef enum {
+@@ -494,9 +495,14 @@ typedef struct {
+   void* uiview;
+ } ghostty_platform_ios_s;
+
++typedef struct {
++  void* gl_area;
++} ghostty_platform_linux_s;
++
+ typedef union {
+   ghostty_platform_macos_s macos;
+   ghostty_platform_ios_s ios;
++  ghostty_platform_linux_s linux;
+ } ghostty_platform_u;
+
+ typedef enum {
+diff --git a/src/apprt/embedded.zig b/src/apprt/embedded.zig
+index 9c078ca15..0a6b1dbf7 100644
+--- a/src/apprt/embedded.zig
++++ b/src/apprt/embedded.zig
+@@ -39,5 +39,10 @@ pub const resourcesDir = internal_os.resourcesDir;
+
+ pub const App = struct {
++    /// Linux toolkit-owned OpenGL contexts cannot be made current on the
++    /// renderer thread. Keep all GPU work on the application thread, as the
++    /// native GTK runtime does.
++    pub const must_draw_from_app_thread = builtin.target.os.tag == .linux;
++
+     /// Because we only expect the embedding API to be used in embedded
+     /// environments, the options are extern so that we can expose it
+     /// directly to a C callconv and not pay for any translation costs.
+@@ -382,6 +387,7 @@ pub const App = struct {
+ pub const Platform = union(PlatformTag) {
+     macos: MacOS,
+     ios: IOS,
++    linux: Linux,
+
+     // If our build target for libghostty is not darwin then we do
+     // not include macos support at all.
+@@ -397,6 +403,12 @@ pub const Platform = union(PlatformTag) {
+         uiview: objc.Object,
+     } else void;
+
++    pub const Linux = if (builtin.target.os.tag == .linux) struct {
++        /// The host-owned GL area. It is opaque to Ghostty; its presence
++        /// proves that the host selected the Linux embedding contract.
++        gl_area: *anyopaque,
++    } else void;
++
+     // The C ABI compatible version of this union. The tag is expected
+     // to be stored elsewhere.
+     pub const C = extern union {
+@@ -408,6 +420,10 @@ pub const Platform = union(PlatformTag) {
+         ios: extern struct {
+             uiview: ?*anyopaque,
+         },
++
++        linux: extern struct {
++            gl_area: ?*anyopaque,
++        },
+     };
+
+     /// Initialize a Platform a tag and configuration from the C ABI.
+@@ -426,6 +442,10 @@ pub const Platform = union(PlatformTag) {
+                     break :ios error.UIViewMustBeSet);
+                 break :ios .{ .ios = .{ .uiview = uiview } };
+             } else error.UnsupportedPlatform,
++
++            .linux => if (Linux != void) .{ .linux = .{
++                .gl_area = c_platform.linux.gl_area orelse return error.GLAreaMustBeSet,
++            } } else error.UnsupportedPlatform,
+         };
+     }
+ };
+@@ -435,6 +455,7 @@ pub const PlatformTag = enum(c_int) {
+
+     macos = 1,
+     ios = 2,
++    linux = 3,
+ };
+
+ pub const EnvVar = extern struct {
+diff --git a/src/renderer/OpenGL.zig b/src/renderer/OpenGL.zig
+index 9b3185454..9b9bccb47 100644
+--- a/src/renderer/OpenGL.zig
++++ b/src/renderer/OpenGL.zig
+@@ -170,8 +170,11 @@ pub fn surfaceInit(surface: *apprt.Surface) !void {
+         => try prepareContext(null),
+
+         apprt.embedded => {
+-            // TODO(mitchellh): this does nothing today to allow libghostty
+-            // to compile for OpenGL targets but libghostty is strictly
++            // The Linux embedder follows GTK's context contract: the host
++            // makes its OpenGL context current before creating the surface.
++            if (builtin.target.os.tag == .linux) try prepareContext(null);
++
++            // Other embedded OpenGL platforms remain unsupported and only
+             // broken for rendering on this platforms.
+         },
+     }
+--
+2.51.0

@@ -1,0 +1,9 @@
+prefix=${pcfiledir}
+libdir=${prefix}/lib
+includedir=${prefix}/include
+
+Name: awesomux-ghostty
+Description: awesoMux language-neutral Ghostty/GTK integration shim
+Version: 0.1.0
+Libs: -L${libdir} -lawesomux-ghostty
+Cflags: -I${includedir}

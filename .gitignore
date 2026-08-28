@@ -1,0 +1,4 @@
+.build/
+.swiftpm/
+swift-gtk/.build/
+swift-gtk/.swiftpm/

@@ -1,0 +1,30 @@
+From 54fc92d4984483036d3e72c4ce890f73b6bbd0c7 Mon Sep 17 00:00:00 2001
+From: awesoMux Linux <noreply@awesomux.local>
+Date: Fri, 28 Aug 2026 00:00:00 -0400
+Subject: [PATCH] plugin: support a configured GIR search path
+
+Allow hermetic development packages to provide GIR metadata without modifying
+system directories. Standard platform paths remain the fallback.
+---
+ Plugins/gir2swift-plugin/plugin.swift | 6 +++++-
+ 1 file changed, 5 insertions(+), 1 deletion(-)
+
+diff --git a/Plugins/gir2swift-plugin/plugin.swift b/Plugins/gir2swift-plugin/plugin.swift
+index 9e3bb44..77329ec 100644
+--- a/Plugins/gir2swift-plugin/plugin.swift
++++ b/Plugins/gir2swift-plugin/plugin.swift
+@@ -61,7 +61,11 @@ func girManifestName(for target: Target, in targetPackageDirectory: Path) -> Path
+ /// - Returns: Directory path containing every file in `girFiles`.
+ /// - Throws: ``Gir2SwiftError/failedToGetGirDirectory(containing:)`` when no common directory can be found.
+ func getGirDirectory(containing girFiles: [String]) throws -> Path {
+-    let possibleDirectories = ["/opt/homebrew/share/gir-1.0", "/usr/local/share/gir-1.0", "/usr/share/gir-1.0"].map(Path.init(_:))
++    let configuredDirectories = ProcessInfo.processInfo.environment["GIR2SWIFT_GIR_PATH"]?
++        .split(separator: ":")
++        .map(String.init) ?? []
++    let possibleDirectories = (configuredDirectories + ["/opt/homebrew/share/gir-1.0", "/usr/local/share/gir-1.0", "/usr/share/gir-1.0"])
++        .map(Path.init(_:))
+     for directory in possibleDirectories {
+         let directoryContainsAllGirs = girFiles.allSatisfy { file in
+             let path = directory.appending(file).string
+--
+2.51.0

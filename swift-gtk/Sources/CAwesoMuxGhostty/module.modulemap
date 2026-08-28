@@ -1,0 +1,5 @@
+module CAwesoMuxGhostty [system] {
+  header "../../../ghostty-shim/include/awesomux_ghostty.h"
+  link "awesomux-ghostty"
+  export *
+}
