@@ -156,6 +156,16 @@ public struct WorkspaceGroupSnapshot: Codable, Equatable, Identifiable, Sendable
     }
 }
 
+public struct RecentlyClosedWorkspaceRecord: Codable, Equatable, Sendable {
+    public var workspaceID: UUID
+    public var closedAt: Date
+
+    public init(workspaceID: UUID, closedAt: Date) {
+        self.workspaceID = workspaceID
+        self.closedAt = closedAt
+    }
+}
+
 public struct SessionSnapshot: Codable, Equatable, Sendable {
     public static let currentSchemaVersion = 2
 
@@ -164,6 +174,7 @@ public struct SessionSnapshot: Codable, Equatable, Sendable {
     public var groups: [WorkspaceGroupSnapshot]
     public var pinnedWorkspaceIDs: [UUID]
     public var attentionWorkspaceIDs: [UUID]
+    public var recentlyClosedWorkspaces: [RecentlyClosedWorkspaceRecord]
 
     public var workspaces: [WorkspaceSnapshot] {
         groups.flatMap(\.workspaces)
@@ -174,17 +185,19 @@ public struct SessionSnapshot: Codable, Equatable, Sendable {
         selectedWorkspaceID: UUID? = nil,
         groups: [WorkspaceGroupSnapshot] = [],
         pinnedWorkspaceIDs: [UUID] = [],
-        attentionWorkspaceIDs: [UUID] = []
+        attentionWorkspaceIDs: [UUID] = [],
+        recentlyClosedWorkspaces: [RecentlyClosedWorkspaceRecord] = []
     ) {
         self.schemaVersion = schemaVersion
         self.selectedWorkspaceID = selectedWorkspaceID
         self.groups = groups
         self.pinnedWorkspaceIDs = pinnedWorkspaceIDs
         self.attentionWorkspaceIDs = attentionWorkspaceIDs
+        self.recentlyClosedWorkspaces = recentlyClosedWorkspaces
     }
 
     private enum CodingKeys: String, CodingKey {
-        case schemaVersion, selectedWorkspaceID, groups, pinnedWorkspaceIDs, attentionWorkspaceIDs
+        case schemaVersion, selectedWorkspaceID, groups, pinnedWorkspaceIDs, attentionWorkspaceIDs, recentlyClosedWorkspaces
     }
 
     public init(from decoder: Decoder) throws {
@@ -194,7 +207,8 @@ public struct SessionSnapshot: Codable, Equatable, Sendable {
             selectedWorkspaceID: try values.decodeIfPresent(UUID.self, forKey: .selectedWorkspaceID),
             groups: try values.decodeIfPresent([WorkspaceGroupSnapshot].self, forKey: .groups) ?? [],
             pinnedWorkspaceIDs: try values.decodeIfPresent([UUID].self, forKey: .pinnedWorkspaceIDs) ?? [],
-            attentionWorkspaceIDs: try values.decodeIfPresent([UUID].self, forKey: .attentionWorkspaceIDs) ?? []
+            attentionWorkspaceIDs: try values.decodeIfPresent([UUID].self, forKey: .attentionWorkspaceIDs) ?? [],
+            recentlyClosedWorkspaces: try values.decodeIfPresent([RecentlyClosedWorkspaceRecord].self, forKey: .recentlyClosedWorkspaces) ?? []
         )
     }
 
@@ -227,6 +241,12 @@ public struct SessionSnapshot: Codable, Equatable, Sendable {
               pinnedWorkspaceIDs.allSatisfy(Set(workspaceIDs).contains),
               attentionWorkspaceIDs.allSatisfy(Set(workspaceIDs).contains)
         else { throw SessionValidationError.invalidSidebarProjectionIDs }
+        guard Set(recentlyClosedWorkspaces.map(\.workspaceID)).count == recentlyClosedWorkspaces.count,
+              recentlyClosedWorkspaces.count <= 20,
+              recentlyClosedWorkspaces.allSatisfy({ record in
+                  workspaces.contains { $0.id == record.workspaceID && $0.isSoftClosed }
+              })
+        else { throw SessionValidationError.invalidRecentlyClosedWorkspaceIDs }
         if let selectedWorkspaceID,
            !workspaces.contains(where: {
                $0.id == selectedWorkspaceID && !$0.isSoftClosed
@@ -271,6 +291,7 @@ public enum SessionValidationError: Error, Equatable {
     case invalidGroupName(UUID)
     case invalidSidebarProjectionIDs
     case invalidAcknowledgedPaneIDs(UUID)
+    case invalidRecentlyClosedWorkspaceIDs
 }
 
 public enum CloseDecision: Equatable, Sendable {

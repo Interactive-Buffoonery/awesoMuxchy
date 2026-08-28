@@ -148,6 +148,7 @@ private final class ApplicationState: @unchecked Sendable {
     private var searchResultIDs: [UUID] = []
     private var searchResultIndex = 0
     private var stack: StackRef?
+    private var window: ApplicationWindowRef?
     private var title: LabelRef?
     private var rootWidget: BoxRef?
     private var sidebarFooter: SidebarStatusFooter?
@@ -169,6 +170,7 @@ private final class ApplicationState: @unchecked Sendable {
     private var lastWorkspaceCreateAt: ContinuousClock.Instant?
     private var context = FocusedPaneContextCoordinator()
     private var actions: [GIO.SimpleAction] = []
+    private var commandActions: [CommandID: GIO.SimpleAction] = [:]
     private var menu: GIO.Menu?
 
     init?(snapshot: SessionSnapshot, store: SessionStore, preferencesStore: AppPreferencesStore) {
@@ -176,6 +178,7 @@ private final class ApplicationState: @unchecked Sendable {
         terminalRuntime = runtime
         self.snapshot = snapshot
         self.snapshot.reconcileAttentionWorkspaceIDs()
+        self.snapshot.pruneRecentlyClosedWorkspaces()
         self.store = store
         self.preferencesStore = preferencesStore
         preferences = preferencesStore.load()
@@ -188,8 +191,8 @@ private final class ApplicationState: @unchecked Sendable {
             styles.styleProvider.style_provider_ptr, UInt32(GTK_STYLE_PROVIDER_PRIORITY_APPLICATION))
     }
 
-    func attach(stack: StackRef, title: LabelRef, root: BoxRef, sidebarFooter: SidebarStatusFooter) {
-        self.stack = stack; self.title = title; rootWidget = root; self.sidebarFooter = sidebarFooter
+    func attach(window: ApplicationWindowRef, stack: StackRef, title: LabelRef, root: BoxRef, sidebarFooter: SidebarStatusFooter) {
+        self.window = window; self.stack = stack; self.title = title; rootWidget = root; self.sidebarFooter = sidebarFooter
         applyTheme(); sidebarFooter.update(AgentFooterSummary(snapshot: snapshot))
     }
 
@@ -411,6 +414,25 @@ private final class ApplicationState: @unchecked Sendable {
             onFocusChanged: { [weak self] focused in if focused { self?.terminalFocused(pane.id) } }) else { return nil }
         surfaces.append(surface); surfacesByPane[pane.id] = surface; workspaceByPane[pane.id] = workspaceID
         return surface
+    }
+
+    func buildLayout(_ layout: PaneLayout, workspace: WorkspaceSnapshot) -> (WidgetRef, [TerminalSurface])? {
+        switch layout {
+        case let .pane(pane):
+            let ordinal = (workspace.layout.paneIDs.firstIndex(of: pane.id) ?? 0) + 1
+            guard let surface = makeSurface(pane: pane, workspaceID: workspace.id,
+                label: "\(workspace.name) \(pane.title)",
+                description: "Terminal pane \(ordinal) of \(workspace.layout.paneCount) in the \(workspace.name) workspace")
+            else { return nil }
+            surface.widget.setHexpand(expand: true); surface.widget.setVexpand(expand: true)
+            return (surface.widget, [surface])
+        case let .split(axis, fraction, first, second):
+            guard let one = buildLayout(first, workspace: workspace), let two = buildLayout(second, workspace: workspace) else { return nil }
+            let paned = PanedRef(orientation: axis == .horizontal ? .horizontal : .vertical)
+            paned.set(position: Int((axis == .horizontal ? 1240.0 : 820.0) * min(max(fraction, 0.1), 0.9)))
+            paned.setWideHandle(wide: true); paned.setStart(child: one.0); paned.setEnd(child: two.0)
+            return (WidgetRef(paned), one.1 + two.1)
+        }
     }
 
     func surface(for paneID: UUID) -> TerminalSurface? { surfacesByPane[paneID] }
@@ -679,6 +701,10 @@ private final class ApplicationState: @unchecked Sendable {
                 _ = action(group.name) { [weak self] in self?.moveWorkspace(workspaceID, to: group.id) }
             }
         }
+        box.append(child: SeparatorRef(orientation: .horizontal))
+        _ = action("Close Workspace") { [weak self] in self?.softCloseWorkspace(workspaceID) }
+        box.append(child: SeparatorRef(orientation: .horizontal))
+        _ = action("Clear Workspace") { [weak self] in self?.presentClearWorkspaceConfirmation(workspaceID) }
         if isLifted { liftedPinActions[workspaceID] = pin } else { regularPinActions[workspaceID] = pin }
         popover.set(child: box); gtk_widget_set_parent(popover.widget_ptr, row.widget_ptr)
         let click = GestureClick(); click.set(button: 3)
@@ -817,6 +843,109 @@ private final class ApplicationState: @unchecked Sendable {
         groupCounts[sourceID]?.label = "\(snapshot.groups.first(where: { $0.id == sourceID })?.workspaces.filter { !$0.isSoftClosed }.count ?? 0)"
         groupCounts[groupID]?.label = "\(snapshot.groups.first(where: { $0.id == groupID })?.workspaces.filter { !$0.isSoftClosed }.count ?? 0)"
         refreshLiftedRows(); persist()
+    }
+
+    private func softCloseWorkspace(_ workspaceID: UUID) {
+        let closesLastWorkspace = snapshot.workspaces.filter({ !$0.isSoftClosed }).count == 1
+        guard let groupID = snapshot.groups.first(where: { $0.workspaces.contains { $0.id == workspaceID } })?.id,
+              (try? snapshot.softCloseWorkspace(workspaceID)) != nil else { return }
+        rows[workspaceID]?.set(visible: false); railRows[workspaceID]?.set(visible: false)
+        groupCounts[groupID]?.label = "\(snapshot.groups.first(where: { $0.id == groupID })?.workspaces.filter { !$0.isSoftClosed }.count ?? 0)"
+        refreshLiftedRows(); refreshCommandEnablement()
+        if closesLastWorkspace { persist(); window?.close(); return }
+        if let selected = snapshot.selectedWorkspaceID { select(selected) } else { persist() }
+    }
+
+    private func reopenMostRecentlyClosedWorkspace() {
+        pruneExpiredClosedWorkspaces()
+        guard let workspaceID = snapshot.recentlyClosedWorkspaces.first?.workspaceID,
+              let workspace = snapshot.workspace(id: workspaceID),
+              let group = snapshot.groups.first(where: { $0.workspaces.contains { $0.id == workspaceID } })
+        else { return }
+        let rebuiltRuntime = runtimes[workspaceID] == nil
+        if runtimes[workspaceID] == nil {
+            guard let stack, let body = groupBodies[group.id] else { return }
+            guard let layout = buildLayout(workspace.layout, workspace: workspace),
+                  let focused = surface(for: workspace.focusedPaneID) else {
+                removeWorkspaceUI(workspace); return
+            }
+            let pathBar = makePathBar(); let page = BoxRef(orientation: .vertical, spacing: 0)
+            page.append(child: layout.0); page.append(child: pathBar.root)
+            let pageName = workspace.id.uuidString; _ = pageName.withCString { stack.addNamed(child: page, name: $0) }
+            appendWorkspaceRow(makeRow(workspace: workspace, groupID: group.id), to: body, groupID: group.id)
+            sidebarRailRows?.append(child: makeRailRow(workspace: workspace))
+            install(workspace: workspace, groupID: group.id, pageName: pageName, pathBar: pathBar, focusedSurface: focused)
+        }
+        guard (try? snapshot.reopenMostRecentlyClosedWorkspace()) == workspaceID else {
+            if rebuiltRuntime { removeWorkspaceUI(workspace) }
+            return
+        }
+        rows[workspaceID]?.set(visible: true); railRows[workspaceID]?.set(visible: true)
+        reorderGroupRows(group.id)
+        groupCounts[group.id]?.label = "\(group.workspaces.filter { !$0.isSoftClosed }.count)"
+        refreshLiftedRows(); refreshCommandEnablement(); select(workspaceID)
+    }
+
+    private func reorderGroupRows(_ groupID: UUID) {
+        guard let body = groupBodies[groupID], let group = snapshot.groups.first(where: { $0.id == groupID }) else { return }
+        var previous: ToggleButtonRef?
+        for workspace in group.workspaces where !workspace.isSoftClosed {
+            guard let row = rows[workspace.id] else { continue }
+            if let previous { body.reorderChildAfter(child: row, sibling: previous) }
+            else { body.reorderChildAfter(child: WidgetRef(row), sibling: nil as WidgetRef?) }
+            previous = row
+        }
+        if let create = groupCreateRows[groupID] {
+            if let previous { body.reorderChildAfter(child: WidgetRef(create), sibling: WidgetRef(previous)) }
+            else { body.reorderChildAfter(child: WidgetRef(create), sibling: nil as WidgetRef?) }
+        }
+    }
+
+    private func presentClearWorkspaceConfirmation(_ workspaceID: UUID) {
+        guard let workspace = snapshot.workspace(id: workspaceID) else { return }
+        let hasActivity = workspace.layout.panes.contains { [.running, .waiting, .thinking, .needsAttention].contains($0.agentState) }
+        let safeName = ChromeText.sanitized(workspace.name, limit: 120)
+        let window = WindowRef(); window.title = "Clear Workspace"; window.setDefaultSize(width: 480, height: 190)
+        let box = BoxRef(orientation: .vertical, spacing: 12)
+        box.setMarginStart(margin: 20); box.setMarginEnd(margin: 20); box.setMarginTop(margin: 20); box.setMarginBottom(margin: 20)
+        let heading = LabelRef(str: "Clear Workspace"); heading.add(cssClass: "aw-menu-title"); heading.xalign = 0
+        let body = LabelRef(str: hasActivity
+            ? "\(safeName) has activity that will be interrupted. The workspace will be closed permanently and can't be reopened."
+            : "\(safeName) will be closed permanently and can't be reopened.")
+        body.xalign = 0; body.set(wrap: true)
+        let actions = BoxRef(orientation: .horizontal, spacing: 8); actions.setHalign(align: .end)
+        let cancel = ButtonRef(label: "Cancel"); let clear = ButtonRef(label: "Clear Workspace")
+        cancel.onClicked { [window] _ in window.close() }
+        clear.onClicked { [weak self, window] _ in self?.clearWorkspace(workspaceID); window.close() }
+        actions.append(child: cancel); actions.append(child: clear)
+        box.append(child: heading); box.append(child: body); box.append(child: actions)
+        window.set(child: box); window.present()
+    }
+
+    private func clearWorkspace(_ workspaceID: UUID) {
+        guard let groupID = snapshot.groups.first(where: { $0.workspaces.contains { $0.id == workspaceID } })?.id,
+              let removed = try? snapshot.clearWorkspace(workspaceID) else { return }
+        removeWorkspaceUI(removed)
+        groupCounts[groupID]?.label = "\(snapshot.groups.first(where: { $0.id == groupID })?.workspaces.filter { !$0.isSoftClosed }.count ?? 0)"
+        refreshLiftedRows(); refreshCommandEnablement()
+        if let selected = snapshot.selectedWorkspaceID { select(selected) }
+        else { title?.label = ""; focusedPaneID = nil; focusedSurface = nil; persist() }
+    }
+
+    private func removeWorkspaceUI(_ workspace: WorkspaceSnapshot) {
+        if let row = rows[workspace.id], let controller = workspaceContextControllers.removeValue(forKey: workspace.id) {
+            gtk_widget_remove_controller(row.widget_ptr, controller.event_controller_ptr)
+        }
+        workspaceContextPopovers.removeValue(forKey: workspace.id)?.unparent()
+        if let child = workspace.id.uuidString.withCString({ stack?.getChildBy(name: $0) }) { stack?.remove(child: child) }
+        let paneSurfaces = workspace.layout.paneIDs.compactMap { surfacesByPane[$0] }
+        for paneID in workspace.layout.paneIDs { surfacesByPane.removeValue(forKey: paneID); workspaceByPane.removeValue(forKey: paneID) }
+        surfaces.removeAll { surface in paneSurfaces.contains { $0 === surface } }
+        runtimes.removeValue(forKey: workspace.id); rows.removeValue(forKey: workspace.id)?.unparent()
+        metadata.removeValue(forKey: workspace.id); workspaceTitles.removeValue(forKey: workspace.id)
+        regularPinActions.removeValue(forKey: workspace.id)
+        if let rail = railRows.removeValue(forKey: workspace.id) { sidebarRailRows?.remove(child: rail) }
+        for groupID in workspaceIDsByGroup.keys { workspaceIDsByGroup[groupID]?.removeAll { $0 == workspace.id } }
     }
 
     func refreshLiftedRows() {
@@ -1043,6 +1172,7 @@ private final class ApplicationState: @unchecked Sendable {
         let results = BoxRef(orientation: .vertical, spacing: 3)
         let implemented: Set<CommandID> = [.newWorkspace, .newWorkspaceInCurrentDirectory,
             .renameWorkspace, .acknowledgeWorkspace, .togglePinWorkspace,
+            .closeWorkspace, .clearWorkspace, .reopenClosedWorkspace,
             .previousWorkspace, .nextWorkspace, .previousPane, .nextPane,
             .toggleSidebarWidth, .toggleSidebarVisibility]
         var commandRows: [(String, ButtonRef)] = []
@@ -1071,6 +1201,7 @@ private final class ApplicationState: @unchecked Sendable {
     func installCommands(on application: Gtk.ApplicationRef) {
         let implemented: Set<CommandID> = [.newWorkspace, .newWorkspaceInCurrentDirectory,
             .renameWorkspace, .acknowledgeWorkspace, .togglePinWorkspace,
+            .closeWorkspace, .clearWorkspace, .reopenClosedWorkspace,
             .previousWorkspace, .nextWorkspace, .previousPane, .nextPane,
             .toggleSidebarWidth, .toggleSidebarVisibility]
         let menu = GIO.Menu()
@@ -1078,9 +1209,11 @@ private final class ApplicationState: @unchecked Sendable {
             let submenu = GIO.Menu()
             for definition in CommandCatalog.definitions where definition.section == section {
                 let action = GIO.SimpleAction(name: definition.id.rawValue, parameterType: nil as VariantTypeRef?)
-                action.set(enabled: implemented.contains(definition.id))
+                action.set(enabled: implemented.contains(definition.id)
+                    && (definition.id != .reopenClosedWorkspace || !snapshot.recentlyClosedWorkspaces.isEmpty))
                 action.onActivate { [weak self] _, _ in self?.perform(definition.id) }
                 application.add(action: action)
+                commandActions[definition.id] = action
                 submenu.append(label: definition.action, detailedAction: "app.\(definition.id.rawValue)")
                 if let chord = definition.defaultChord { install(chord, for: definition.id, on: application) }
                 actions.append(action)
@@ -1088,6 +1221,15 @@ private final class ApplicationState: @unchecked Sendable {
             menu.appendSubmenu(label: section.rawValue, submenu: submenu)
         }
         application.set(menubar: menu); self.menu = menu
+    }
+
+    private func refreshCommandEnablement() {
+        pruneExpiredClosedWorkspaces()
+        commandActions[.reopenClosedWorkspace]?.set(enabled: !snapshot.recentlyClosedWorkspaces.isEmpty)
+    }
+
+    private func pruneExpiredClosedWorkspaces() {
+        for workspace in snapshot.pruneRecentlyClosedWorkspaces() { removeWorkspaceUI(workspace) }
     }
 
     private func install(_ chord: KeyChord, for command: CommandID, on application: Gtk.ApplicationRef) {
@@ -1103,11 +1245,15 @@ private final class ApplicationState: @unchecked Sendable {
     private func perform(_ command: CommandID) {
         if command == .newWorkspace { createDefaultWorkspace(); return }
         if command == .newWorkspaceInCurrentDirectory { createWorkspaceInCurrentDirectory(); return }
+        if command == .reopenClosedWorkspace { reopenMostRecentlyClosedWorkspace(); return }
         guard let selected = snapshot.selectedWorkspaceID, let runtime = runtimes[selected] else { return }
         switch command {
         case .renameWorkspace: presentWorkspaceNameDialog(selected)
         case .acknowledgeWorkspace: acknowledgeWorkspace(selected)
         case .togglePinWorkspace: togglePinned(selected)
+        case .closeWorkspace: softCloseWorkspace(selected)
+        case .clearWorkspace: presentClearWorkspaceConfirmation(selected)
+        case .reopenClosedWorkspace: break
         case .toggleSidebarWidth: toggleSidebarWidth()
         case .toggleSidebarVisibility: toggleSidebarVisibility()
         case .previousWorkspace: selectRelative(-1)
@@ -1485,25 +1631,7 @@ private func buildWindow(for application: Gtk.ApplicationRef) {
 
     let stack = StackRef(); stack.add(cssClass: "aw-content"); stack.setHexpand(expand: true); stack.setVexpand(expand: true)
     stack.set(hhomogeneous: true); stack.set(vhomogeneous: true)
-    state.attach(stack: stack, title: title, root: root, sidebarFooter: sidebarFooter)
-
-    func buildLayout(_ layout: PaneLayout, workspace: WorkspaceSnapshot) -> (WidgetRef, [TerminalSurface])? {
-        switch layout {
-        case let .pane(pane):
-            let ordinal = (workspace.layout.paneIDs.firstIndex(of: pane.id) ?? 0) + 1
-            guard let surface = state.makeSurface(pane: pane, workspaceID: workspace.id,
-                label: "\(workspace.name) \(pane.title)",
-                description: "Terminal pane \(ordinal) of \(workspace.layout.paneCount) in the \(workspace.name) workspace") else { return nil }
-            surface.widget.setHexpand(expand: true); surface.widget.setVexpand(expand: true)
-            return (surface.widget, [surface])
-        case let .split(axis, fraction, first, second):
-            guard let one = buildLayout(first, workspace: workspace), let two = buildLayout(second, workspace: workspace) else { return nil }
-            let paned = PanedRef(orientation: axis == .horizontal ? .horizontal : .vertical)
-            paned.set(position: Int((axis == .horizontal ? 1240.0 : 820.0) * min(max(fraction, 0.1), 0.9)))
-            paned.setWideHandle(wide: true); paned.setStart(child: one.0); paned.setEnd(child: two.0)
-            return (WidgetRef(paned), one.1 + two.1)
-        }
-    }
+    state.attach(window: window, stack: stack, title: title, root: root, sidebarFooter: sidebarFooter)
 
     for projection in SidebarChromeProjection(snapshot: snapshot).groups {
         guard let group = snapshot.groups.first(where: { $0.id == projection.id }) else { continue }
@@ -1512,7 +1640,7 @@ private func buildWindow(for application: Gtk.ApplicationRef) {
         let body = section.body
 
         for workspace in group.workspaces where !workspace.isSoftClosed {
-            guard let layout = buildLayout(workspace.layout, workspace: workspace),
+            guard let layout = state.buildLayout(workspace.layout, workspace: workspace),
                   let focused = state.surface(for: workspace.focusedPaneID) else { fatalError("Ghostty terminal surface initialization failed") }
             let pathBar = state.makePathBar(); let page = BoxRef(orientation: .vertical, spacing: 0)
             page.append(child: layout.0); page.append(child: pathBar.root)

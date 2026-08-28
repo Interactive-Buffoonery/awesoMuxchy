@@ -562,6 +562,58 @@ private func snapshot(_ workspaces: [WorkspaceSnapshot]) -> SessionSnapshot {
     #expect(!SidebarPresentationPolicy.hasAttention(value))
 }
 
+@Test func softCloseReopenAndClearPreserveExplicitRecoverySemantics() throws {
+    let first = workspace(panes: 1)
+    let second = workspace(panes: 1)
+    var value = snapshot([first, second])
+    value.pinnedWorkspaceIDs = [first.id]
+    let now = Date(timeIntervalSince1970: 10_000)
+    try value.softCloseWorkspace(first.id, now: now)
+    #expect(value.workspace(id: first.id)?.isSoftClosed == true)
+    #expect(value.recentlyClosedWorkspaces.map(\.workspaceID) == [first.id])
+    #expect(value.pinnedWorkspaceIDs.isEmpty)
+    #expect(value.selectedWorkspaceID == second.id)
+    let reopened = try value.reopenMostRecentlyClosedWorkspace(now: now)
+    #expect(reopened == first.id)
+    #expect(value.workspace(id: first.id)?.isSoftClosed == false)
+    #expect(value.selectedWorkspaceID == first.id)
+    #expect(value.recentlyClosedWorkspaces.isEmpty)
+
+    try value.softCloseWorkspace(first.id, now: now)
+    let cleared = try value.clearWorkspace(first.id)
+    #expect(cleared.id == first.id)
+    #expect(value.workspace(id: first.id) == nil)
+    #expect(value.recentlyClosedWorkspaces.isEmpty)
+    #expect(throws: SessionMutationError.noSelectedWorkspace) {
+        try value.reopenMostRecentlyClosedWorkspace()
+    }
+    try value.softCloseWorkspace(second.id, now: now)
+    #expect(value.selectedWorkspaceID == nil)
+    #expect(try value.reopenMostRecentlyClosedWorkspace(now: now) == second.id)
+}
+
+@Test func recentlyClosedWorkspacesDecodeLegacyRejectLiveEntriesAndExpire() throws {
+    let first = workspace(panes: 1)
+    let value = snapshot([first])
+    var object = try #require(JSONSerialization.jsonObject(with: JSONEncoder().encode(value)) as? [String: Any])
+    object.removeValue(forKey: "recentlyClosedWorkspaces")
+    let decoded = try JSONDecoder().decode(SessionSnapshot.self, from: JSONSerialization.data(withJSONObject: object))
+    #expect(decoded.recentlyClosedWorkspaces.isEmpty)
+    var invalid = value
+    invalid.recentlyClosedWorkspaces = [.init(workspaceID: first.id, closedAt: Date())]
+    #expect(throws: SessionValidationError.invalidRecentlyClosedWorkspaceIDs) { try invalid.validated() }
+
+    let second = workspace(panes: 1)
+    let now = Date(timeIntervalSince1970: 100_000)
+    var expiring = snapshot([first, second])
+    try expiring.softCloseWorkspace(first.id, now: now)
+    #expect(throws: SessionMutationError.noSelectedWorkspace) {
+        try expiring.reopenMostRecentlyClosedWorkspace(now: now.addingTimeInterval(24 * 60 * 60 + 1))
+    }
+    #expect(expiring.recentlyClosedWorkspaces.isEmpty)
+    #expect(expiring.workspace(id: first.id) == nil)
+}
+
 @Test func sidebarPresentationPolicyMirrorsBothEdgesAndAttentionDiscovery() {
     #expect(SidebarPresentationPolicy.proximity(pointerX: 39, containerWidth: 1_000, position: .left) == .revealed)
     #expect(SidebarPresentationPolicy.proximity(pointerX: 961, containerWidth: 1_000, position: .right) == .revealed)

@@ -7,6 +7,7 @@ public enum CommandID: String, CaseIterable, Codable, Sendable {
     case togglePinWorkspace
     case closePane
     case closeWorkspace
+    case clearWorkspace
     case reopenClosedWorkspace
     case splitRight
     case splitDown
@@ -92,6 +93,8 @@ public enum CommandCatalog {
               defaultChord: chord("w", .control)),
         .init(id: .closeWorkspace, action: "Close Workspace", section: .workspace,
               defaultChord: chord("w", .control, .shift)),
+        .init(id: .clearWorkspace, action: "Clear Workspace", section: .workspace,
+              defaultChord: chord("w", .control, .shift, .alt)),
         .init(id: .reopenClosedWorkspace, action: "Reopen Closed Workspace", section: .workspace,
               defaultChord: chord("t", .control, .shift)),
         .init(id: .splitRight, action: "Split Right", section: .pane,

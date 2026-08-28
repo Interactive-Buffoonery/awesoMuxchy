@@ -69,6 +69,7 @@ public extension PaneLayout {
 }
 
 public extension SessionSnapshot {
+    static var recentlyClosedWorkspaceTTL: TimeInterval { 24 * 60 * 60 }
     var selectedWorkspace: WorkspaceSnapshot? {
         guard let selectedWorkspaceID else { return nil }
         return workspaces.first { $0.id == selectedWorkspaceID }
@@ -237,6 +238,53 @@ public extension SessionSnapshot {
         reconcileAttentionWorkspaceIDs()
     }
 
+    mutating func softCloseWorkspace(_ workspaceID: UUID, now: Date = Date()) throws {
+        try updateWorkspace(id: workspaceID) { workspace in
+            guard !workspace.isSoftClosed else { throw SessionMutationError.workspaceNotFound(workspaceID) }
+            workspace.isSoftClosed = true
+        }
+        pinnedWorkspaceIDs.removeAll { $0 == workspaceID }
+        attentionWorkspaceIDs.removeAll { $0 == workspaceID }
+        pruneRecentlyClosedWorkspaces(now: now)
+        recentlyClosedWorkspaces.removeAll { $0.workspaceID == workspaceID }
+        recentlyClosedWorkspaces.insert(.init(workspaceID: workspaceID, closedAt: now), at: 0)
+        if recentlyClosedWorkspaces.count > 20 { recentlyClosedWorkspaces.removeLast(recentlyClosedWorkspaces.count - 20) }
+        if selectedWorkspaceID == workspaceID {
+            selectedWorkspaceID = workspaces.first(where: { !$0.isSoftClosed })?.id
+        }
+    }
+
+    @discardableResult
+    mutating func reopenMostRecentlyClosedWorkspace(now: Date = Date()) throws -> UUID {
+        pruneRecentlyClosedWorkspaces(now: now)
+        guard let workspaceID = recentlyClosedWorkspaces.first?.workspaceID else {
+            throw SessionMutationError.noSelectedWorkspace
+        }
+        try updateWorkspace(id: workspaceID) { workspace in
+            guard workspace.isSoftClosed else { throw SessionMutationError.workspaceNotFound(workspaceID) }
+            workspace.isSoftClosed = false
+        }
+        recentlyClosedWorkspaces.removeFirst()
+        selectedWorkspaceID = workspaceID
+        return workspaceID
+    }
+
+    @discardableResult
+    mutating func clearWorkspace(_ workspaceID: UUID) throws -> WorkspaceSnapshot {
+        for groupIndex in groups.indices {
+            guard let workspaceIndex = groups[groupIndex].workspaces.firstIndex(where: { $0.id == workspaceID }) else { continue }
+            let removed = groups[groupIndex].workspaces.remove(at: workspaceIndex)
+            pinnedWorkspaceIDs.removeAll { $0 == workspaceID }
+            attentionWorkspaceIDs.removeAll { $0 == workspaceID }
+            recentlyClosedWorkspaces.removeAll { $0.workspaceID == workspaceID }
+            if selectedWorkspaceID == workspaceID {
+                selectedWorkspaceID = workspaces.first(where: { !$0.isSoftClosed })?.id
+            }
+            return removed
+        }
+        throw SessionMutationError.workspaceNotFound(workspaceID)
+    }
+
     mutating func reconcileAttentionWorkspaceIDs() {
         for groupIndex in groups.indices {
             for workspaceIndex in groups[groupIndex].workspaces.indices {
@@ -273,6 +321,7 @@ public extension SessionSnapshot {
         let removedSet = Set(removedWorkspaceIDs)
         pinnedWorkspaceIDs.removeAll(where: removedSet.contains)
         attentionWorkspaceIDs.removeAll(where: removedSet.contains)
+        recentlyClosedWorkspaces.removeAll { removedSet.contains($0.workspaceID) }
         if let selectedWorkspaceID, removedWorkspaceIDs.contains(selectedWorkspaceID) {
             self.selectedWorkspaceID = groups.lazy
                 .flatMap(\.workspaces)
@@ -360,6 +409,21 @@ public extension SessionSnapshot {
             return
         }
         throw SessionMutationError.workspaceNotFound(workspaceID)
+    }
+
+    @discardableResult
+    mutating func pruneRecentlyClosedWorkspaces(now: Date = Date()) -> [WorkspaceSnapshot] {
+        let cutoff = now.addingTimeInterval(-Self.recentlyClosedWorkspaceTTL)
+        let expiredIDs = Set(recentlyClosedWorkspaces.filter { $0.closedAt < cutoff }.map(\.workspaceID))
+        recentlyClosedWorkspaces.removeAll { expiredIDs.contains($0.workspaceID) }
+        guard !expiredIDs.isEmpty else { return [] }
+        var removed: [WorkspaceSnapshot] = []
+        for groupIndex in groups.indices {
+            let expired = groups[groupIndex].workspaces.filter { expiredIDs.contains($0.id) && $0.isSoftClosed }
+            groups[groupIndex].workspaces.removeAll { expiredIDs.contains($0.id) && $0.isSoftClosed }
+            removed.append(contentsOf: expired)
+        }
+        return removed
     }
 
     private func availableGroupName(_ rawName: String, excluding groupID: UUID? = nil) throws -> String {

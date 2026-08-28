@@ -116,6 +116,12 @@ geometry and state styling have also passed a real-window visual correction.
   per-workspace `Mute Notifications`/`Unmute Notifications` overrides persist.
   Unanswered-turn ingestion, reorder DnD, injected-clock UI coverage, and
   AT-SPI announcements remain pending.
+- `Close Workspace`, `Reopen Closed Workspace`, and `Clear Workspace` now have
+  persistent model semantics and awesoMux-owned Ctrl-Shift-W, Ctrl-Shift-T,
+  and Ctrl-Alt-Shift-W routing. Recovery is capped at 20 entries/24 hours,
+  prunes expired snapshot data, and commits reopen only after terminal/UI
+  reconstruction succeeds. Permanent clear always confirms and releases all
+  pane surfaces without creating a recovery record.
 
 ## Remaining vertical-slice hardening
 
@@ -123,7 +129,7 @@ geometry and state styling have also passed a real-window visual correction.
 - Real desktop IME preedit/commit and Orca inspection.
 - Automated pointer selection, hover, scroll, primary selection, and pending
   clipboard teardown tests.
-- Close/recreate actions in the product UI rather than only the stress harness.
+- Automated destructive-dialog interaction and restored daemon continuity.
 - Collapsed/hidden/right-side presentation, Arrow/Home/End list navigation,
   Orca state inspection, richer group actions,
   foreground-shell detection, full settings panes, and agent runtime event

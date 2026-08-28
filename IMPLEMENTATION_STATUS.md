@@ -126,6 +126,12 @@ help, and agent context while preserving the compact reference geometry.
   the row action acknowledge every waiting pane in that workspace immediately.
   Fast selection/focus changes invalidate the pending dwell. Per-workspace
   notification mute overrides also persist and use exact Mute/Unmute wording.
+- Workspace rows now expose real soft close and permanent clear actions. Soft
+  close records a bounded, 24-hour recovery snapshot, removes the row from all
+  projections, selects the next live workspace, and powers Ctrl-Shift-T
+  reconstruction without draining recovery state until GTK rebuild succeeds.
+  Clear always confirms with baseline permanent-close copy, creates no reopen
+  entry, and tears down the workspace's terminal surfaces and UI ownership.
 - A real inspected screenshot and comparison index were pushed in focused
   visual-QA commits `4149963` and `01cc8d7`.
 
