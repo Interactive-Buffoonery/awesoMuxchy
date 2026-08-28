@@ -30,7 +30,7 @@ help, and agent context while preserving the compact reference geometry.
 - Three standalone stress runs each passed 100 cycles with two concurrently
   busy, successfully realized surfaces. Peak RSS was 307,208 KiB on the first
   driver-cache warm-up and 245,056/244,844 KiB on the following runs.
-- Thirty-two Swift tests cover model mutations, exact command-catalog chord
+- Thirty-three Swift tests cover model mutations, exact command-catalog chord
   uniqueness, defensive snapshot limits, XDG profile paths, owner-only writes,
   current/previous recovery, and corrupt-file quarantine.
 - Native GTK application actions and accelerators are generated from the same
@@ -58,8 +58,15 @@ help, and agent context while preserving the compact reference geometry.
   and notification-mute preferences persist as owner-only profile JSON.
 - Real inspected footer screenshots cover a working Git repository and a
   two-agent thinking/needs-attention fixture. The full local preflight passes
-  32 tests after the GLib main-loop publication and resolver hardening; the
+  33 tests after the GLib main-loop publication and resolver hardening; the
   focused visual-QA commit is pushed as `e89d3bb`.
+- The focused-pane footer now follows the reference's compact intrinsic
+  geometry: 24-point path control, 10/11-point monospaced type hierarchy,
+  5-point radii, low-opacity fills, state-colored half-point-equivalent
+  hairlines, grouped branch/PR icons, and vertically centered chips. Repository
+  roots display the exact `repo root` wording and nested paths become
+  repo-relative; a real 1440 × 860 X11 capture was inspected and pushed in the
+  focused visual-QA commit `9a092c9`.
 - A real inspected screenshot and comparison index were pushed in focused
   visual-QA commits `4149963` and `01cc8d7`.
 
@@ -78,13 +85,12 @@ help, and agent context while preserving the compact reference geometry.
 
 ## Next work
 
-1. Review and correct the enriched footer chrome against product feedback.
-2. Add the foreground-shell capability signal needed to gate inserted Git/gh
+1. Add the foreground-shell capability signal needed to gate inserted Git/gh
    commands as precisely as macOS does.
-3. Implement product-level split/close/recreate commands and teardown-race coverage.
-4. Complete sidebar group creation, ordering controls, and dynamic menu enablement.
-5. Add bounded/coalesced persistence writes, recovery UI, and forced-termination tests.
-6. Continue through the root implementation order, capturing each required
+2. Implement product-level split/close/recreate commands and teardown-race coverage.
+3. Complete sidebar group creation, ordering controls, and dynamic menu enablement.
+4. Add bounded/coalesced persistence writes, recovery UI, and forced-termination tests.
+5. Continue through the root implementation order, capturing each required
    visual milestone.
 
 The verified SwiftGtk4 baseline is committed locally as `260e917`. No

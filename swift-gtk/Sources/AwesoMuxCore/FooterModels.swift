@@ -198,6 +198,36 @@ public struct TerminalFooterDetails: Equatable, Sendable {
         self.ci = ci
         self.editors = editors
     }
+
+    public var pathPresentation: FooterPathPresentation {
+        FooterPathPresentation(context: context, repoRoot: repoRoot)
+    }
+}
+
+public struct FooterPathPresentation: Equatable, Sendable {
+    public let project: String
+    public let path: String
+
+    public init(context: FocusedPaneContext, repoRoot: String?) {
+        guard let repoRoot else {
+            project = context.project
+            path = context.path
+            return
+        }
+        let canonicalRoot = (repoRoot as NSString).standardizingPath
+        let canonicalDirectory = (context.copyPath as NSString).standardizingPath
+        guard canonicalDirectory == canonicalRoot || canonicalDirectory.hasPrefix(canonicalRoot + "/") else {
+            project = context.project
+            path = context.path
+            return
+        }
+        project = ChromeText.sanitized((canonicalRoot as NSString).lastPathComponent, limit: 80)
+        if canonicalDirectory == canonicalRoot {
+            path = "repo root"
+        } else {
+            path = ChromeText.sanitized(String(canonicalDirectory.dropFirst(canonicalRoot.count + 1)), limit: 180)
+        }
+    }
 }
 
 public struct BoundedCommandRunner: Sendable {

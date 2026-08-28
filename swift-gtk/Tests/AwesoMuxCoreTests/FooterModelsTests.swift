@@ -97,4 +97,18 @@ import Testing
     let details = TerminalFooterResolver(runner: runner).resolve(context)
     #expect(details.repoRoot == root.path)
     #expect(details.branch == "footer-fixture")
+    #expect(details.pathPresentation.project == root.lastPathComponent)
+    #expect(details.pathPresentation.path == "Sources/App")
+}
+
+@Test func footerPathPresentationUsesRepoRootCopyAndRejectsUnrelatedRoots() {
+    let identity = FocusedPaneIdentity(workspaceID: UUID(), paneID: UUID(), generation: 1)
+    let rootContext = FocusedPaneContext.resolve(identity: identity, workingDirectory: "/work/awesomux")
+    let root = FooterPathPresentation(context: rootContext, repoRoot: "/work/awesomux")
+    #expect(root.project == "awesomux")
+    #expect(root.path == "repo root")
+
+    let unrelated = FooterPathPresentation(context: rootContext, repoRoot: "/other/repo")
+    #expect(unrelated.project == rootContext.project)
+    #expect(unrelated.path == rootContext.path)
 }

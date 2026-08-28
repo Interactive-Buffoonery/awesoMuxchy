@@ -5,7 +5,8 @@ Updated: 2026-08-28
 ## Current phase
 
 Viability, defensive restoration, and the enriched sidebar/terminal footer
-milestone are complete and locally verified.
+milestone are complete and locally verified. The terminal footer's reference
+geometry and state styling have also passed a real-window visual correction.
 
 ## Completed
 
@@ -33,7 +34,7 @@ milestone are complete and locally verified.
 - Sidebar rows switch complete workspaces through a native GTK stack. The
   Development workspace owns a two-pane split and Review owns an independent
   terminal, all without exposing Ghostty handles to application code.
-- Thirty-two state tests cover grouped snapshots, defensive limits, selection,
+- Thirty-three state tests cover grouped snapshots, defensive limits, selection,
   ordering, split/focus/close mutations, command chords, round trips,
   profile-scoped paths, owner-only persistence, quarantine, and recovery.
 - The app renders its GTK stack/sidebar directly from `SessionSnapshot`, and
@@ -58,6 +59,10 @@ milestone are complete and locally verified.
 - Footer resolution runs concurrently off the GTK thread and publishes through
   GLib's main context. Git/`gh` execution is non-shell, bounded, prompt-free,
   output-capped, HTTPS-validated, and guarded against stale pane identity.
+- The path control and status chips now use the reference's intrinsic sizing,
+  spacing, radii, opacity, tone-specific borders, and 10/11-point monospaced
+  hierarchy. Repository roots render as `repo root`; nested directories render
+  repo-relative, and disappearing Git/PR/CI state clears stale chips.
 
 ## Remaining vertical-slice hardening
 

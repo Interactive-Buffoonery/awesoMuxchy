@@ -44,7 +44,8 @@ final class FocusedPanePathBar: @unchecked Sendable {
     private let project = LabelRef(str: "")
     private let path = LabelRef(str: "")
     private let branchMenu = MenuButtonRef()
-    private let branchLabel = LabelRef(str: "")
+    private let branchName = LabelRef(str: "")
+    private let branchHint = LabelRef(str: "")
     private let dirty = LabelRef(str: "")
     private let pullRequestMenu = MenuButtonRef()
     private let pullRequestLabel = LabelRef(str: "")
@@ -64,23 +65,29 @@ final class FocusedPanePathBar: @unchecked Sendable {
         pathMenu.set(hasFrame: false)
         pathMenu.set(alwaysShowArrow: false)
         pathMenu.set(canShrink: true)
-        let pathContent = BoxRef(orientation: .horizontal, spacing: 7)
+        pathMenu.valign = .center
+        let pathContent = BoxRef(orientation: .horizontal, spacing: 6)
         let folder = ImageRef(iconName: "folder-symbolic")
+        folder.set(pixelSize: 11)
         folder.add(cssClass: "aw-path-project")
         pathContent.append(child: folder)
         project.add(cssClass: "aw-path-project")
         project.setEllipsize(mode: PangoEllipsizeMode(rawValue: 3))
         project.setMaxWidthChars(nChars: 28)
         pathContent.append(child: project)
-        let divider = LabelRef(str: "│")
-        divider.add(cssClass: "aw-path-divider")
-        pathContent.append(child: divider)
+        let hierarchy = LabelRef(str: "›")
+        hierarchy.add(cssClass: "aw-path-hierarchy")
+        pathContent.append(child: hierarchy)
         path.add(cssClass: "aw-path-location")
         path.setEllipsize(mode: PangoEllipsizeMode(rawValue: 2))
         path.setMaxWidthChars(nChars: 48)
         pathContent.append(child: path)
+        let divider = SeparatorRef(orientation: .vertical)
+        divider.add(cssClass: "aw-path-divider")
+        divider.setSizeRequest(width: 1, height: 12)
+        pathContent.append(child: divider)
         let chevron = LabelRef(str: "⌃")
-        chevron.add(cssClass: "aw-path-muted")
+        chevron.add(cssClass: "aw-path-chevron")
         pathContent.append(child: chevron)
         pathMenu.set(child: pathContent)
         root.append(child: pathMenu)
@@ -89,23 +96,50 @@ final class FocusedPanePathBar: @unchecked Sendable {
         spacer.setHexpand(expand: true)
         root.append(child: spacer)
 
-        configureChip(branchMenu, label: branchLabel, css: "aw-chip-branch")
+        configureBranchChip()
         dirty.add(cssClass: "aw-chip-dirty")
+        dirty.valign = .center
         dirty.set(visible: false)
         root.append(child: dirty)
-        configureChip(pullRequestMenu, label: pullRequestLabel, css: "aw-chip-pr")
+        configurePullRequestChip()
         configureChip(ciMenu, label: ciLabel, css: "aw-chip-ci")
         remote.add(cssClass: "aw-chip-remote")
+        remote.valign = .center
         remote.set(visible: false)
         root.append(child: remote)
     }
 
+    private func configureBranchChip() {
+        let content = BoxRef(orientation: .horizontal, spacing: 6)
+        let icon = LabelRef(str: "⎇")
+        icon.add(cssClass: "aw-chip-icon")
+        content.append(child: icon)
+        content.append(child: branchName)
+        branchHint.add(cssClass: "aw-chip-hint")
+        content.append(child: branchHint)
+        configureChip(branchMenu, child: content, css: "aw-chip-branch")
+    }
+
+    private func configurePullRequestChip() {
+        let content = BoxRef(orientation: .horizontal, spacing: 6)
+        let icon = LabelRef(str: "↟")
+        icon.add(cssClass: "aw-chip-icon")
+        content.append(child: icon)
+        content.append(child: pullRequestLabel)
+        configureChip(pullRequestMenu, child: content, css: "aw-chip-pr")
+    }
+
     private func configureChip(_ button: MenuButtonRef, label: LabelRef, css: String) {
+        configureChip(button, child: label, css: css)
+    }
+
+    private func configureChip(_ button: MenuButtonRef, child: some WidgetProtocol, css: String) {
         button.add(cssClass: "aw-chip")
         button.add(cssClass: css)
         button.set(hasFrame: false)
         button.set(alwaysShowArrow: false)
-        button.set(child: label)
+        button.valign = .center
+        button.set(child: child)
         button.set(visible: false)
         root.append(child: button)
     }
@@ -130,26 +164,41 @@ final class FocusedPanePathBar: @unchecked Sendable {
 
     func updateDetails(_ details: TerminalFooterDetails) {
         guard context?.identity == details.context.identity else { return }
+        let presentation = details.pathPresentation
+        project.label = presentation.project
+        path.label = presentation.path
         pathMenu.set(popover: pathPopover(path: details.repoRoot ?? details.context.copyPath, editors: details.editors))
         if let branch = details.branch {
             let arrows = [details.git?.ahead ?? 0 > 0 ? "↑\(capped(details.git?.ahead ?? 0))" : nil,
                           details.git?.behind ?? 0 > 0 ? "↓\(capped(details.git?.behind ?? 0))" : nil]
                 .compactMap { $0 }.joined(separator: " ")
-            branchLabel.label = arrows.isEmpty ? "⌘ \(branch)" : "⌘ \(branch)  \(arrows)"
+            branchName.label = branch
+            branchHint.label = arrows
+            branchHint.set(visible: !arrows.isEmpty)
             branchMenu.setTooltip(text: "Branch \(branch). Open branch options.")
             branchMenu.set(popover: branchPopover(current: branch, branches: details.branches))
             branchMenu.set(visible: true)
+        } else {
+            branchMenu.set(visible: false)
         }
         if let count = details.git?.dirtyCount, count > 0 {
             dirty.label = "+\(capped(count))"
             dirty.setTooltip(text: "\(count) changed working-copy entries")
             dirty.set(visible: true)
+        } else {
+            dirty.set(visible: false)
         }
         if let pr = details.pullRequest {
             pullRequestLabel.label = "PR #\(pr.number)"
+            pullRequestMenu.remove(cssClass: "aw-chip-pr-open")
+            pullRequestMenu.remove(cssClass: "aw-chip-pr-draft")
+            pullRequestMenu.remove(cssClass: "aw-chip-pr-review")
+            pullRequestMenu.add(cssClass: pr.state == .draft ? "aw-chip-pr-draft" : pr.state == .inReview ? "aw-chip-pr-review" : "aw-chip-pr-open")
             pullRequestMenu.setTooltip(text: "Pull request #\(pr.number), \(pr.state == .draft ? "draft" : pr.state == .inReview ? "in review" : "open")")
             pullRequestMenu.set(popover: pullRequestPopover(pr))
             pullRequestMenu.set(visible: true)
+        } else {
+            pullRequestMenu.set(visible: false)
         }
         if let ci = details.ci {
             ciLabel.label = ci.state == .failing ? "CI ✕" : "CI …"
@@ -158,6 +207,8 @@ final class FocusedPanePathBar: @unchecked Sendable {
             ciMenu.setTooltip(text: [ci.workflowName, ci.state == .failing ? "failing" : "running"].compactMap { $0 }.joined(separator: ": "))
             ciMenu.set(popover: ciPopover(ci))
             ciMenu.set(visible: true)
+        } else {
+            ciMenu.set(visible: false)
         }
     }
 

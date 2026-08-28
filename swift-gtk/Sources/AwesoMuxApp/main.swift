@@ -59,14 +59,16 @@ private final class ApplicationState: @unchecked Sendable {
       .aw-shell{min-width:32px;min-height:32px;color:#89b4fa;background:#252538;border:1px solid #45475a;border-radius:7px;font-family:monospace;font-size:11px;font-weight:700;}
       .aw-row-title{color:#cdd6f4;font-size:12px;font-weight:600;}.aw-row-meta{color:#7f849c;font-family:monospace;font-size:10px;}
       .aw-sidebar-footer{min-height:38px;color:#7f849c;background:#181825;border-top:1px solid #313244;font-family:monospace;font-size:10px;}
-      .aw-pathbar{min-height:38px;color:#a6adc8;background:#181825;border-top:1px solid #313244;font-family:monospace;font-size:11px;}
-      .aw-path-project{color:#cdd6f4;font-weight:700;}.aw-path-location{color:#a6adc8;}.aw-path-muted,.aw-path-divider{color:#6c7086;}
-      menubutton.aw-path-menu>button{min-height:24px;padding:2px 6px;background:rgba(205,214,244,.055);border:1px solid rgba(205,214,244,.10);border-radius:6px;}
-      menubutton.aw-path-menu>button:hover{background:rgba(205,214,244,.11);}
-      menubutton.aw-chip>button,.aw-chip-dirty,.aw-chip-remote{min-height:22px;padding:1px 7px;border:0;border-radius:6px;font-family:monospace;font-size:10px;font-weight:700;}
-      menubutton.aw-chip-branch>button{color:#fab387;background:rgba(250,179,135,.13);} .aw-chip-dirty{color:#f9e2af;background:rgba(249,226,175,.11);}
-      menubutton.aw-chip-pr>button{color:#cba6f7;background:rgba(203,166,247,.13);} menubutton.aw-chip-ci>button{color:#89dceb;background:rgba(137,220,235,.12);}
-      menubutton.aw-chip-ci-failing>button{color:#f38ba8;background:rgba(243,139,168,.13);} .aw-chip-remote{color:#89dceb;background:rgba(137,220,235,.12);}
+      .aw-pathbar{min-height:38px;color:#a6adc8;background:#181825;border-top:1px solid rgba(205,214,244,.14);font-family:"Noto Sans Mono","DejaVu Sans Mono",monospace;font-size:11px;}
+      .aw-path-project{color:#a6adc8;font-weight:600;}.aw-path-location{color:#7f849c;font-weight:400;}.aw-path-hierarchy{color:#6c7086;font-size:8px;font-weight:600;}.aw-path-chevron{color:#6c7086;font-size:8px;font-weight:700;}
+      separator.aw-path-divider{min-width:1px;min-height:12px;background:rgba(108,112,134,.65);}
+      menubutton.aw-path-menu>button{min-height:24px;padding:2px 6px;background:rgba(203,166,247,.08);border:1px solid rgba(203,166,247,.38);border-radius:5px;box-shadow:none;}
+      menubutton.aw-path-menu>button:hover{background:rgba(203,166,247,.18);}
+      menubutton.aw-chip>button,.aw-chip-dirty,.aw-chip-remote{min-height:20px;padding:3px 7px;border:1px solid transparent;border-radius:5px;box-shadow:none;font-family:"Noto Sans Mono","DejaVu Sans Mono",monospace;font-size:10px;font-weight:500;}
+      .aw-chip-icon{font-size:11px;font-weight:600;}.aw-chip-hint{opacity:.65;}
+      menubutton.aw-chip-branch>button{color:#fab387;background:rgba(250,179,135,.10);border-color:rgba(250,179,135,.38);} .aw-chip-dirty{color:#f9e2af;background:rgba(249,226,175,.12);border-color:rgba(249,226,175,.40);}
+      menubutton.aw-chip-pr>button{color:#a6e3a1;background:rgba(166,227,161,.10);border-color:rgba(166,227,161,.38);} menubutton.aw-chip-pr-draft>button{color:#cba6f7;background:rgba(203,166,247,.10);border-color:rgba(203,166,247,.38);} menubutton.aw-chip-pr-review>button{color:#89dceb;background:rgba(137,220,235,.10);border-color:rgba(137,220,235,.38);}
+      menubutton.aw-chip-ci>button{color:#89dceb;background:rgba(137,220,235,.10);border-color:rgba(137,220,235,.38);} menubutton.aw-chip-ci-failing>button{color:#f38ba8;background:rgba(243,139,168,.10);border-color:rgba(243,139,168,.38);} .aw-chip-remote{color:#89dceb;background:rgba(137,220,235,.10);border-color:rgba(137,220,235,.38);}
       popover contents{background:#252538;border:1px solid #45475a;border-radius:9px;box-shadow:0 8px 24px rgba(0,0,0,.35);}
       .aw-popover{min-width:190px;}.aw-menu-title{padding:5px 7px;color:#cdd6f4;font-size:13px;font-weight:700;}
       .aw-menu-heading{padding:5px 7px 2px;color:#7f849c;font-family:monospace;font-size:9px;font-weight:700;letter-spacing:1px;}
