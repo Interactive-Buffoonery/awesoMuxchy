@@ -2,11 +2,13 @@ import AwesoMuxCore
 import AwesoMuxTerminal
 import CGtk
 import Foundation
+import GIO
+import GLib
 import Gtk
 
 private final class ApplicationState {
     private final class WorkspaceRuntime {
-        let name: String
+        let workspaceID: UUID
         let pageName: String
         let root: WidgetRef
         let surfaces: [TerminalSurface]
@@ -14,14 +16,14 @@ private final class ApplicationState {
         var focusedSurface: TerminalSurface
 
         init(
-            name: String,
+            workspaceID: UUID,
             pageName: String,
             root: WidgetRef,
             surfaces: [TerminalSurface],
             focusedPaneID: UUID,
             focusedSurface: TerminalSurface
         ) {
-            self.name = name
+            self.workspaceID = workspaceID
             self.pageName = pageName
             self.root = root
             self.surfaces = surfaces
@@ -31,6 +33,9 @@ private final class ApplicationState {
     }
 
     let terminalRuntime: TerminalRuntime
+    private(set) var snapshot: SessionSnapshot
+    private let sessionStore: SessionStore
+    private(set) var isPersistencePaused = false
     private let chromeStyles = CSSProvider(from: """
         .aw-root {
           background: #181825;
@@ -73,15 +78,18 @@ private final class ApplicationState {
     private(set) var focusedSurface: TerminalSurface?
     private(set) var focusedPaneID: UUID?
     private var surfacesByPaneID: [UUID: TerminalSurface] = [:]
-    private var workspaceNameByPaneID: [UUID: String] = [:]
-    private var workspaces: [String: WorkspaceRuntime] = [:]
-    private var workspaceRows: [String: ButtonRef] = [:]
+    private var workspaceIDByPaneID: [UUID: UUID] = [:]
+    private var workspaces: [UUID: WorkspaceRuntime] = [:]
+    private var workspaceRows: [UUID: ButtonRef] = [:]
     private var workspaceStack: StackRef?
-    private(set) var selectedWorkspaceName: String?
+    private var commandActions: [GIO.SimpleAction] = []
+    private var commandMenu: GIO.Menu?
 
-    init?() {
+    init?(snapshot: SessionSnapshot, sessionStore: SessionStore) {
         guard let runtime = TerminalRuntime() else { return nil }
         terminalRuntime = runtime
+        self.snapshot = snapshot
+        self.sessionStore = sessionStore
     }
 
     deinit {
@@ -90,42 +98,50 @@ private final class ApplicationState {
     }
 
     func makeSurface(
-        paneID: UUID,
-        workspaceName: String,
-        workingDirectory: String,
+        pane: PaneSnapshot,
+        workspaceID: UUID,
         accessibleLabel: String,
         accessibleDescription: String
     ) -> TerminalSurface? {
         guard let surface = terminalRuntime.makeSurface(
-            workingDirectory: workingDirectory,
+            workingDirectory: pane.workingDirectory,
             accessibleLabel: accessibleLabel,
             accessibleDescription: accessibleDescription,
             onFocusChanged: { [weak self] focused in
                 guard focused else { return }
-                self?.terminalDidFocus(paneID: paneID)
+                self?.terminalDidFocus(paneID: pane.id)
             }
         ) else { return nil }
         surfaces.append(surface)
-        surfacesByPaneID[paneID] = surface
-        workspaceNameByPaneID[paneID] = workspaceName
+        surfacesByPaneID[pane.id] = surface
+        workspaceIDByPaneID[pane.id] = workspaceID
         return surface
     }
 
     private func terminalDidFocus(paneID: UUID) {
         guard let surface = surfacesByPaneID[paneID],
-              let workspaceName = workspaceNameByPaneID[paneID],
-              let workspace = workspaces[workspaceName]
+              let workspaceID = workspaceIDByPaneID[paneID],
+              let workspace = workspaces[workspaceID]
         else { return }
+        let focusChanged = snapshot.workspace(id: workspaceID)?.focusedPaneID != paneID
+        if focusChanged {
+            try? snapshot.focusPane(paneID, in: workspaceID)
+        }
         workspace.focusedPaneID = paneID
         workspace.focusedSurface = surface
         focusedPaneID = paneID
         focusedSurface = surface
+        if focusChanged { persistSnapshot() }
     }
 
     func focus(paneID: UUID) {
         guard let surface = surfacesByPaneID[paneID] else { return }
         terminalDidFocus(paneID: paneID)
         surface.focus()
+    }
+
+    func surface(for paneID: UUID) -> TerminalSurface? {
+        surfacesByPaneID[paneID]
     }
 
     func installChromeStyles(for widget: WidgetRef) {
@@ -138,7 +154,7 @@ private final class ApplicationState {
 
     func install(
         stack: StackRef,
-        workspace: String,
+        workspaceID: UUID,
         pageName: String,
         root: WidgetRef,
         surfaces: [TerminalSurface],
@@ -147,39 +163,204 @@ private final class ApplicationState {
         row: ButtonRef
     ) {
         workspaceStack = stack
-        workspaces[workspace] = WorkspaceRuntime(
-            name: workspace,
+        workspaces[workspaceID] = WorkspaceRuntime(
+            workspaceID: workspaceID,
             pageName: pageName,
             root: root,
             surfaces: surfaces,
             focusedPaneID: focusedPaneID,
             focusedSurface: focusedSurface
         )
-        workspaceRows[workspace] = row
+        workspaceRows[workspaceID] = row
     }
 
-    func selectWorkspace(_ name: String) {
-        guard let workspace = workspaces[name], let stack = workspaceStack else { return }
+    func selectWorkspace(_ workspaceID: UUID) {
+        guard let workspace = workspaces[workspaceID], let stack = workspaceStack else { return }
+        try? snapshot.selectWorkspace(workspaceID)
         workspace.pageName.withCString { stack.setVisibleChild(name: $0) }
-        selectedWorkspaceName = name
-        for (rowName, row) in workspaceRows {
-            if rowName == name {
+        for (rowWorkspaceID, row) in workspaceRows {
+            if rowWorkspaceID == workspaceID {
                 row.add(cssClass: "suggested-action")
             } else {
                 row.remove(cssClass: "suggested-action")
             }
         }
         focus(paneID: workspace.focusedPaneID)
+        persistSnapshot()
+    }
+
+    private func persistSnapshot() {
+        do {
+            try sessionStore.save(snapshot)
+            isPersistencePaused = false
+        } catch {
+            isPersistencePaused = true
+        }
+    }
+
+    func installCommands(on application: Gtk.ApplicationRef) {
+        let implemented: Set<CommandID> = [
+            .previousWorkspace, .nextWorkspace, .previousPane, .nextPane,
+        ]
+        let menu = GIO.Menu()
+        for section in [CommandSection.file, .view, .workspace, .pane] {
+            let submenu = GIO.Menu()
+            for definition in CommandCatalog.definitions where definition.section == section {
+                let action = GIO.SimpleAction(
+                    name: definition.id.rawValue,
+                    parameterType: nil as VariantTypeRef?
+                )
+                action.set(enabled: implemented.contains(definition.id))
+                action.onActivate { [weak self] _, _ in
+                    self?.perform(definition.id)
+                }
+                application.add(action: action)
+                submenu.append(
+                    label: definition.action,
+                    detailedAction: "app.\(definition.id.rawValue)"
+                )
+                if let chord = definition.defaultChord {
+                    installAccelerator(chord: chord, for: definition.id, on: application)
+                }
+                commandActions.append(action)
+            }
+            menu.appendSubmenu(label: section.rawValue, submenu: submenu)
+        }
+        application.set(menubar: menu)
+        commandMenu = menu
+    }
+
+    private func installAccelerator(
+        chord: KeyChord,
+        for command: CommandID,
+        on application: Gtk.ApplicationRef
+    ) {
+        let modifiers: [(ShortcutModifier, String)] = [
+            (.control, "<Control>"), (.alt, "<Alt>"),
+            (.shift, "<Shift>"), (.superKey, "<Super>"),
+        ]
+        let gtkKeyNames = [
+            "/": "slash", "[": "bracketleft", "]": "bracketright",
+            "-": "minus", "=": "equal",
+        ]
+        let accelerator = modifiers
+            .filter { chord.modifiers.contains($0.0) }
+            .map(\.1)
+            .joined() + (gtkKeyNames[chord.key] ?? chord.key)
+        accelerator.withCString { acceleratorPointer in
+            let pointers: [UnsafePointer<CChar>?] = [acceleratorPointer, nil]
+            pointers.withUnsafeBufferPointer { buffer in
+                application.setAccelsForAction(
+                    detailedActionName: "app.\(command.rawValue)",
+                    accels: buffer.baseAddress!
+                )
+            }
+        }
+    }
+
+    private func perform(_ command: CommandID) {
+        guard let selectedWorkspaceID = snapshot.selectedWorkspaceID,
+              let workspace = workspaces[selectedWorkspaceID]
+        else { return }
+        switch command {
+        case .previousWorkspace:
+            selectRelativeWorkspace(offset: -1)
+        case .nextWorkspace:
+            selectRelativeWorkspace(offset: 1)
+        case .previousPane:
+            focusRelativePane(offset: -1, in: workspace)
+        case .nextPane:
+            focusRelativePane(offset: 1, in: workspace)
+        default:
+            break
+        }
+    }
+
+    private func selectRelativeWorkspace(offset: Int) {
+        guard (try? snapshot.selectRelativeWorkspace(offset: offset)) != nil,
+              let selectedWorkspaceID = snapshot.selectedWorkspaceID
+        else { return }
+        selectWorkspace(selectedWorkspaceID)
+    }
+
+    private func focusRelativePane(offset: Int, in workspace: WorkspaceRuntime) {
+        guard (try? snapshot.focusRelativePane(
+            offset: offset,
+            in: workspace.workspaceID
+        )) != nil,
+              let paneID = snapshot.workspace(id: workspace.workspaceID)?.focusedPaneID
+        else { return }
+        focus(paneID: paneID)
     }
 }
 
 nonisolated(unsafe) private var retainedState: ApplicationState?
 
-private func buildWindow(for application: ApplicationRef) {
-    guard let state = ApplicationState() else {
+private func initialSnapshot(workingDirectory: String) -> SessionSnapshot {
+    let developmentPrimary = PaneSnapshot(
+        title: "Primary terminal",
+        workingDirectory: workingDirectory
+    )
+    let developmentSecondary = PaneSnapshot(
+        title: "Secondary terminal",
+        workingDirectory: workingDirectory
+    )
+    let reviewPrimary = PaneSnapshot(
+        title: "Primary terminal",
+        workingDirectory: workingDirectory
+    )
+    let development = WorkspaceSnapshot(
+        name: "Development",
+        focusedPaneID: developmentPrimary.id,
+        layout: .split(
+            axis: .horizontal,
+            fraction: 0.5,
+            first: .pane(developmentPrimary),
+            second: .pane(developmentSecondary)
+        )
+    )
+    let review = WorkspaceSnapshot(
+        name: "Review",
+        focusedPaneID: reviewPrimary.id,
+        layout: .pane(reviewPrimary)
+    )
+    return SessionSnapshot(
+        selectedWorkspaceID: development.id,
+        groups: [
+            WorkspaceGroupSnapshot(
+                name: "Local",
+                color: .blue,
+                workspaces: [development, review]
+            ),
+        ]
+    )
+}
+
+private func buildWindow(for application: Gtk.ApplicationRef) {
+    let directory = FileManager.default.currentDirectoryPath
+    let fallbackSnapshot = initialSnapshot(workingDirectory: directory)
+    let paths: SessionProfilePaths
+    do {
+        paths = try SessionProfilePaths(profile: "default")
+    } catch {
+        fatalError("Default profile path is invalid")
+    }
+    let sessionStore = SessionStore(paths: paths)
+    let snapshot: SessionSnapshot
+    switch try? sessionStore.loadRecovering() {
+    case let .restored(restored), let .recoveredPrevious(restored):
+        snapshot = restored
+    case .missing, .resetAfterQuarantine, .none:
+        snapshot = fallbackSnapshot
+    }
+    guard let state = ApplicationState(
+        snapshot: snapshot,
+        sessionStore: sessionStore
+    ) else {
         fatalError("Ghostty runtime initialization failed")
     }
     retainedState = state
+    state.installCommands(on: application)
 
     let window = ApplicationWindowRef(application: application)
     window.title = "awesoMux"
@@ -201,86 +382,86 @@ private func buildWindow(for application: ApplicationRef) {
     brand.add(cssClass: "aw-brand")
     sidebar.append(child: brand)
 
-    let groupLabel = LabelRef(str: "LOCAL")
-    groupLabel.xalign = 0
-    groupLabel.add(cssClass: "aw-group-label")
-    groupLabel.setMarginTop(margin: 18)
-    sidebar.append(child: groupLabel)
-
-    let directory = FileManager.default.currentDirectoryPath
-    let developmentPrimaryID = UUID()
-    let developmentSecondaryID = UUID()
-    let reviewPrimaryID = UUID()
-    guard let developmentPrimary = state.makeSurface(
-        paneID: developmentPrimaryID,
-        workspaceName: "Development",
-        workingDirectory: directory,
-        accessibleLabel: "Development primary terminal",
-        accessibleDescription: "First terminal pane in the Development workspace"
-    ), let developmentSecondary = state.makeSurface(
-        paneID: developmentSecondaryID,
-        workspaceName: "Development",
-        workingDirectory: directory,
-        accessibleLabel: "Development secondary terminal",
-        accessibleDescription: "Second terminal pane in the Development workspace"
-    ), let reviewPrimary = state.makeSurface(
-        paneID: reviewPrimaryID,
-        workspaceName: "Review",
-        workingDirectory: directory,
-        accessibleLabel: "Review primary terminal",
-        accessibleDescription: "Terminal pane in the Review workspace"
-    ) else {
-        fatalError("Ghostty terminal surface initialization failed")
-    }
-
     let stack = StackRef()
     stack.setHexpand(expand: true)
     stack.setVexpand(expand: true)
     stack.set(hhomogeneous: true)
     stack.set(vhomogeneous: true)
 
-    let developmentPanes = PanedRef(orientation: .horizontal)
-    developmentPanes.set(position: 580)
-    developmentPanes.setWideHandle(wide: true)
-    developmentPanes.setStart(child: developmentPrimary.widget)
-    developmentPanes.setEnd(child: developmentSecondary.widget)
-    _ = stack.addNamed(child: developmentPanes, name: "development")
-
-    let reviewPage = BoxRef(orientation: .vertical, spacing: 0)
-    reviewPage.append(child: reviewPrimary.widget)
-    _ = stack.addNamed(child: reviewPage, name: "review")
-
-    let workspaceDefinitions: [(String, String, WidgetRef, [TerminalSurface], UUID, TerminalSurface)] = [
-        ("Development", "development", WidgetRef(developmentPanes), [developmentPrimary, developmentSecondary], developmentPrimaryID, developmentPrimary),
-        ("Review", "review", WidgetRef(reviewPage), [reviewPrimary], reviewPrimaryID, reviewPrimary),
-    ]
-    for (title, pageName, page, workspaceSurfaces, workspaceFocusID, workspaceFocus) in workspaceDefinitions {
-        let row = ButtonRef(label: title)
-        row.add(cssClass: "aw-workspace-row")
-        row.setHalign(align: .fill)
-        row.setMarginTop(margin: 8)
-        row.setMarginBottom(margin: 8)
-        row.onClicked { [weak state] _ in
-            state?.selectWorkspace(title)
+    func buildLayout(
+        _ layout: PaneLayout,
+        workspace: WorkspaceSnapshot
+    ) -> (widget: WidgetRef, surfaces: [TerminalSurface])? {
+        switch layout {
+        case let .pane(pane):
+            let ordinal = (workspace.layout.paneIDs.firstIndex(of: pane.id) ?? 0) + 1
+            guard let surface = state.makeSurface(
+                pane: pane,
+                workspaceID: workspace.id,
+                accessibleLabel: "\(workspace.name) \(pane.title)",
+                accessibleDescription: "Terminal pane \(ordinal) of \(workspace.layout.paneCount) in the \(workspace.name) workspace"
+            ) else { return nil }
+            return (surface.widget, [surface])
+        case let .split(axis, fraction, first, second):
+            guard let firstPage = buildLayout(first, workspace: workspace),
+                  let secondPage = buildLayout(second, workspace: workspace)
+            else { return nil }
+            let paned = PanedRef(
+                orientation: axis == .horizontal ? .horizontal : .vertical
+            )
+            let available = axis == .horizontal ? 1160.0 : 850.0
+            paned.set(position: Int(available * min(max(fraction, 0.1), 0.9)))
+            paned.setWideHandle(wide: true)
+            paned.setStart(child: firstPage.widget)
+            paned.setEnd(child: secondPage.widget)
+            return (WidgetRef(paned), firstPage.surfaces + secondPage.surfaces)
         }
-        sidebar.append(child: row)
-        state.install(
-            stack: stack,
-            workspace: title,
-            pageName: pageName,
-            root: page,
-            surfaces: workspaceSurfaces,
-            focusedPaneID: workspaceFocusID,
-            focusedSurface: workspaceFocus,
-            row: row
-        )
+    }
+
+    for group in snapshot.groups where !group.isCollapsed {
+        let groupLabel = LabelRef(str: group.name.uppercased())
+        groupLabel.xalign = 0
+        groupLabel.add(cssClass: "aw-group-label")
+        groupLabel.setMarginTop(margin: 18)
+        sidebar.append(child: groupLabel)
+
+        for workspace in group.workspaces where !workspace.isSoftClosed {
+            guard let page = buildLayout(workspace.layout, workspace: workspace),
+                  let focusedSurface = state.surface(for: workspace.focusedPaneID)
+            else {
+                fatalError("Ghostty terminal surface initialization failed")
+            }
+            let pageName = workspace.id.uuidString
+            _ = pageName.withCString { stack.addNamed(child: page.widget, name: $0) }
+            let row = ButtonRef(label: workspace.name)
+            row.add(cssClass: "aw-workspace-row")
+            row.setHalign(align: .fill)
+            row.setMarginTop(margin: 8)
+            row.setMarginBottom(margin: 8)
+            row.onClicked { [weak state] _ in
+                state?.selectWorkspace(workspace.id)
+            }
+            sidebar.append(child: row)
+            state.install(
+                stack: stack,
+                workspaceID: workspace.id,
+                pageName: pageName,
+                root: page.widget,
+                surfaces: page.surfaces,
+                focusedPaneID: workspace.focusedPaneID,
+                focusedSurface: focusedSurface,
+                row: row
+            )
+        }
     }
 
     root.append(child: sidebar)
     root.append(child: stack)
     window.set(child: root)
     window.present()
-    state.selectWorkspace("Development")
+    if let selectedWorkspaceID = snapshot.selectedWorkspaceID {
+        state.selectWorkspace(selectedWorkspaceID)
+    }
 }
 
 let status = Application.run(

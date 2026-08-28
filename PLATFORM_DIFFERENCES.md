@@ -1,5 +1,12 @@
 # Platform differences
 
+## Keyboard modifiers
+
+Linux uses Control for the macOS Command shortcut layer and Alt for Option.
+Shortcuts that use both macOS Control and Command map to Super+Control so the
+chord stays distinct. The shared Linux command catalog owns this translation;
+Ghostty keybindings are not a parallel application-command route.
+
 This register starts empty of approved product differences. Toolkit mechanics
 do not count as user-visible differences.
 

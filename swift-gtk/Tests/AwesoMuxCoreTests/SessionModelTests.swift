@@ -106,3 +106,134 @@ private func snapshot(_ workspaces: [WorkspaceSnapshot]) -> SessionSnapshot {
         try value.selectWorkspace(closed.id)
     }
 }
+
+@Test func commandCatalogHasUniqueIDsAndChords() {
+    let definitions = CommandCatalog.definitions
+    #expect(Set(definitions.map(\.id)).count == definitions.count)
+    let chords = definitions.compactMap(\.defaultChord)
+    #expect(Set(chords).count == chords.count)
+    #expect(CommandCatalog.definition(for: .splitRight).action == "Split Right")
+    #expect(CommandCatalog.definition(for: .newWorkspaceGroup).action == "New Workspace Group…")
+}
+
+@Test func relativeWorkspaceAndPaneNavigationWraps() throws {
+    let first = workspace(panes: 2)
+    let second = workspace(panes: 1)
+    var value = snapshot([first, second])
+
+    try value.selectRelativeWorkspace(offset: -1)
+    #expect(value.selectedWorkspaceID == second.id)
+    try value.selectRelativeWorkspace(offset: 1)
+    #expect(value.selectedWorkspaceID == first.id)
+
+    try value.focusRelativePane(offset: -1, in: first.id)
+    #expect(value.workspace(id: first.id)?.focusedPaneID == first.layout.paneIDs.last)
+}
+
+@Test func workspaceOrderingStaysInsideOwningGroup() throws {
+    let first = workspace(panes: 1)
+    let second = workspace(panes: 1)
+    var value = snapshot([first, second])
+    try value.moveWorkspace(first.id, offset: 1)
+    #expect(value.groups[0].workspaces.map(\.id) == [second.id, first.id])
+    try value.moveWorkspace(first.id, offset: 20)
+    #expect(value.groups[0].workspaces.map(\.id) == [second.id, first.id])
+}
+
+@Test func profilePathsRejectTraversalAndUseXDGStateHome() throws {
+    #expect(throws: SessionProfileError.invalidProfileName) {
+        try SessionProfilePaths(profile: "../other")
+    }
+    let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    let paths = try SessionProfilePaths(
+        profile: "default",
+        environment: ["XDG_STATE_HOME": root.path],
+        homeDirectory: URL(fileURLWithPath: "/unused")
+    )
+    #expect(paths.snapshotURL.path.hasSuffix("awesomux/profiles/default/session.json"))
+}
+
+@Test func corruptCurrentSnapshotRecoversPreviousAndQuarantines() throws {
+    let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    defer { try? FileManager.default.removeItem(at: root) }
+    let store = SessionStore(
+        snapshotURL: root.appendingPathComponent("session.json"),
+        previousSnapshotURL: root.appendingPathComponent("session.previous.json"),
+        quarantineDirectoryURL: root.appendingPathComponent("quarantine")
+    )
+    let first = snapshot([workspace(panes: 1)])
+    let second = snapshot([workspace(panes: 2)])
+    try store.save(first)
+    try store.save(second)
+    try Data("not-json".utf8).write(to: store.snapshotURL, options: .atomic)
+
+    #expect(try store.loadRecovering() == .recoveredPrevious(first))
+    let quarantined = try FileManager.default.contentsOfDirectory(
+        at: store.quarantineDirectoryURL,
+        includingPropertiesForKeys: nil
+    )
+    #expect(quarantined.count == 1)
+    let attributes = try FileManager.default.attributesOfItem(atPath: quarantined[0].path)
+    #expect((attributes[.posixPermissions] as? NSNumber)?.intValue == 0o600)
+}
+
+@Test func invalidCurrentAndPreviousResetAfterQuarantine() throws {
+    let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    defer { try? FileManager.default.removeItem(at: root) }
+    try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+    let store = SessionStore(
+        snapshotURL: root.appendingPathComponent("session.json"),
+        previousSnapshotURL: root.appendingPathComponent("session.previous.json"),
+        quarantineDirectoryURL: root.appendingPathComponent("quarantine")
+    )
+    try Data("bad-current".utf8).write(to: store.snapshotURL)
+    try Data("bad-previous".utf8).write(to: store.previousSnapshotURL)
+    #expect(try store.loadRecovering() == .resetAfterQuarantine)
+    #expect(try FileManager.default.contentsOfDirectory(
+        at: store.quarantineDirectoryURL,
+        includingPropertiesForKeys: nil
+    ).count == 2)
+}
+
+@Test func oversizedSnapshotIsQuarantinedWithoutDecoding() throws {
+    let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    defer { try? FileManager.default.removeItem(at: root) }
+    try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+    let store = SessionStore(
+        snapshotURL: root.appendingPathComponent("session.json"),
+        quarantineDirectoryURL: root.appendingPathComponent("quarantine")
+    )
+    let oversized = Data(repeating: 0x20, count: SessionStore.maximumSnapshotBytes + 1)
+    try oversized.write(to: store.snapshotURL)
+    #expect(try store.loadRecovering() == .resetAfterQuarantine)
+    #expect(!FileManager.default.fileExists(atPath: store.snapshotURL.path))
+    #expect(try FileManager.default.contentsOfDirectory(
+        at: store.quarantineDirectoryURL,
+        includingPropertiesForKeys: nil
+    ).count == 1)
+}
+
+@Test func rejectsUnsafeSplitFractionAndSelectedClosedWorkspace() {
+    let pane = PaneSnapshot(title: "shell", workingDirectory: "/tmp")
+    let second = PaneSnapshot(title: "shell", workingDirectory: "/tmp")
+    let invalidLayout = PaneLayout.split(
+        axis: .horizontal,
+        fraction: .infinity,
+        first: .pane(pane),
+        second: .pane(second)
+    )
+    let invalidWorkspace = WorkspaceSnapshot(
+        name: "Invalid",
+        focusedPaneID: pane.id,
+        layout: invalidLayout
+    )
+    #expect(throws: SessionValidationError.invalidSplitFraction) {
+        try snapshot([invalidWorkspace]).validated()
+    }
+
+    var closed = workspace(panes: 1)
+    closed.isSoftClosed = true
+    #expect(throws: SessionValidationError.missingSelectedWorkspace) {
+        try snapshot([closed]).validated()
+    }
+}

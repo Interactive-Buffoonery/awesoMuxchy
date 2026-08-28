@@ -21,3 +21,9 @@ recovery write gate remain product contracts.
 
 The storage path is a recorded platform difference; restore behavior is not.
 Files and directories must be owner-only (`0600`/`0700`).
+
+The Linux implementation stores `session.json`, `session.previous.json`, and a
+quarantine directory below `$XDG_STATE_HOME/awesomux/profiles/<profile>/` (or
+the XDG default under the home directory). Profile names reject separators and
+traversal. Reads are capped at 4 MiB, layout depth at 32, and pane count per
+workspace at 64 before the snapshot can reach GTK or Ghostty.

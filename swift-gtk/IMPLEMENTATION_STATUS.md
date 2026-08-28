@@ -4,7 +4,8 @@ Updated: 2026-08-28
 
 ## Current phase
 
-Viability passed; production workspace/sidebar implementation is active.
+Viability passed; command/sidebar work is active and defensive restoration has
+started.
 
 ## Completed
 
@@ -32,8 +33,14 @@ Viability passed; production workspace/sidebar implementation is active.
 - Sidebar rows switch complete workspaces through a native GTK stack. The
   Development workspace owns a two-pane split and Review owns an independent
   terminal, all without exposing Ghostty handles to application code.
-- Nine state tests cover grouped snapshots, defensive validation, selection,
-  split/focus/close mutations, round trips, and owner-only persistence.
+- Seventeen state tests cover grouped snapshots, defensive limits, selection,
+  ordering, split/focus/close mutations, command chords, round trips,
+  profile-scoped paths, owner-only persistence, quarantine, and recovery.
+- The app renders its GTK stack/sidebar directly from `SessionSnapshot`, and
+  native GTK actions plus accelerators share `CommandCatalog` with tests.
+- A real two-launch check restored profile state and maintained `0600`
+  current/previous snapshots; invalid and oversized files are moved into a
+  `0700` quarantine with `0600` file permissions.
 
 ## Remaining vertical-slice hardening
 

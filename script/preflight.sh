@@ -33,8 +33,7 @@ git -C "$repo_root/vendor/ghostty" apply --check \
 
 "$repo_root/script/check-text-baseline.py"
 "$swiftc_bin" -warnings-as-errors -typecheck \
-  "$repo_root/swift-gtk/Sources/AwesoMuxCore/SessionModel.swift" \
-  "$repo_root/swift-gtk/Sources/AwesoMuxCore/SessionStore.swift"
+  "$repo_root"/swift-gtk/Sources/AwesoMuxCore/*.swift
 
 cc -std=c17 -fsyntax-only -Wall -Wextra -Werror \
   $(pkg-config --cflags gtk4) \

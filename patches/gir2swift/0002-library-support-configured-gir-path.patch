@@ -13,18 +13,12 @@ diff --git a/Sources/libgir2swift/utilities/planning.swift b/Sources/libgir2swif
 index 075002b..a98c83f 100644
 --- a/Sources/libgir2swift/utilities/planning.swift
 +++ b/Sources/libgir2swift/utilities/planning.swift
-@@ -154,7 +154,11 @@ extension Plan {
-     /// - Returns: Location of the `.gir` file, if found.
-     private static func searchForGir(named name: String, pkgConfig: Set<String>) throws -> URL? {
-         // Common locations of `.gir` files on different platforms
+@@ -157 +157,5 @@ extension Plan {
 -        let defaultPaths = ["/opt/homebrew/share/gir-1.0", "/usr/local/share/gir-1.0", "/usr/share/gir-1.0"].map { URL(fileURLWithPath: $0, isDirectory: false) }
 +        let configuredPaths = ProcessInfo.processInfo.environment["GIR2SWIFT_GIR_PATH"]?
 +            .split(separator: ":")
 +            .map(String.init) ?? []
 +        let defaultPaths = (configuredPaths + ["/opt/homebrew/share/gir-1.0", "/usr/local/share/gir-1.0", "/usr/share/gir-1.0"])
 +            .map { URL(fileURLWithPath: $0, isDirectory: false) }
-
-         var searchPaths = defaultPaths
-         #if os(macOS)
 --
 2.51.0

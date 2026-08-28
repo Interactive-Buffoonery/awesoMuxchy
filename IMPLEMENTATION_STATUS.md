@@ -5,8 +5,8 @@ Updated: 2026-08-28
 ## Current phase
 
 SwiftGtk4 passed its language/toolkit viability checkpoint. Phase 4 terminal
-lifecycle is verified and production workspace/sidebar implementation is
-active.
+lifecycle is verified, phase 5 command/sidebar foundations are active, and
+phase 6 snapshot recovery has started.
 
 ## Completed evidence
 
@@ -29,8 +29,14 @@ active.
 - Three standalone stress runs each passed 100 cycles with two concurrently
   busy, successfully realized surfaces. Peak RSS was 307,208 KiB on the first
   driver-cache warm-up and 245,056/244,844 KiB on the following runs.
-- Nine Swift model, mutation, validation, and owner-only persistence tests
-  pass.
+- Seventeen Swift tests cover model mutations, exact command-catalog chord
+  uniqueness, defensive snapshot limits, XDG profile paths, owner-only writes,
+  current/previous recovery, and corrupt-file quarantine.
+- Native GTK application actions and accelerators are generated from the same
+  command catalog used by tests. Workspace and pane navigation route through
+  the shared snapshot rather than a parallel UI-only selection model.
+- The real app restored a profile-scoped snapshot across two launches and
+  created owner-only current and previous files.
 - The release integration harness asserts both real terminal surfaces publish
   focus callbacks; the full local preflight passes after this routing change.
 - A real inspected screenshot and comparison index were pushed in focused
@@ -51,11 +57,12 @@ active.
 
 ## Next work
 
-1. Finish product-level focus/close/recreate and teardown-race coverage.
-2. Connect the workspace/sidebar UI to persisted state and command routing.
-3. Implement defensive profile-scoped session restoration and crash recovery.
+1. Implement product-level split/new/close/recreate commands and teardown-race coverage.
+2. Complete sidebar group creation, ordering controls, and dynamic menu enablement.
+3. Add bounded/coalesced persistence writes, recovery UI, and forced-termination tests.
 4. Continue through the root implementation order, capturing each required
    visual milestone.
 
-No implementation source has been committed or pushed; only the explicitly
-allowed visual-QA screenshot/index commits are on the remote.
+The verified SwiftGtk4 baseline is committed locally as `260e917`. No
+implementation source commit has been pushed; only explicitly allowed
+visual-QA commits are on the remote.

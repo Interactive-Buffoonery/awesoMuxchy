@@ -59,6 +59,25 @@ public indirect enum PaneLayout: Codable, Equatable, Sendable {
         case let .split(_, _, first, second): first.paneIDs + second.paneIDs
         }
     }
+
+    func validateStructure(depth: Int = 0) throws {
+        guard depth <= 32 else { throw SessionValidationError.layoutTooDeep }
+        switch self {
+        case let .pane(pane):
+            guard !pane.workingDirectory.isEmpty,
+                  pane.workingDirectory.utf8.count <= 4_096,
+                  pane.title.utf8.count <= 512
+            else {
+                throw SessionValidationError.invalidPaneText(pane.id)
+            }
+        case let .split(_, fraction, first, second):
+            guard fraction.isFinite, (0.05...0.95).contains(fraction) else {
+                throw SessionValidationError.invalidSplitFraction
+            }
+            try first.validateStructure(depth: depth + 1)
+            try second.validateStructure(depth: depth + 1)
+        }
+    }
 }
 
 public struct WorkspaceSnapshot: Codable, Equatable, Identifiable, Sendable {
@@ -130,19 +149,35 @@ public struct SessionSnapshot: Codable, Equatable, Sendable {
         guard schemaVersion == Self.currentSchemaVersion else {
             throw SessionValidationError.unsupportedSchema(schemaVersion)
         }
+        guard groups.count <= 128 else {
+            throw SessionValidationError.snapshotLimitExceeded
+        }
         let groupIDs = groups.map(\.id)
         guard Set(groupIDs).count == groupIDs.count else {
             throw SessionValidationError.duplicateGroupID
         }
         let workspaceIDs = workspaces.map(\.id)
+        guard workspaceIDs.count <= 512 else {
+            throw SessionValidationError.snapshotLimitExceeded
+        }
         guard Set(workspaceIDs).count == workspaceIDs.count else {
             throw SessionValidationError.duplicateWorkspaceID
         }
-        if let selectedWorkspaceID, !workspaceIDs.contains(selectedWorkspaceID) {
+        if let selectedWorkspaceID,
+           !workspaces.contains(where: {
+               $0.id == selectedWorkspaceID && !$0.isSoftClosed
+           }) {
             throw SessionValidationError.missingSelectedWorkspace
         }
         for workspace in workspaces {
+            guard workspace.name.utf8.count <= 512 else {
+                throw SessionValidationError.invalidWorkspaceName(workspace.id)
+            }
+            try workspace.layout.validateStructure()
             let paneIDs = workspace.layout.paneIDs
+            guard paneIDs.count <= 64 else {
+                throw SessionValidationError.snapshotLimitExceeded
+            }
             guard Set(paneIDs).count == paneIDs.count else {
                 throw SessionValidationError.duplicatePaneID(workspace.id)
             }
@@ -161,6 +196,11 @@ public enum SessionValidationError: Error, Equatable {
     case missingSelectedWorkspace
     case duplicatePaneID(UUID)
     case missingFocusedPane(UUID)
+    case invalidSplitFraction
+    case layoutTooDeep
+    case snapshotLimitExceeded
+    case invalidPaneText(UUID)
+    case invalidWorkspaceName(UUID)
 }
 
 public enum CloseDecision: Equatable, Sendable {
