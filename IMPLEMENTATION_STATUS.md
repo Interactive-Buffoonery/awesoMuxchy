@@ -121,6 +121,11 @@ help, and agent context while preserving the compact reference geometry.
   bounded Pinned ordering. Rename refreshes regular, lifted, rail, search, and
   persisted representations; moving preserves terminal/pane identity and
   rebinds the row menu to its destination group.
+- Needs Input acknowledgement is pane-scoped and persistent: a focused waiting
+  pane acknowledges only after a guarded 500 ms dwell, while Ctrl-Shift-K and
+  the row action acknowledge every waiting pane in that workspace immediately.
+  Fast selection/focus changes invalidate the pending dwell. Per-workspace
+  notification mute overrides also persist and use exact Mute/Unmute wording.
 - A real inspected screenshot and comparison index were pushed in focused
   visual-QA commits `4149963` and `01cc8d7`.
 

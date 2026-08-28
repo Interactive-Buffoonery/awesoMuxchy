@@ -163,6 +163,7 @@ private final class ApplicationState: @unchecked Sendable {
     private var isSidebarOverlayMounted = false
     private var isSidebarTemporarilyRevealed = false
     private var sidebarRevealGeneration = 0
+    private var attentionAcknowledgementGeneration = 0
     private var sidebarMotionController: EventControllerMotion?
     private var searchKeyController: EventControllerKey?
     private var lastWorkspaceCreateAt: ContinuousClock.Instant?
@@ -422,6 +423,7 @@ private final class ApplicationState: @unchecked Sendable {
         runtime.focusedPaneID = paneID; runtime.focusedSurface = surface
         focusedPaneID = paneID; focusedSurface = surface
         updateChrome(workspaceID)
+        scheduleAttentionAcknowledgement(workspaceID: workspaceID, paneID: paneID)
         if changed { persist() }
     }
 
@@ -649,6 +651,15 @@ private final class ApplicationState: @unchecked Sendable {
         }
         _ = action("New Workspace Here") { [weak self] in self?.createWorkspace(here: workspaceID, fallbackGroupID: groupID) }
         _ = action("Rename Workspace...") { [weak self] in self?.presentWorkspaceNameDialog(workspaceID) }
+        if let workspace = snapshot.workspace(id: workspaceID),
+           workspace.layout.panes.contains(where: {
+               $0.agentState == .needsAttention && !workspace.acknowledgedAttentionPaneIDs.contains($0.id)
+           }) {
+            _ = action("Acknowledge Workspace") { [weak self] in self?.acknowledgeWorkspace(workspaceID) }
+        }
+        let muteTitle = snapshot.workspace(id: workspaceID)?.notificationsMuted == true
+            ? "Unmute Notifications" : "Mute Notifications"
+        _ = action(muteTitle) { [weak self] in self?.toggleWorkspaceNotifications(workspaceID) }
         let pin = action(snapshot.pinnedWorkspaceIDs.contains(workspaceID) ? "Unpin" : "Pin") { [weak self] in
             self?.togglePinned(workspaceID)
         }
@@ -676,6 +687,51 @@ private final class ApplicationState: @unchecked Sendable {
         if isLifted { liftedContextControllers[workspaceID] = click } else { workspaceContextControllers[workspaceID] = click }
         gtk_widget_add_controller(row.widget_ptr, click.event_controller_ptr)
         if isLifted { liftedContextPopovers[workspaceID] = popover } else { workspaceContextPopovers[workspaceID] = popover }
+    }
+
+    private func rebuildWorkspaceContextMenu(_ workspaceID: UUID) {
+        guard let row = rows[workspaceID],
+              let groupID = snapshot.groups.first(where: { $0.workspaces.contains { $0.id == workspaceID } })?.id
+        else { return }
+        if let controller = workspaceContextControllers.removeValue(forKey: workspaceID) {
+            gtk_widget_remove_controller(row.widget_ptr, controller.event_controller_ptr)
+        }
+        workspaceContextPopovers.removeValue(forKey: workspaceID)?.unparent()
+        regularPinActions.removeValue(forKey: workspaceID)
+        installWorkspaceContextMenu(on: row, workspaceID: workspaceID, groupID: groupID)
+    }
+
+    private func acknowledgeWorkspace(_ workspaceID: UUID) {
+        attentionAcknowledgementGeneration += 1
+        guard (try? snapshot.acknowledgeWorkspace(workspaceID)) != nil else { return }
+        rebuildWorkspaceContextMenu(workspaceID)
+        refreshLiftedRows(); updateSidebarVisibility(); persist()
+    }
+
+    private func scheduleAttentionAcknowledgement(workspaceID: UUID, paneID: UUID) {
+        attentionAcknowledgementGeneration += 1
+        let generation = attentionAcknowledgementGeneration
+        guard let workspace = snapshot.workspace(id: workspaceID),
+              workspace.layout.pane(id: paneID)?.agentState == .needsAttention,
+              !workspace.acknowledgedAttentionPaneIDs.contains(paneID)
+        else { return }
+        DispatchQueue.main.asyncAfter(deadline: .now() + .milliseconds(500)) { [weak self] in
+            performOnGTKMain {
+                guard let self, self.attentionAcknowledgementGeneration == generation,
+                      self.snapshot.selectedWorkspaceID == workspaceID,
+                      self.runtimes[workspaceID]?.focusedPaneID == paneID,
+                      (try? self.snapshot.acknowledgePane(paneID, in: workspaceID)) != nil
+                else { return }
+                self.rebuildWorkspaceContextMenu(workspaceID)
+                self.refreshLiftedRows(); self.updateSidebarVisibility(); self.persist()
+            }
+        }
+    }
+
+    private func toggleWorkspaceNotifications(_ workspaceID: UUID) {
+        guard (try? snapshot.toggleWorkspaceNotificationsMuted(workspaceID)) != nil else { return }
+        rebuildWorkspaceContextMenu(workspaceID)
+        refreshLiftedRows(); persist()
     }
 
     private func createWorkspace(here workspaceID: UUID, fallbackGroupID: UUID) {
@@ -986,7 +1042,7 @@ private final class ApplicationState: @unchecked Sendable {
         let search = SearchEntryRef(); search.setPlaceholder(text: "Search workspaces and actions...")
         let results = BoxRef(orientation: .vertical, spacing: 3)
         let implemented: Set<CommandID> = [.newWorkspace, .newWorkspaceInCurrentDirectory,
-            .renameWorkspace,
+            .renameWorkspace, .acknowledgeWorkspace, .togglePinWorkspace,
             .previousWorkspace, .nextWorkspace, .previousPane, .nextPane,
             .toggleSidebarWidth, .toggleSidebarVisibility]
         var commandRows: [(String, ButtonRef)] = []
@@ -1014,7 +1070,7 @@ private final class ApplicationState: @unchecked Sendable {
 
     func installCommands(on application: Gtk.ApplicationRef) {
         let implemented: Set<CommandID> = [.newWorkspace, .newWorkspaceInCurrentDirectory,
-            .renameWorkspace,
+            .renameWorkspace, .acknowledgeWorkspace, .togglePinWorkspace,
             .previousWorkspace, .nextWorkspace, .previousPane, .nextPane,
             .toggleSidebarWidth, .toggleSidebarVisibility]
         let menu = GIO.Menu()
@@ -1050,6 +1106,8 @@ private final class ApplicationState: @unchecked Sendable {
         guard let selected = snapshot.selectedWorkspaceID, let runtime = runtimes[selected] else { return }
         switch command {
         case .renameWorkspace: presentWorkspaceNameDialog(selected)
+        case .acknowledgeWorkspace: acknowledgeWorkspace(selected)
+        case .togglePinWorkspace: togglePinned(selected)
         case .toggleSidebarWidth: toggleSidebarWidth()
         case .toggleSidebarVisibility: toggleSidebarVisibility()
         case .previousWorkspace: selectRelative(-1)

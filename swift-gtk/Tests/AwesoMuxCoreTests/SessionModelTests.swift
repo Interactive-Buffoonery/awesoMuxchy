@@ -505,6 +505,63 @@ private func snapshot(_ workspaces: [WorkspaceSnapshot]) -> SessionSnapshot {
     }
 }
 
+@Test func workspaceAcknowledgementAndNotificationOverridesPersistIndependently() throws {
+    let waitingPane = PaneSnapshot(title: "Approval", workingDirectory: "/tmp", agentState: .needsAttention)
+    let quietPane = PaneSnapshot(title: "Shell", workingDirectory: "/tmp")
+    let waiting = WorkspaceSnapshot(name: "Waiting", focusedPaneID: waitingPane.id, layout: .pane(waitingPane))
+    let quiet = WorkspaceSnapshot(name: "Quiet", focusedPaneID: quietPane.id, layout: .pane(quietPane))
+    var value = snapshot([waiting, quiet])
+    value.reconcileAttentionWorkspaceIDs()
+    #expect(value.attentionWorkspaceIDs == [waiting.id])
+
+    try value.toggleWorkspaceNotificationsMuted(waiting.id)
+    #expect(value.workspace(id: waiting.id)?.notificationsMuted == true)
+    #expect(value.workspace(id: quiet.id)?.notificationsMuted == false)
+    try value.acknowledgeWorkspace(waiting.id)
+    #expect(value.workspace(id: waiting.id)?.acknowledgedAttentionPaneIDs == [waitingPane.id])
+    #expect(value.attentionWorkspaceIDs.isEmpty)
+    #expect(!SidebarPresentationPolicy.hasAttention(value))
+    value.reconcileAttentionWorkspaceIDs()
+    #expect(value.attentionWorkspaceIDs.isEmpty)
+
+    let encoded = try JSONEncoder().encode(value)
+    let decoded = try JSONDecoder().decode(SessionSnapshot.self, from: encoded)
+    #expect(decoded.workspace(id: waiting.id)?.notificationsMuted == true)
+    #expect(decoded.workspace(id: waiting.id)?.acknowledgedAttentionPaneIDs == [waitingPane.id])
+
+    var object = try #require(JSONSerialization.jsonObject(with: encoded) as? [String: Any])
+    var groups = try #require(object["groups"] as? [[String: Any]])
+    var workspaces = try #require(groups[0]["workspaces"] as? [[String: Any]])
+    workspaces[0].removeValue(forKey: "notificationsMuted")
+    workspaces[0].removeValue(forKey: "acknowledgedAttentionPaneIDs")
+    groups[0]["workspaces"] = workspaces; object["groups"] = groups
+    let legacy = try JSONDecoder().decode(SessionSnapshot.self, from: JSONSerialization.data(withJSONObject: object))
+    #expect(legacy.workspace(id: waiting.id)?.notificationsMuted == false)
+    #expect(legacy.workspace(id: waiting.id)?.acknowledgedAttentionPaneIDs.isEmpty == true)
+
+    value.groups[0].workspaces[0].layout = .pane(PaneSnapshot(
+        id: waitingPane.id, title: waitingPane.title, workingDirectory: waitingPane.workingDirectory
+    ))
+    value.reconcileAttentionWorkspaceIDs()
+    #expect(value.workspace(id: waiting.id)?.acknowledgedAttentionPaneIDs.isEmpty == true)
+}
+
+@Test func paneAcknowledgementKeepsWorkspaceLiftedUntilEveryWaitingPaneIsRead() throws {
+    let firstPane = PaneSnapshot(title: "First", workingDirectory: "/tmp", agentState: .needsAttention)
+    let secondPane = PaneSnapshot(title: "Second", workingDirectory: "/tmp", agentState: .needsAttention)
+    let workspace = WorkspaceSnapshot(name: "Two waits", focusedPaneID: firstPane.id, layout: .split(
+        axis: .horizontal, fraction: 0.5, first: .pane(firstPane), second: .pane(secondPane)
+    ))
+    var value = snapshot([workspace])
+    value.reconcileAttentionWorkspaceIDs()
+    try value.acknowledgePane(firstPane.id, in: workspace.id)
+    #expect(value.attentionWorkspaceIDs == [workspace.id])
+    #expect(value.workspace(id: workspace.id)?.acknowledgedAttentionPaneIDs == [firstPane.id])
+    try value.acknowledgePane(secondPane.id, in: workspace.id)
+    #expect(value.attentionWorkspaceIDs.isEmpty)
+    #expect(!SidebarPresentationPolicy.hasAttention(value))
+}
+
 @Test func sidebarPresentationPolicyMirrorsBothEdgesAndAttentionDiscovery() {
     #expect(SidebarPresentationPolicy.proximity(pointerX: 39, containerWidth: 1_000, position: .left) == .revealed)
     #expect(SidebarPresentationPolicy.proximity(pointerX: 961, containerWidth: 1_000, position: .right) == .revealed)

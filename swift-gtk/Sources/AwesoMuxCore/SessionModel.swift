@@ -95,19 +95,42 @@ public struct WorkspaceSnapshot: Codable, Equatable, Identifiable, Sendable {
     public var isSoftClosed: Bool
     public var focusedPaneID: UUID
     public var layout: PaneLayout
+    public var notificationsMuted: Bool
+    public var acknowledgedAttentionPaneIDs: [UUID]
 
     public init(
         id: UUID = UUID(),
         name: String,
         isSoftClosed: Bool = false,
         focusedPaneID: UUID,
-        layout: PaneLayout
+        layout: PaneLayout,
+        notificationsMuted: Bool = false,
+        acknowledgedAttentionPaneIDs: [UUID] = []
     ) {
         self.id = id
         self.name = name
         self.isSoftClosed = isSoftClosed
         self.focusedPaneID = focusedPaneID
         self.layout = layout
+        self.notificationsMuted = notificationsMuted
+        self.acknowledgedAttentionPaneIDs = acknowledgedAttentionPaneIDs
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case id, name, isSoftClosed, focusedPaneID, layout, notificationsMuted, acknowledgedAttentionPaneIDs
+    }
+
+    public init(from decoder: Decoder) throws {
+        let values = try decoder.container(keyedBy: CodingKeys.self)
+        self.init(
+            id: try values.decode(UUID.self, forKey: .id),
+            name: try values.decode(String.self, forKey: .name),
+            isSoftClosed: try values.decodeIfPresent(Bool.self, forKey: .isSoftClosed) ?? false,
+            focusedPaneID: try values.decode(UUID.self, forKey: .focusedPaneID),
+            layout: try values.decode(PaneLayout.self, forKey: .layout),
+            notificationsMuted: try values.decodeIfPresent(Bool.self, forKey: .notificationsMuted) ?? false,
+            acknowledgedAttentionPaneIDs: try values.decodeIfPresent([UUID].self, forKey: .acknowledgedAttentionPaneIDs) ?? []
+        )
     }
 }
 
@@ -222,6 +245,9 @@ public struct SessionSnapshot: Codable, Equatable, Sendable {
             guard Set(paneIDs).count == paneIDs.count else {
                 throw SessionValidationError.duplicatePaneID(workspace.id)
             }
+            guard Set(workspace.acknowledgedAttentionPaneIDs).count == workspace.acknowledgedAttentionPaneIDs.count,
+                  workspace.acknowledgedAttentionPaneIDs.allSatisfy(Set(paneIDs).contains)
+            else { throw SessionValidationError.invalidAcknowledgedPaneIDs(workspace.id) }
             guard paneIDs.contains(workspace.focusedPaneID) else {
                 throw SessionValidationError.missingFocusedPane(workspace.id)
             }
@@ -244,6 +270,7 @@ public enum SessionValidationError: Error, Equatable {
     case invalidWorkspaceName(UUID)
     case invalidGroupName(UUID)
     case invalidSidebarProjectionIDs
+    case invalidAcknowledgedPaneIDs(UUID)
 }
 
 public enum CloseDecision: Equatable, Sendable {

@@ -3,6 +3,8 @@ public enum CommandID: String, CaseIterable, Codable, Sendable {
     case newWorkspaceInCurrentDirectory
     case newWorkspaceGroup
     case renameWorkspace
+    case acknowledgeWorkspace
+    case togglePinWorkspace
     case closePane
     case closeWorkspace
     case reopenClosedWorkspace
@@ -82,6 +84,10 @@ public enum CommandCatalog {
               defaultChord: chord("n", .control, .superKey)),
         .init(id: .renameWorkspace, action: "Rename Workspace", section: .workspace,
               defaultChord: chord("r", .control, .shift)),
+        .init(id: .acknowledgeWorkspace, action: "Acknowledge Workspace", section: .workspace,
+              defaultChord: chord("k", .control, .shift)),
+        .init(id: .togglePinWorkspace, action: "Pin or Unpin Workspace", section: .workspace,
+              defaultChord: chord("p", .control, .alt)),
         .init(id: .closePane, action: "Close Pane", section: .pane,
               defaultChord: chord("w", .control)),
         .init(id: .closeWorkspace, action: "Close Workspace", section: .workspace,

@@ -213,9 +213,45 @@ public extension SessionSnapshot {
         pinnedWorkspaceIDs.insert(workspaceID, at: target)
     }
 
+    mutating func toggleWorkspaceNotificationsMuted(_ workspaceID: UUID) throws {
+        try updateWorkspace(id: workspaceID) { $0.notificationsMuted.toggle() }
+    }
+
+    mutating func acknowledgeWorkspace(_ workspaceID: UUID) throws {
+        try updateWorkspace(id: workspaceID) { workspace in
+            workspace.acknowledgedAttentionPaneIDs = workspace.layout.panes
+                .filter { $0.agentState == .needsAttention }.map(\.id)
+        }
+        attentionWorkspaceIDs.removeAll { $0 == workspaceID }
+    }
+
+    mutating func acknowledgePane(_ paneID: UUID, in workspaceID: UUID) throws {
+        try updateWorkspace(id: workspaceID) { workspace in
+            guard workspace.layout.pane(id: paneID)?.agentState == .needsAttention else {
+                throw SessionMutationError.paneNotFound(paneID)
+            }
+            if !workspace.acknowledgedAttentionPaneIDs.contains(paneID) {
+                workspace.acknowledgedAttentionPaneIDs.append(paneID)
+            }
+        }
+        reconcileAttentionWorkspaceIDs()
+    }
+
     mutating func reconcileAttentionWorkspaceIDs() {
+        for groupIndex in groups.indices {
+            for workspaceIndex in groups[groupIndex].workspaces.indices {
+                let activeAttention = Set(groups[groupIndex].workspaces[workspaceIndex].layout.panes
+                    .filter { $0.agentState == .needsAttention }.map(\.id))
+                groups[groupIndex].workspaces[workspaceIndex].acknowledgedAttentionPaneIDs.removeAll {
+                    !activeAttention.contains($0)
+                }
+            }
+        }
         let eligible = workspaces.filter { workspace in
-            !workspace.isSoftClosed && workspace.layout.panes.contains { $0.agentState == .needsAttention }
+            let acknowledged = Set(workspace.acknowledgedAttentionPaneIDs)
+            return !workspace.isSoftClosed && workspace.layout.panes.contains {
+                $0.agentState == .needsAttention && !acknowledged.contains($0.id)
+            }
         }.map(\.id)
         let eligibleSet = Set(eligible)
         attentionWorkspaceIDs.removeAll {

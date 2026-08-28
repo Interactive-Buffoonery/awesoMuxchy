@@ -110,8 +110,12 @@ geometry and state styling have also passed a real-window visual correction.
   click exposes implemented `New Workspace Here`, rename, cross-group move,
   and `Pin`/`Unpin` actions. Pinned rows additionally expose bounded
   identity-based `Move Workspace Up/Down`; moves retain terminal runtimes.
-  Unanswered-turn ingestion, acknowledgement timing, reorder DnD, and AT-SPI
-  announcements remain pending.
+  Pane-scoped acknowledgement IDs now persist backward-compatibly. A guarded
+  500 ms focused-pane dwell, immediate `Acknowledge Workspace` row action and
+  Ctrl-Shift-K route reconcile the lifted section and hidden edge cue. Exact
+  per-workspace `Mute Notifications`/`Unmute Notifications` overrides persist.
+  Unanswered-turn ingestion, reorder DnD, injected-clock UI coverage, and
+  AT-SPI announcements remain pending.
 
 ## Remaining vertical-slice hardening
 

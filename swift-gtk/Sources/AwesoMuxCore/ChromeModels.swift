@@ -317,8 +317,12 @@ public enum SidebarPresentationPolicy {
         snapshot.groups.lazy
             .flatMap(\.workspaces)
             .filter { !$0.isSoftClosed }
-            .flatMap { $0.layout.panes }
-            .contains { $0.agentState == .needsAttention }
+            .contains { workspace in
+                let acknowledged = Set(workspace.acknowledgedAttentionPaneIDs)
+                return workspace.layout.panes.contains {
+                    $0.agentState == .needsAttention && !acknowledged.contains($0.id)
+                }
+            }
     }
 }
 
