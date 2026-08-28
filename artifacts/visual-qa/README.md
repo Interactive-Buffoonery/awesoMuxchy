@@ -1,5 +1,28 @@
 # Visual QA
 
+## 2026-08-28 — SwiftGtk4 sidebar and focused-pane footer chrome
+
+- Linux images: [populated selected workspace](swift-gtk/progress/07-sidebar-footer/populated-selected-x11.png)
+  and [alternate/new workspace selection](swift-gtk/progress/07-sidebar-footer/alternate-selection-x11.png).
+- Reference: awesoMux macOS at `fed33ff47c559344fc6db6fa53f16e75fcc4a116`.
+- Captured content size: 1440 × 852 on X11/GLX under XWayland.
+- Implemented behavior: the 188-point sidebar has a fixed search/create header,
+  dense live group rows, disclosure, selection/hover treatment, metadata, a
+  pinned truthful `0 agents` footer, and real workspace creation. Each
+  workspace page has a 38-point focused-pane path bar whose sanitized cwd
+  follows terminal focus and sidebar selection.
+- Verification: native `org.gtk.Actions` switched workspaces and created the
+  inspected third workspace; the full local preflight passed 23 Swift tests,
+  release terminal integration, and 100 two-surface lifecycle cycles.
+- Privacy: the QA shell profile contains no history, command output,
+  credentials, or clipboard data. Normal local development-style path chrome
+  is intentionally visible.
+- Visible differences: GTK-native icon/font metrics differ slightly; pinned
+  workspaces, row actions/agent badges, settings/help buttons, Git/branch/PR
+  enrichment, and explicit arrow/Home/End list navigation remain future work.
+- Next correction: review density and typography with Sarah, then add only the
+  next approved truthful sidebar/path-bar behavior; `amx` remains deferred.
+
 ## 2026-08-28 — SwiftGtk4 New Workspace command
 
 - Linux image: [new-workspace-command-x11.png](swift-gtk/progress/06-workspace-commands/new-workspace-command-x11.png)
