@@ -1,5 +1,28 @@
 # Visual QA
 
+## 2026-08-28 — SwiftGtk4 macOS footer visual correction
+
+- Linux image: [focused footer](swift-gtk/progress/09-footer-macos-parity/focused-footer-x11.png).
+- Reference: Sarah's supplied focused-pane footer crop and awesoMux macOS at
+  `fed33ff47c559344fc6db6fa53f16e75fcc4a116`.
+- Captured content size: 1440 × 860 on X11/GLX under XWayland.
+- Corrected treatment: controls retain intrinsic height inside the 38-point
+  footer; the path control is 24 points with 6-point internal spacing; status
+  chips use the reference 10/11-point hierarchy, 5-point radii, restrained
+  fills, and tone-matched hairlines. Branch and PR content have separate icon,
+  primary-label, and secondary-state roles.
+- Corrected semantics: repository roots use the exact `repo root` wording,
+  nested working directories use repo-relative paths, and Git/PR/CI chips are
+  explicitly cleared when their resolved state disappears.
+- Verification: the image was captured from the real GTK application after
+  background repository resolution and opened at original resolution for
+  inspection. The focused repository supplied real branch, ahead, and dirty
+  state; the test suite covers root/nested/fallback path presentation.
+- Platform-specific remainder: Apple system mono and SF Symbols are not
+  redistributable on Linux, so the implementation uses Noto Sans Mono with
+  DejaVu/generic fallbacks and portable glyphs while retaining the measured
+  macOS sizes, weights, spacing, and color roles.
+
 ## 2026-08-28 — SwiftGtk4 footer feature parity
 
 - Linux images: [focused Git footer](swift-gtk/progress/08-footer-parity/focused-git-footer-x11.png)
