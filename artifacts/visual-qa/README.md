@@ -1,5 +1,29 @@
 # Visual QA
 
+## 2026-08-29 — SwiftGtk4 native Wayland terminal rendering
+
+- Linux image: [native Wayland two-pane workspace](swift-gtk/progress/48-native-wayland/native-wayland-two-pane.png).
+- Reference: `TerminalView.swift`, `WorkspaceView.swift`, and the sidebar shell
+  at macOS baseline `fed33ff47c559344fc6db6fa53f16e75fcc4a116`.
+- Captured content: the real 1440 × 888 release app using GTK's native Wayland
+  backend on COSMIC, with two independently rendered Ghostty panes in one
+  workspace at the monitor's 100% scale.
+- Correction: the shared language-neutral shim now selects Ghostty's supported
+  desktop-OpenGL path before GTK initialization. On installed GTK 4.14.5 it
+  applies the canonical `gl-disable-gles`, `vulkan-disable`, and
+  `gl-no-fractional` compatibility selection; GTK 4.16+ uses `GDK_DISABLE`.
+- Verification: native terminal integration passes Unicode, focus, rapid
+  resize/reflow, clipboard, environment, title/cwd, close-risk, and pane
+  independence checks. The 100-cycle two-surface lifecycle harness passes, as
+  do real integration runs at COSMIC scales 125%, 150%, and 200%. The display
+  was restored to 2560×1440@99.946 Hz and 100%.
+- Inspection: the PNG was opened at original resolution. Both terminal
+  framebuffers are complete, the divider is continuous, prompts and cursors
+  are sharp, and the sidebar/title/footer geometry has no holes or clipping.
+- Privacy: an isolated profile and visual-QA-only Bash configuration provide a
+  fixed prompt with no history or startup files. The image contains no typed
+  commands, terminal output, clipboard data, credentials, or private paths.
+
 ## 2026-08-29 — SwiftGtk4 focused-footer interactive targets
 
 - Linux image: [interactive focused-footer chips](swift-gtk/progress/47-focused-footer-targets/interactive-chip-targets-x11.png).
@@ -1196,9 +1220,10 @@
   commands, repository paths, history, clipboard data, or credentials appear.
 - Visible differences: group actions, workspace status metadata, close
   affordances, bottom status bar, and command palette remain future milestones.
-- Runtime note: this inspectable capture uses X11/GLX under XWayland because
-  the current COSMIC/NVIDIA native Wayland path cannot create Ghostty's
-  required desktop OpenGL context.
+- Historical runtime note: this 2026-08-28 capture used X11/GLX because the
+  native context path failed at that milestone. The GTK 4.14 desktop-GL
+  initialization correction and native evidence above resolved that constraint
+  on 2026-08-29.
 
 ## 2026-08-28 — SwiftGtk4 terminal integration
 

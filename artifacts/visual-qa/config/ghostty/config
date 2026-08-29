@@ -1,0 +1,3 @@
+# Visual-QA-only shell: fixed prompt, no startup files, and no shell integration.
+command = /bin/bash --noprofile --norc
+shell-integration = none
