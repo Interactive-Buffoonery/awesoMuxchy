@@ -26,6 +26,7 @@ public enum CommandID: String, CaseIterable, Codable, Sendable {
     case nextPane
     case commandPalette
     case keyboardShortcuts
+    case focusSidebar
     case toggleSidebarWidth
     case toggleSidebarVisibility
 
@@ -155,6 +156,8 @@ public enum CommandCatalog {
               defaultChord: chord("k", .control)),
         .init(id: .keyboardShortcuts, action: "Keyboard Shortcuts", section: .view,
               defaultChord: chord("/", .control)),
+        .init(id: .focusSidebar, action: "Focus Sidebar", section: .view,
+              defaultChord: chord("s", .control, .superKey)),
         .init(id: .toggleSidebarWidth, action: "Collapse/Expand Sidebar", section: .view,
               defaultChord: chord("\\", .control)),
         .init(id: .toggleSidebarVisibility, action: "Hide/Show Sidebar", section: .view,

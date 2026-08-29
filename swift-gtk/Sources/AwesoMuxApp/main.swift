@@ -397,6 +397,25 @@ private final class ApplicationState: @unchecked Sendable {
         try? preferencesStore.save(preferences)
     }
 
+    private func focusSidebar() {
+        if preferences.isSidebarHidden {
+            preferences.isSidebarHidden = false
+            updateSidebarVisibility()
+            try? preferencesStore.save(preferences)
+        }
+        timeout(add: 0) { [weak self] in
+            guard let self else { return false }
+            if self.preferences.sidebarWidth < SidebarWidthPolicy.railThreshold {
+                let targetID = self.snapshot.selectedWorkspaceID ?? self.workspaceJumpOrder().first
+                if let targetID, self.railRows[targetID]?.grabFocus() == true { return false }
+                _ = self.collapsedEmptyAction?.grabFocus()
+            } else {
+                _ = self.sidebarSearchEntry?.grabFocus()
+            }
+            return false
+        }
+    }
+
     private func updateSidebarVisibility() {
         mountSidebarOverlay(preferences.isSidebarHidden)
         isSidebarTemporarilyRevealed = false
@@ -2405,7 +2424,7 @@ private final class ApplicationState: @unchecked Sendable {
             .jumpWorkspace1, .jumpWorkspace2, .jumpWorkspace3, .jumpWorkspace4,
             .jumpWorkspace5, .jumpWorkspace6, .jumpWorkspace7, .jumpWorkspace8,
             .jumpWorkspace9,
-            .toggleSidebarWidth, .toggleSidebarVisibility]
+            .focusSidebar, .toggleSidebarWidth, .toggleSidebarVisibility]
         var commandRows: [(String, ButtonRef)] = []
         for definition in CommandCatalog.definitions where implemented.contains(definition.id) {
             let button = ButtonRef(label: definition.action)
@@ -2486,7 +2505,7 @@ private final class ApplicationState: @unchecked Sendable {
             .jumpWorkspace1, .jumpWorkspace2, .jumpWorkspace3, .jumpWorkspace4,
             .jumpWorkspace5, .jumpWorkspace6, .jumpWorkspace7, .jumpWorkspace8,
             .jumpWorkspace9,
-            .toggleSidebarWidth, .toggleSidebarVisibility]
+            .focusSidebar, .toggleSidebarWidth, .toggleSidebarVisibility]
         let menu = GIO.Menu()
         for section in [CommandSection.file, .view, .workspace, .pane] {
             let submenu = GIO.Menu()
@@ -2535,6 +2554,7 @@ private final class ApplicationState: @unchecked Sendable {
         if command == .newWorkspace { createDefaultWorkspace(); return }
         if command == .newWorkspaceInCurrentDirectory { createWorkspaceInCurrentDirectory(); return }
         if command == .reopenClosedWorkspace { reopenMostRecentlyClosedWorkspace(); return }
+        if command == .focusSidebar { focusSidebar(); return }
         if command == .toggleSidebarWidth { toggleSidebarWidth(); return }
         if command == .toggleSidebarVisibility { toggleSidebarVisibility(); return }
         if let index = command.workspaceJumpIndex { selectWorkspace(atFlatIndex: index); return }
@@ -2546,7 +2566,7 @@ private final class ApplicationState: @unchecked Sendable {
         case .closeWorkspace: softCloseWorkspace(selected)
         case .clearWorkspace: presentClearWorkspaceConfirmation(selected)
         case .reopenClosedWorkspace: break
-        case .toggleSidebarWidth, .toggleSidebarVisibility,
+        case .focusSidebar, .toggleSidebarWidth, .toggleSidebarVisibility,
              .jumpWorkspace1, .jumpWorkspace2, .jumpWorkspace3, .jumpWorkspace4,
              .jumpWorkspace5, .jumpWorkspace6, .jumpWorkspace7, .jumpWorkspace8,
              .jumpWorkspace9: break

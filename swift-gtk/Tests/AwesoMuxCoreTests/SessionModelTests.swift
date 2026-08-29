@@ -114,6 +114,12 @@ private func snapshot(_ workspaces: [WorkspaceSnapshot]) -> SessionSnapshot {
     #expect(Set(chords).count == chords.count)
     #expect(CommandCatalog.definition(for: .splitRight).action == "Split Right")
     #expect(CommandCatalog.definition(for: .newWorkspaceGroup).action == "New Workspace Group…")
+    #expect(CommandCatalog.definition(for: .focusSidebar) == CommandDefinition(
+        id: .focusSidebar,
+        action: "Focus Sidebar",
+        section: .view,
+        defaultChord: KeyChord(key: "s", modifiers: [.control, .superKey])
+    ))
     #expect(CommandCatalog.definition(for: .toggleSidebarWidth).action == "Collapse/Expand Sidebar")
     #expect(CommandCatalog.definition(for: .toggleSidebarVisibility).action == "Hide/Show Sidebar")
 }
