@@ -443,7 +443,10 @@ geometry and state styling have also passed a real-window visual correction.
   passes 107 tests and every process-level harness.
 - The activity panel now owns one tested open/filter state machine and closes
   transactionally when the sidebar enters its 60-point rail, clearing both the
-  activity filter and sidebar search. Sidebar-owned keyboard focus follows the
+  activity filter and sidebar search. Escape is captured across the panel
+  subtree and uses the same tested filter-clearing close transition,
+  disclosure-focus return, and accessibility announcement instead of relying
+  on pointer access to the close button. Sidebar-owned keyboard focus follows the
   selected stable workspace identity into the rail and back into the expanded
   hierarchy, while terminal-owned focus is not stolen. Roster titles share the
   sidebar's coarse live-title projection; workspace rename and every pane

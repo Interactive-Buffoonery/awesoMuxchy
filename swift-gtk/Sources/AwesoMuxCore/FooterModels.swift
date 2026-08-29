@@ -45,6 +45,13 @@ public struct AgentActivityPanelState: Equatable, Sendable {
         return changed
     }
 
+    /// Keyboard dismissal shares the close transition so Escape cannot leave a
+    /// stale state-chip filter behind when focus returns to the disclosure.
+    @discardableResult
+    public mutating func dismissFromKeyboard() -> Bool {
+        close()
+    }
+
     @discardableResult
     public mutating func sidebarModeChanged(to mode: SidebarWidthMode) -> Bool {
         guard mode == .collapsed else { return false }

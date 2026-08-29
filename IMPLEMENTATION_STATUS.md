@@ -522,7 +522,10 @@ help, and agent context while preserving the compact reference geometry.
   changes. Single-pane roster rows use the sidebar's coarse live workspace
   title, every pane title/cwd callback refreshes the roster, and nonfocused cwd
   updates persist instead of being dropped. Collapsing closes the panel and
-  clears its filter plus sidebar search; selected-row keyboard focus follows
+  clears its filter plus sidebar search. A capture-phase Escape route dismisses
+  the panel from any focused descendant, clears the active state filter,
+  restores focus to the total-agent disclosure, and shares the existing close
+  announcement. Selected-row keyboard focus follows
   between the expanded hierarchy and 60-point rail only when the sidebar owned
   focus, so terminal focus is preserved. Real GTK action and AT-SPI QA verified
   dismissal, non-resurrection, cleared search, and selected-row focus in both

@@ -376,6 +376,7 @@ final class SidebarStatusFooter {
     let collapsedRoot = BoxRef(orientation: .vertical, spacing: 8)
     private let activityPanel = BoxRef(orientation: .vertical, spacing: 4)
     private let activityRows = BoxRef(orientation: .vertical, spacing: 2)
+    private let activityPanelKeyController = EventControllerKey()
     private let thinking = ButtonRef()
     private let thinkingLabel = LabelRef(str: "")
     private let output = ButtonRef()
@@ -405,6 +406,14 @@ final class SidebarStatusFooter {
         activityPanel.setMarginEnd(margin: 8)
         activityPanel.setMarginTop(margin: 6)
         activityPanel.setMarginBottom(margin: 6)
+        activityPanelKeyController.propagationPhase = .capture
+        activityPanelKeyController.onKeyPressed { [weak self] _, keyval, _, _ in
+            guard keyval == UInt(GDK_KEY_Escape) else { return false }
+            return self?.dismissActivityPanelFromKeyboard() ?? false
+        }
+        gtk_widget_add_controller(
+            activityPanel.widget_ptr, activityPanelKeyController.event_controller_ptr
+        )
         let panelHeader = BoxRef(orientation: .horizontal, spacing: 4)
         let heading = LabelRef(str: "AGENTS")
         heading.add(cssClass: "aw-menu-heading")
@@ -642,6 +651,14 @@ final class SidebarStatusFooter {
 
     private func showActivity(state: AgentState) {
         setExpanded(true, filter: state)
+    }
+
+    private func dismissActivityPanelFromKeyboard() -> Bool {
+        let changed = panelState.dismissFromKeyboard()
+        rebuildActivityRows()
+        guard changed else { return false }
+        applyPanelVisibility(restoreDisclosureFocus: true)
+        return true
     }
 
     private func setExpanded(

@@ -85,6 +85,18 @@ import Testing
     #expect(!remainedClosed)
 }
 
+@Test func activityPanelEscapeDismissalClearsFilterAndIsIdempotent() {
+    var state = AgentActivityPanelState()
+    let opened = state.open(filter: .thinking)
+    let dismissed = state.dismissFromKeyboard()
+    #expect(opened)
+    #expect(dismissed)
+    #expect(!state.isExpanded)
+    #expect(state.filter == nil)
+    let dismissedAgain = state.dismissFromKeyboard()
+    #expect(!dismissedAgain)
+}
+
 @Test func activityRosterUsesTheSameCoarseLiveTitleAsTheSidebar() {
     let pane = PaneSnapshot(title: "Live build title", workingDirectory: "/tmp", agent: "Codex")
     let workspace = WorkspaceSnapshot(
