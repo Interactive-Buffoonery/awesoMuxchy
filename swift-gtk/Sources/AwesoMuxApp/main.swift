@@ -175,6 +175,8 @@ private final class ApplicationState: @unchecked Sendable {
     private var surfacesByPane: [UUID: TerminalSurface] = [:]
     private var workspaceByPane: [UUID: UUID] = [:]
     private var surfaceGenerationByPane: [UUID: Int] = [:]
+    private let runtimeSessionID = UUID()
+    private var agentEventWatchers: [UUID: AgentEventWatcher] = [:]
     private var runtimes: [UUID: WorkspaceRuntime] = [:]
     private var rows: [UUID: ToggleButtonRef] = [:]
     private var regularRowChrome: [UUID: WorkspaceRowChrome] = [:]
@@ -184,6 +186,10 @@ private final class ApplicationState: @unchecked Sendable {
     private var railGroupAttentionLabels: [UUID: LabelRef] = [:]
     private var metadata: [UUID: LabelRef] = [:]
     private var workspaceTitles: [UUID: LabelRef] = [:]
+    private var regularAgentTileHosts: [UUID: BoxRef] = [:]
+    private var regularAgentTiles: [UUID: OverlayRef] = [:]
+    private var railAgentTileHosts: [UUID: BoxRef] = [:]
+    private var railAgentTiles: [UUID: OverlayRef] = [:]
     private var workspaceIDsByGroup: [UUID: [UUID]] = [:]
     private var groupRoots: [UUID: BoxRef] = [:]
     private var groupBodies: [UUID: BoxRef] = [:]
@@ -532,7 +538,12 @@ private final class ApplicationState: @unchecked Sendable {
     func makeSurface(pane: PaneSnapshot, workspaceID: UUID, label: String, description: String) -> TerminalSurface? {
         let generation = (surfaceGenerationByPane[pane.id] ?? 0) + 1
         surfaceGenerationByPane[pane.id] = generation
+        let endpoint = try? AgentEventEndpoint(
+            profileDirectory: store.snapshotURL.deletingLastPathComponent(),
+            sessionID: runtimeSessionID, paneID: pane.id
+        )
         guard let surface = terminalRuntime.makeSurface(workingDirectory: pane.workingDirectory,
+            environment: endpoint?.environment ?? [:],
             accessibleLabel: label, accessibleDescription: description,
             onFocusChanged: { [weak self] focused in if focused { self?.terminalFocused(pane.id) } },
             onTitleChanged: { [weak self] title in
@@ -548,9 +559,21 @@ private final class ApplicationState: @unchecked Sendable {
                 }
             }) else {
             surfaceGenerationByPane.removeValue(forKey: pane.id)
+            if let endpoint { try? FileManager.default.removeItem(at: endpoint.fileURL) }
             return nil
         }
         surfaces.append(surface); surfacesByPane[pane.id] = surface; workspaceByPane[pane.id] = workspaceID
+        if let endpoint {
+            let watcher = AgentEventWatcher(fileURL: endpoint.fileURL) { [weak self] update in
+                performOnGTKMain { [weak self] in
+                    self?.publishPaneAgentUpdate(
+                        update, paneID: pane.id, workspaceID: workspaceID, generation: generation
+                    )
+                }
+            }
+            agentEventWatchers[pane.id] = watcher
+            watcher.start()
+        }
         return surface
     }
 
@@ -582,6 +605,37 @@ private final class ApplicationState: @unchecked Sendable {
         refreshWorkspaceRowPresentation(workspaceID)
         if snapshot.selectedWorkspaceID == workspaceID { updateChrome(workspaceID) }
         persist()
+    }
+
+    private func publishPaneAgentUpdate(
+        _ update: AgentRuntimeUpdate, paneID: UUID, workspaceID: UUID, generation: Int
+    ) {
+        guard acceptsPanePublication(paneID, workspaceID: workspaceID, generation: generation),
+              (try? snapshot.updatePaneAgentState(
+                  paneID: paneID, workspaceID: workspaceID, agent: update.agent,
+                  state: update.state, attentionReason: update.attentionReason
+              )) != nil
+        else { return }
+        refreshWorkspaceAgentTile(workspaceID)
+        refreshWorkspaceRowPresentation(workspaceID)
+        refreshLiftedRows()
+        sidebarFooter?.update(AgentFooterSummary(snapshot: snapshot))
+        persist()
+    }
+
+    private func refreshWorkspaceAgentTile(_ workspaceID: UUID) {
+        guard let workspace = snapshot.workspace(id: workspaceID) else { return }
+        let presentation = SidebarAgentTilePresentation.project(workspace: workspace)
+        if let host = regularAgentTileHosts[workspaceID] {
+            if let previous = regularAgentTiles[workspaceID] { host.remove(child: previous) }
+            let tile = makeAgentTile(presentation, size: 32)
+            host.append(child: tile); regularAgentTiles[workspaceID] = tile
+        }
+        if let host = railAgentTileHosts[workspaceID] {
+            if let previous = railAgentTiles[workspaceID] { host.remove(child: previous) }
+            let tile = makeAgentTile(presentation, size: 28, collapsed: true)
+            host.append(child: tile); railAgentTiles[workspaceID] = tile
+        }
     }
 
     private func refreshWorkspaceRowPresentation(_ workspaceID: UUID) {
@@ -1241,7 +1295,9 @@ private final class ApplicationState: @unchecked Sendable {
         row.add(cssClass: "aw-\(groupColor.rawValue)")
         let content = BoxRef(orientation: .horizontal, spacing: 10); content.setMarginEnd(margin: 28)
         let agentTile = SidebarAgentTilePresentation.project(workspace: workspace)
-        content.append(child: makeAgentTile(agentTile, size: 32))
+        let agentHost = BoxRef(orientation: .horizontal, spacing: 0)
+        let agentWidget = makeAgentTile(agentTile, size: 32)
+        agentHost.append(child: agentWidget); content.append(child: agentHost)
         let details = BoxRef(orientation: .vertical, spacing: 2); details.setHexpand(expand: true)
         let name = LabelRef(str: SidebarWorkspaceTitle.resolve(workspace: workspace))
         name.add(cssClass: "aw-row-title"); name.xalign = 0; name.setEllipsize(mode: PangoEllipsizeMode(rawValue: 3))
@@ -1262,6 +1318,7 @@ private final class ApplicationState: @unchecked Sendable {
         installWorkspaceContextMenu(on: row, workspaceID: workspace.id, groupID: groupID)
         installWorkspacePanePeek(on: row, workspace: workspace)
         rows[workspace.id] = row; metadata[workspace.id] = meta; workspaceTitles[workspace.id] = name
+        regularAgentTileHosts[workspace.id] = agentHost; regularAgentTiles[workspace.id] = agentWidget
         if !(workspaceIDsByGroup[groupID] ?? []).contains(workspace.id) { workspaceIDsByGroup[groupID, default: []].append(workspace.id) }
         let chrome = WorkspaceRowChrome(row: row) { [weak self] in self?.softCloseWorkspace(workspace.id) }
         regularRowChrome[workspace.id] = chrome
@@ -1275,7 +1332,9 @@ private final class ApplicationState: @unchecked Sendable {
         button.setSizeRequest(width: 40, height: 40)
         let agentTile = SidebarAgentTilePresentation.project(workspace: workspace)
         let content = OverlayRef()
-        content.set(child: makeAgentTile(agentTile, size: 28, collapsed: true))
+        let agentHost = BoxRef(orientation: .horizontal, spacing: 0)
+        let agentWidget = makeAgentTile(agentTile, size: 28, collapsed: true)
+        agentHost.append(child: agentWidget); content.set(child: agentHost)
         let jumpNumber = LabelRef(str: ""); jumpNumber.add(cssClass: "aw-jump-overlay")
         jumpNumber.setSizeRequest(width: 40, height: 40)
         jumpNumber.setHalign(align: .center); jumpNumber.setValign(align: .center)
@@ -1288,6 +1347,7 @@ private final class ApplicationState: @unchecked Sendable {
         setAccessibleDescription(button, "Workspace; \(agentTile.accessibilityLabel)")
         button.onClicked { [weak self] _ in self?.select(workspace.id) }
         railRows[workspace.id] = button
+        railAgentTileHosts[workspace.id] = agentHost; railAgentTiles[workspace.id] = agentWidget
         railJumpNumberLabels[workspace.id] = jumpNumber
         refreshRailJumpNumbers()
         return button
@@ -2134,11 +2194,16 @@ private final class ApplicationState: @unchecked Sendable {
             surfacesByPane.removeValue(forKey: paneID)
             workspaceByPane.removeValue(forKey: paneID)
             surfaceGenerationByPane.removeValue(forKey: paneID)
+            agentEventWatchers.removeValue(forKey: paneID)?.stop()
         }
         surfaces.removeAll { surface in paneSurfaces.contains { $0 === surface } }
         runtimes.removeValue(forKey: workspace.id); rows.removeValue(forKey: workspace.id)
         regularRowChrome.removeValue(forKey: workspace.id)?.detach()
         liftedRowChrome.removeValue(forKey: workspace.id)?.detach()
+        regularAgentTileHosts.removeValue(forKey: workspace.id)
+        regularAgentTiles.removeValue(forKey: workspace.id)
+        railAgentTileHosts.removeValue(forKey: workspace.id)
+        railAgentTiles.removeValue(forKey: workspace.id)
         railJumpNumberLabels.removeValue(forKey: workspace.id)
         metadata.removeValue(forKey: workspace.id); workspaceTitles.removeValue(forKey: workspace.id)
         regularPinActions.removeValue(forKey: workspace.id)
@@ -2636,6 +2701,7 @@ private final class ApplicationState: @unchecked Sendable {
             surfacesByPane.removeValue(forKey: pane.id)
             workspaceByPane.removeValue(forKey: pane.id)
             surfaceGenerationByPane.removeValue(forKey: pane.id)
+            agentEventWatchers.removeValue(forKey: pane.id)?.stop()
             surfaces.removeAll { $0 === surface }
             return
         }
@@ -2830,12 +2896,17 @@ private final class ApplicationState: @unchecked Sendable {
                 surfacesByPane.removeValue(forKey: paneID)
                 workspaceByPane.removeValue(forKey: paneID)
                 surfaceGenerationByPane.removeValue(forKey: paneID)
+                agentEventWatchers.removeValue(forKey: paneID)?.stop()
             }
             surfaces.removeAll { surface in paneSurfaces.contains { $0 === surface } }
             runtimes.removeValue(forKey: workspace.id)
             rows.removeValue(forKey: workspace.id)
             regularRowChrome.removeValue(forKey: workspace.id)?.detach()
             liftedRowChrome.removeValue(forKey: workspace.id)?.detach()
+            regularAgentTileHosts.removeValue(forKey: workspace.id)
+            regularAgentTiles.removeValue(forKey: workspace.id)
+            railAgentTileHosts.removeValue(forKey: workspace.id)
+            railAgentTiles.removeValue(forKey: workspace.id)
             railJumpNumberLabels.removeValue(forKey: workspace.id)
             metadata.removeValue(forKey: workspace.id)
             workspaceTitles.removeValue(forKey: workspace.id)

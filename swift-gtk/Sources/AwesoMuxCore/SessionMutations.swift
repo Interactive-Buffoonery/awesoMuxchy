@@ -291,6 +291,7 @@ public extension SessionSnapshot {
     mutating func updatePaneAgentState(
         paneID: UUID,
         workspaceID: UUID,
+        agent: String? = nil,
         state: AgentState,
         attentionReason: AttentionReason? = nil
     ) throws {
@@ -301,6 +302,7 @@ public extension SessionSnapshot {
             guard let previous = workspace.layout.pane(id: paneID),
                   let updated = workspace.layout.replacingPane(id: paneID, with: { pane in
                       var pane = pane
+                      if let agent { pane.agent = ChromeText.sanitized(agent, limit: 80) }
                       pane.agentState = state
                       pane.attentionReason = resolvedAttentionReason
                       return .pane(pane)

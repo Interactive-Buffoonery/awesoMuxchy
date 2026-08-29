@@ -1,5 +1,10 @@
 import CAwesoMuxGhostty
 import Gtk
+#if canImport(Glibc)
+import Glibc
+#else
+import Darwin
+#endif
 
 private final class TerminalCallbackBox {
     let onFocusChanged: ((Bool) -> Void)?
@@ -56,6 +61,7 @@ public final class TerminalRuntime {
     public func makeSurface(
         workingDirectory: String,
         command: String? = nil,
+        environment: [String: String] = [:],
         accessibleLabel: String,
         accessibleDescription: String,
         onFocusChanged: ((Bool) -> Void)? = nil,
@@ -66,6 +72,7 @@ public final class TerminalRuntime {
             runtime: self,
             workingDirectory: workingDirectory,
             command: command,
+            environment: environment,
             accessibleLabel: accessibleLabel,
             accessibleDescription: accessibleDescription,
             onFocusChanged: onFocusChanged,
@@ -85,6 +92,7 @@ public final class TerminalSurface {
         runtime: TerminalRuntime,
         workingDirectory: String,
         command: String?,
+        environment: [String: String],
         accessibleLabel: String,
         accessibleDescription: String,
         onFocusChanged: ((Bool) -> Void)?,
@@ -103,15 +111,28 @@ public final class TerminalSurface {
             close_requested: nil,
             focus_changed: terminalFocusChanged
         )
+        let entries = environment.sorted { $0.key < $1.key }
+        let keys: [UnsafeMutablePointer<CChar>?] = entries.map { strdup($0.key) }
+        let values: [UnsafeMutablePointer<CChar>?] = entries.map { strdup($0.value) }
+        defer {
+            keys.forEach { free($0) }
+            values.forEach { free($0) }
+        }
+        guard keys.allSatisfy({ $0 != nil }), values.allSatisfy({ $0 != nil }) else { return nil }
+        var variables: [amx_ghostty_env_var] = entries.indices.map { index in
+            amx_ghostty_env_var(key: UnsafePointer(keys[index]!), value: UnsafePointer(values[index]!))
+        }
         let surface = workingDirectory.withCString { directory in
-            if let command {
-                return command.withCString { commandPointer in
-                    amx_ghostty_surface_create(
-                        runtime.handle, directory, commandPointer, callbacks
+            func create(_ commandPointer: UnsafePointer<CChar>?) -> OpaquePointer? {
+                variables.withUnsafeMutableBufferPointer { buffer in
+                    amx_ghostty_surface_create_with_environment(
+                        runtime.handle, directory, commandPointer,
+                        buffer.baseAddress, buffer.count, callbacks
                     )
                 }
             }
-            return amx_ghostty_surface_create(runtime.handle, directory, nil, callbacks)
+            if let command { return command.withCString(create) }
+            return create(nil)
         }
         guard let surface, let rawWidget = amx_ghostty_surface_widget(surface) else {
             return nil

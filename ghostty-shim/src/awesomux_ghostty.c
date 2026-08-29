@@ -18,6 +18,8 @@ struct amx_ghostty_surface {
   amx_ghostty_callbacks callbacks;
   char *working_directory;
   char *command;
+  ghostty_env_var_s *environment;
+  size_t environment_count;
   size_t pending_clipboard_reads;
   bool destroying;
 };
@@ -270,6 +272,8 @@ static void on_realize(GtkGLArea *area, amx_ghostty_surface *surface) {
   config.scale_factor = gtk_widget_get_scale_factor(GTK_WIDGET(area));
   config.working_directory = surface->working_directory;
   config.command = surface->command;
+  config.env_vars = surface->environment;
+  config.env_var_count = surface->environment_count;
   surface->core = ghostty_surface_new(surface->app->core, &config);
 }
 
@@ -453,14 +457,37 @@ amx_ghostty_surface *amx_ghostty_surface_create(
     const char *working_directory,
     const char *command,
     amx_ghostty_callbacks callbacks) {
-  if (app == NULL) return NULL;
+  return amx_ghostty_surface_create_with_environment(
+      app, working_directory, command, NULL, 0, callbacks);
+}
+
+amx_ghostty_surface *amx_ghostty_surface_create_with_environment(
+    amx_ghostty_app *app,
+    const char *working_directory,
+    const char *command,
+    const amx_ghostty_env_var *environment,
+    size_t environment_count,
+    amx_ghostty_callbacks callbacks) {
+  if (app == NULL || (environment_count > 0 && environment == NULL)) return NULL;
   amx_ghostty_surface *surface = calloc(1, sizeof(*surface));
   if (surface == NULL) return NULL;
   surface->app = app;
   surface->callbacks = callbacks;
   surface->working_directory = g_strdup(working_directory);
   surface->command = g_strdup(command);
+  if (environment_count > 0) {
+    surface->environment = calloc(environment_count, sizeof(*surface->environment));
+    if (surface->environment == NULL) goto fail;
+    surface->environment_count = environment_count;
+    for (size_t index = 0; index < environment_count; index++) {
+      surface->environment[index].key = g_strdup(environment[index].key);
+      surface->environment[index].value = g_strdup(environment[index].value);
+      if (surface->environment[index].key == NULL ||
+          surface->environment[index].value == NULL) goto fail;
+    }
+  }
   surface->area = gtk_gl_area_new();
+  if (surface->area == NULL) goto fail;
   g_object_ref_sink(surface->area);
   surface->ime = gtk_im_multicontext_new();
 
@@ -507,6 +534,10 @@ amx_ghostty_surface *amx_ghostty_surface_create(
   gtk_widget_add_controller(surface->area, scroll);
 
   return surface;
+
+fail:
+  finalize_surface(surface);
+  return NULL;
 }
 
 void amx_ghostty_surface_destroy(amx_ghostty_surface *surface) {
@@ -529,6 +560,11 @@ void amx_ghostty_surface_destroy(amx_ghostty_surface *surface) {
 static void finalize_surface(amx_ghostty_surface *surface) {
   g_clear_pointer(&surface->working_directory, g_free);
   g_clear_pointer(&surface->command, g_free);
+  for (size_t index = 0; index < surface->environment_count; index++) {
+    g_free((void *)surface->environment[index].key);
+    g_free((void *)surface->environment[index].value);
+  }
+  g_clear_pointer(&surface->environment, free);
   free(surface);
 }
 

@@ -2,6 +2,7 @@
 #define AWESOMUX_GHOSTTY_H
 
 #include <stdbool.h>
+#include <stddef.h>
 #include <stdint.h>
 
 #ifdef __cplusplus
@@ -16,6 +17,11 @@ extern "C" {
 
 typedef struct amx_ghostty_app amx_ghostty_app;
 typedef struct amx_ghostty_surface amx_ghostty_surface;
+
+typedef struct {
+  const char *key;
+  const char *value;
+} amx_ghostty_env_var;
 
 typedef void (*amx_ghostty_title_cb)(void *userdata, const char *title);
 typedef void (*amx_ghostty_cwd_cb)(void *userdata, const char *working_directory);
@@ -37,6 +43,13 @@ AMX_GHOSTTY_API amx_ghostty_surface *amx_ghostty_surface_create(
     amx_ghostty_app *app,
     const char *working_directory,
     const char *command,
+    amx_ghostty_callbacks callbacks);
+AMX_GHOSTTY_API amx_ghostty_surface *amx_ghostty_surface_create_with_environment(
+    amx_ghostty_app *app,
+    const char *working_directory,
+    const char *command,
+    const amx_ghostty_env_var *environment,
+    size_t environment_count,
     amx_ghostty_callbacks callbacks);
 AMX_GHOSTTY_API void amx_ghostty_surface_destroy(amx_ghostty_surface *surface);
 

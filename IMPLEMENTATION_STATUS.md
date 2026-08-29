@@ -60,6 +60,16 @@ help, and agent context while preserving the compact reference geometry.
   Help & Feedback, live thinking/output/attention chips, total agents, and an
   expandable agent activity panel that routes back to the exact pane. Theme
   and notification-mute preferences persist as owner-only profile JSON.
+- Live agent state now enters through the pane-scoped `awesomux-agent-v1`
+  side channel rather than terminal scraping. Each Ghostty surface receives
+  an owner-only JSONL endpoint plus session/pane identity through a
+  language-neutral environment ABI; a bounded background reader accepts only
+  the five known provider identities and explicit semantic states, then
+  publishes through the existing generation-guarded pane reducer on GTK's
+  main thread. A real Grok `userInputRequired` event moved the exact workspace
+  into Needs Input, refreshed its provider/status tile and three-agent footer,
+  and persisted the pane state. Full preflight passes 83 Swift tests; the
+  terminal harness also proves the environment reaches the child process.
 - Footer menus expose only real routes: Quick Settings directly changes the
   implemented theme, density, and notification preferences, while Report a
   bug… and Suggest a feature… open the verified feedback intake. Placeholder

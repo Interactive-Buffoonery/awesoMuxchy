@@ -12,6 +12,7 @@ private final class FocusRecorder {
     var focusedSurfaces: Set<Int> = []
     var sawExpectedTitle = false
     var sawExpectedWorkingDirectory = false
+    var sawExpectedEnvironment = false
 
     func record(surface: Int, focused: Bool) {
         if focused { focusedSurfaces.insert(surface) }
@@ -71,6 +72,8 @@ private final class IntegrationState {
         second.sendEnter()
         second.send(text: "printf '\\033]2;awesomux-title-ok\\a\\033]7;file://localhost/tmp/awesomux-cwd-ok\\a'")
         second.sendEnter()
+        second.send(text: "if [ \"$AWESOMUX_AGENT_EVENT_PROTOCOL\" = 'awesomux-agent-v1' ] && [ \"$AWESOMUX_SESSION_ID\" = 'session-test' ] && [ \"$AWESOMUX_PANE_ID\" = 'pane-test' ] && [ \"$AWESOMUX_AGENT_EVENT_FILE\" = '/tmp/awesomux-event-test' ]; then printf '\\033]2;awesomux-environment-ok\\a'; fi")
+        second.sendEnter()
         return false
     }
 
@@ -101,6 +104,10 @@ private final class IntegrationState {
         }
         guard focusRecorder.sawExpectedWorkingDirectory else {
             fail(reason: "working-directory callback mismatch")
+            return false
+        }
+        guard focusRecorder.sawExpectedEnvironment else {
+            fail(reason: "surface environment mismatch")
             return false
         }
 
@@ -171,10 +178,19 @@ private func runIntegration(application: Gtk.ApplicationRef) {
         onFocusChanged: { focusRecorder.record(surface: 0, focused: $0) }
     ), let second = runtime.makeSurface(
         workingDirectory: directory,
+        environment: [
+            "AWESOMUX_AGENT_EVENT_PROTOCOL": "awesomux-agent-v1",
+            "AWESOMUX_SESSION_ID": "session-test",
+            "AWESOMUX_PANE_ID": "pane-test",
+            "AWESOMUX_AGENT_EVENT_FILE": "/tmp/awesomux-event-test",
+        ],
         accessibleLabel: "Clipboard write terminal",
         accessibleDescription: "Terminal used to verify Unicode input and clipboard write",
         onFocusChanged: { focusRecorder.record(surface: 1, focused: $0) },
-        onTitleChanged: { if $0 == "awesomux-title-ok" { focusRecorder.sawExpectedTitle = true } },
+        onTitleChanged: {
+            if $0 == "awesomux-title-ok" { focusRecorder.sawExpectedTitle = true }
+            if $0 == "awesomux-environment-ok" { focusRecorder.sawExpectedEnvironment = true }
+        },
         onWorkingDirectoryChanged: {
             if $0 == "/tmp/awesomux-cwd-ok" { focusRecorder.sawExpectedWorkingDirectory = true }
         }
@@ -217,4 +233,4 @@ guard status != nil, !failed else {
     print("terminal integration: failed (\(failureReason))")
     exit(1)
 }
-print("terminal integration: passed input, Unicode, focus, resize, clipboard, title/cwd callbacks, and pane independence")
+print("terminal integration: passed input, Unicode, focus, resize, clipboard, environment, title/cwd callbacks, and pane independence")

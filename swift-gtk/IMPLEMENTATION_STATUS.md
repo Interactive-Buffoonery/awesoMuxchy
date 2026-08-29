@@ -39,6 +39,16 @@ geometry and state styling have also passed a real-window visual correction.
   the pane/workspace/generation still names the live surface. One GTK-main
   publication updates the authoritative snapshot and every title/location
   consumer; explicit workspace renames opt out of live-title replacement.
+- The shim also owns copied language-neutral environment key/value pairs for
+  each surface. The app creates a `0600` pane-specific
+  `awesomux-agent-v1` JSONL endpoint beneath a `0700` profile directory and
+  injects only its protocol/session/pane/file coordinates. A capped background
+  reader rejects non-owner files, symlinks, oversized/malformed/version-mismatched
+  lines, and unknown providers; accepted explicit states cross the GTK-main
+  generation guard into the authoritative snapshot, regular/rail/lifted tiles,
+  activity footer, attention ordering, and persistence. The release harness
+  verifies child environment delivery, and a real Grok blocking-input event
+  was visually inspected at 1440×852.
 - Multi-pane rows now own a 240-point transient pane card matching the reference
   180 ms reveal and 220 ms row-to-card grace. A pure projection preserves pane
   tree order, active identity, provider/state wording, remote identity, and
@@ -280,7 +290,7 @@ geometry and state styling have also passed a real-window visual correction.
 - Automated destructive-dialog interaction and restored daemon continuity.
 - Collapsed/hidden/right-side presentation, pointer roster hover cards,
   Orca state/announcement inspection,
-  foreground-shell detection, full settings panes, and agent runtime event
-  ingestion remain after this footer milestone.
+  foreground-shell detection and full settings panes remain after this footer
+  milestone.
 
 See `VIABILITY.md` for the checkpoint decision and evidence.
