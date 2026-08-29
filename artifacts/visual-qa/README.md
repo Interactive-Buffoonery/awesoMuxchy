@@ -1,5 +1,28 @@
 # Visual QA
 
+## 2026-08-29 — SwiftGtk4 fuzzy sidebar search
+
+- Linux image: [ordered multi-range highlight](swift-gtk/progress/33-fuzzy-sidebar-search/ordered-multi-range-highlight-x11.png).
+- Reference: project-owned `FuzzyMatch.swift` and
+  `SidebarSearchProjection.swift` at macOS baseline
+  `fed33ff47c559344fc6db6fa53f16e75fcc4a116`.
+- Behavior: the real `Search sessions` GTK entry was edited through AT-SPI with
+  the non-contiguous query `eld`. The isolated profile projected the matching
+  workspace and rendered each matched character in `Extremely Long
+  Development…` as a separate bold underlined Pango range. The underlying
+  scorer also covers stable score ordering, word boundaries, contiguous runs,
+  bounded gaps, best alignment, diacritics, and a bounded query length.
+- Inspection: the 296×852 sidebar-only X11/GLX PNG was opened at original
+  resolution. The query, single filtered result, current-result outline, three
+  separated visible highlights, fixed header, and footer remain legible.
+- Verification: full preflight passes the text baseline, 92 Swift tests
+  (including UTF-8 offsets, later better alignment, stable ties, group-order
+  preservation, and hidden-only hits), the production build, real terminal
+  integration, and 100 two-surface lifecycle cycles.
+- Privacy: every visible group, workspace, agent count, and query is synthetic.
+  The strict sidebar crop contains no terminal content, commands, clipboard
+  data, credentials, private paths, or arbitrary agent output.
+
 ## 2026-08-29 — SwiftGtk4 destructive close sheets
 
 - Linux images: [workspace close risk](swift-gtk/progress/32-destructive-close/close-workspace-risk-sheet-x11.png),
