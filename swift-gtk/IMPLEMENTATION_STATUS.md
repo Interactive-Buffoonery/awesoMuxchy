@@ -151,12 +151,18 @@ geometry and state styling have also passed a real-window visual correction.
   click exposes implemented `New Workspace Here`, rename, cross-group move,
   and `Pin`/`Unpin` actions. Pinned rows additionally expose bounded
   identity-based `Move Workspace Up/Down`; moves retain terminal runtimes.
-  Pane-scoped acknowledgement IDs now persist backward-compatibly. A guarded
-  500 ms focused-pane dwell, immediate `Acknowledge Workspace` row action and
-  Ctrl-Shift-K route reconcile the lifted section and hidden edge cue. Exact
+  Pane-scoped acknowledgement IDs now persist backward-compatibly. The ordered
+  lift list is the sole projection membership source, and tested pane-state
+  transitions append new arrivals without moving rows already under the user's
+  pointer. A guarded 500 ms focused-pane dwell preserves the selected row with
+  a runtime-only sticky until navigation away, acknowledges only the active
+  pane, and does not passively clear permission or explicit-input prompts. The
+  immediate `Acknowledge Workspace` row action and Ctrl-Shift-K route release
+  the sticky and reconcile the lifted section and hidden edge cue. Exact
   per-workspace `Mute Notifications`/`Unmute Notifications` overrides persist.
-  Unanswered-turn ingestion, injected-clock UI coverage, and physical AT-SPI
-  announcement inspection remain pending.
+  Full preflight passes 70 Swift tests after this correction. Unanswered-turn
+  ingestion, injected-clock GTK coverage, and physical AT-SPI announcement
+  inspection remain pending.
 - Non-pinned workspace menus now expose tested, bounded within-group Up/Down
   moves plus named previous/next-group and arbitrary-group alternatives.
   Mutations reuse the authoritative snapshot and existing terminal runtime,

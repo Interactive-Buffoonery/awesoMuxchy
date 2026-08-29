@@ -84,6 +84,7 @@ public extension SessionSnapshot {
             throw SessionMutationError.workspaceNotFound(workspaceID)
         }
         selectedWorkspaceID = workspaceID
+        refreshAttentionStickyForSelection()
     }
 
     mutating func focusPane(_ paneID: UUID, in workspaceID: UUID) throws {
@@ -92,6 +93,9 @@ public extension SessionSnapshot {
                 throw SessionMutationError.paneNotFound(paneID)
             }
             workspace.focusedPaneID = paneID
+        }
+        if selectedWorkspaceID == workspaceID {
+            refreshAttentionStickyForSelection()
         }
     }
 
@@ -103,6 +107,7 @@ public extension SessionSnapshot {
         } ?? 0
         let target = (current + offset).modulo(visible.count)
         selectedWorkspaceID = visible[target].id
+        refreshAttentionStickyForSelection()
     }
 
     mutating func focusRelativePane(offset: Int, in workspaceID: UUID) throws {
@@ -124,6 +129,7 @@ public extension SessionSnapshot {
         }
         groups[index].workspaces.append(workspace)
         selectedWorkspaceID = workspace.id
+        refreshAttentionStickyForSelection()
     }
 
     mutating func addGroup(_ group: WorkspaceGroupSnapshot) {
@@ -228,8 +234,12 @@ public extension SessionSnapshot {
             pinnedWorkspaceIDs.remove(at: index)
         } else {
             pinnedWorkspaceIDs.append(workspaceID)
+            if attentionStickyWorkspaceID == workspaceID {
+                attentionStickyWorkspaceID = nil
+            }
             attentionWorkspaceIDs.removeAll { $0 == workspaceID }
         }
+        reconcileAttentionWorkspaceIDs()
     }
 
     mutating func movePinnedWorkspace(_ workspaceID: UUID, offset: Int) throws {
@@ -251,18 +261,76 @@ public extension SessionSnapshot {
             workspace.acknowledgedAttentionPaneIDs = workspace.layout.panes
                 .filter { $0.agentState == .needsAttention }.map(\.id)
         }
+        if attentionStickyWorkspaceID == workspaceID {
+            attentionStickyWorkspaceID = nil
+        }
         attentionWorkspaceIDs.removeAll { $0 == workspaceID }
     }
 
-    mutating func acknowledgePane(_ paneID: UUID, in workspaceID: UUID) throws {
+    @discardableResult
+    mutating func acknowledgePane(
+        _ paneID: UUID,
+        in workspaceID: UUID,
+        passively: Bool = false
+    ) throws -> Bool {
+        var didAcknowledge = false
         try updateWorkspace(id: workspaceID) { workspace in
-            guard workspace.layout.pane(id: paneID)?.agentState == .needsAttention else {
+            guard let pane = workspace.layout.pane(id: paneID), pane.agentState == .needsAttention else {
                 throw SessionMutationError.paneNotFound(paneID)
             }
+            guard !passively || pane.attentionReason?.awaitsExplicitAnswer != true else { return }
             if !workspace.acknowledgedAttentionPaneIDs.contains(paneID) {
                 workspace.acknowledgedAttentionPaneIDs.append(paneID)
+                didAcknowledge = true
             }
         }
+        reconcileAttentionWorkspaceIDs()
+        return didAcknowledge
+    }
+
+    mutating func updatePaneAgentState(
+        paneID: UUID,
+        workspaceID: UUID,
+        state: AgentState,
+        attentionReason: AttentionReason? = nil
+    ) throws {
+        let resolvedAttentionReason: AttentionReason? = state == .needsAttention
+            ? (attentionReason ?? .unknown)
+            : nil
+        try updateWorkspace(id: workspaceID) { workspace in
+            guard let previous = workspace.layout.pane(id: paneID),
+                  let updated = workspace.layout.replacingPane(id: paneID, with: { pane in
+                      var pane = pane
+                      pane.agentState = state
+                      pane.attentionReason = resolvedAttentionReason
+                      return .pane(pane)
+                  })
+            else { throw SessionMutationError.paneNotFound(paneID) }
+            workspace.layout = updated
+            if state == .needsAttention,
+               previous.agentState != .needsAttention || previous.attentionReason != resolvedAttentionReason
+            {
+                workspace.acknowledgedAttentionPaneIDs.removeAll { $0 == paneID }
+            }
+        }
+        reconcileAttentionWorkspaceIDs()
+        if selectedWorkspaceID == workspaceID {
+            refreshAttentionStickyForSelection()
+        }
+    }
+
+    mutating func refreshAttentionStickyForSelection() {
+        let candidate = selectedWorkspaceID.flatMap { selected -> UUID? in
+            guard !pinnedWorkspaceIDs.contains(selected),
+                  let workspace = workspace(id: selected),
+                  !workspace.isSoftClosed
+            else { return nil }
+            let acknowledged = Set(workspace.acknowledgedAttentionPaneIDs)
+            return workspace.layout.panes.contains {
+                $0.agentState == .needsAttention && !acknowledged.contains($0.id)
+            } ? selected : nil
+        }
+        attentionStickyWorkspaceID = candidate
         reconcileAttentionWorkspaceIDs()
     }
 
@@ -273,6 +341,7 @@ public extension SessionSnapshot {
         }
         pinnedWorkspaceIDs.removeAll { $0 == workspaceID }
         attentionWorkspaceIDs.removeAll { $0 == workspaceID }
+        if attentionStickyWorkspaceID == workspaceID { attentionStickyWorkspaceID = nil }
         pruneRecentlyClosedWorkspaces(now: now)
         recentlyClosedWorkspaces.removeAll { $0.workspaceID == workspaceID }
         recentlyClosedWorkspaces.insert(.init(workspaceID: workspaceID, closedAt: now), at: 0)
@@ -294,6 +363,7 @@ public extension SessionSnapshot {
         }
         recentlyClosedWorkspaces.removeFirst()
         selectedWorkspaceID = workspaceID
+        refreshAttentionStickyForSelection()
         return workspaceID
     }
 
@@ -304,6 +374,7 @@ public extension SessionSnapshot {
             let removed = groups[groupIndex].workspaces.remove(at: workspaceIndex)
             pinnedWorkspaceIDs.removeAll { $0 == workspaceID }
             attentionWorkspaceIDs.removeAll { $0 == workspaceID }
+            if attentionStickyWorkspaceID == workspaceID { attentionStickyWorkspaceID = nil }
             recentlyClosedWorkspaces.removeAll { $0.workspaceID == workspaceID }
             if selectedWorkspaceID == workspaceID {
                 selectedWorkspaceID = workspaces.first(where: { !$0.isSoftClosed })?.id
@@ -323,11 +394,12 @@ public extension SessionSnapshot {
                 }
             }
         }
+        let sticky = attentionStickyWorkspaceID
         let eligible = workspaces.filter { workspace in
             let acknowledged = Set(workspace.acknowledgedAttentionPaneIDs)
-            return !workspace.isSoftClosed && workspace.layout.panes.contains {
+            return !workspace.isSoftClosed && (workspace.id == sticky || workspace.layout.panes.contains {
                 $0.agentState == .needsAttention && !acknowledged.contains($0.id)
-            }
+            })
         }.map(\.id)
         let eligibleSet = Set(eligible)
         attentionWorkspaceIDs.removeAll {
@@ -350,6 +422,9 @@ public extension SessionSnapshot {
         pinnedWorkspaceIDs.removeAll(where: removedSet.contains)
         attentionWorkspaceIDs.removeAll(where: removedSet.contains)
         recentlyClosedWorkspaces.removeAll { removedSet.contains($0.workspaceID) }
+        if attentionStickyWorkspaceID.map(removedSet.contains) == true {
+            attentionStickyWorkspaceID = nil
+        }
         if let selectedWorkspaceID, removedWorkspaceIDs.contains(selectedWorkspaceID) {
             self.selectedWorkspaceID = groups.lazy
                 .flatMap(\.workspaces)

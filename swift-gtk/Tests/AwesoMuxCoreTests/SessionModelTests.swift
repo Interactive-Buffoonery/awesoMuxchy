@@ -624,6 +624,88 @@ private func snapshot(_ workspaces: [WorkspaceSnapshot]) -> SessionSnapshot {
     #expect(!SidebarPresentationPolicy.hasAttention(value))
 }
 
+@Test func attentionArrivalOrderIsStableAcrossGroupsAndRepeatSignals() throws {
+    let firstPane = PaneSnapshot(title: "First", workingDirectory: "/tmp")
+    let secondPane = PaneSnapshot(title: "Second", workingDirectory: "/tmp")
+    let first = WorkspaceSnapshot(name: "First", focusedPaneID: firstPane.id, layout: .pane(firstPane))
+    let second = WorkspaceSnapshot(name: "Second", focusedPaneID: secondPane.id, layout: .pane(secondPane))
+    var value = SessionSnapshot(
+        selectedWorkspaceID: first.id,
+        groups: [
+            WorkspaceGroupSnapshot(name: "Earlier group", workspaces: [first]),
+            WorkspaceGroupSnapshot(name: "Later group", workspaces: [second])
+        ]
+    )
+
+    try value.updatePaneAgentState(
+        paneID: secondPane.id, workspaceID: second.id,
+        state: .needsAttention, attentionReason: .bell
+    )
+    try value.updatePaneAgentState(
+        paneID: firstPane.id, workspaceID: first.id,
+        state: .needsAttention, attentionReason: .bell
+    )
+    #expect(value.attentionWorkspaceIDs == [second.id, first.id])
+
+    try value.updatePaneAgentState(
+        paneID: secondPane.id, workspaceID: second.id,
+        state: .needsAttention, attentionReason: .bell
+    )
+    #expect(value.attentionWorkspaceIDs == [second.id, first.id])
+}
+
+@Test func passiveAttentionDwellKeepsSelectedWorkspaceStickyUntilNavigation() throws {
+    let waitingPane = PaneSnapshot(
+        title: "Waiting", workingDirectory: "/tmp", agentState: .needsAttention,
+        attentionReason: .bell
+    )
+    let calmPane = PaneSnapshot(title: "Calm", workingDirectory: "/tmp")
+    let waiting = WorkspaceSnapshot(
+        name: "Waiting", focusedPaneID: waitingPane.id, layout: .pane(waitingPane)
+    )
+    let calm = WorkspaceSnapshot(name: "Calm", focusedPaneID: calmPane.id, layout: .pane(calmPane))
+    var value = snapshot([calm, waiting])
+    value.reconcileAttentionWorkspaceIDs()
+
+    try value.selectWorkspace(waiting.id)
+    #expect(value.attentionStickyWorkspaceID == waiting.id)
+    #expect(try value.acknowledgePane(waitingPane.id, in: waiting.id, passively: true))
+    #expect(value.workspace(id: waiting.id)?.acknowledgedAttentionPaneIDs == [waitingPane.id])
+    #expect(value.attentionWorkspaceIDs == [waiting.id])
+
+    try value.selectWorkspace(calm.id)
+    #expect(value.attentionStickyWorkspaceID == nil)
+    #expect(value.attentionWorkspaceIDs.isEmpty)
+    let returned = SidebarLiftedProjection.project(snapshot: value, query: "")
+    #expect(returned.attention.isEmpty)
+    #expect(returned.groups.flatMap { $0.rows.map(\.id) }.contains(waiting.id))
+
+    try value.selectWorkspace(waiting.id)
+    #expect(value.attentionStickyWorkspaceID == nil)
+    let decoded = try JSONDecoder().decode(SessionSnapshot.self, from: JSONEncoder().encode(value))
+    #expect(decoded.attentionStickyWorkspaceID == nil)
+}
+
+@Test func passiveDwellDoesNotAcknowledgeBlockingPrompt() throws {
+    let pane = PaneSnapshot(
+        title: "Permission", workingDirectory: "/tmp", agentState: .needsAttention,
+        attentionReason: .permissionPrompt
+    )
+    let workspace = WorkspaceSnapshot(name: "Blocked", focusedPaneID: pane.id, layout: .pane(pane))
+    var value = snapshot([workspace])
+    value.reconcileAttentionWorkspaceIDs()
+    try value.selectWorkspace(workspace.id)
+
+    #expect(try !value.acknowledgePane(pane.id, in: workspace.id, passively: true))
+    #expect(value.workspace(id: workspace.id)?.acknowledgedAttentionPaneIDs.isEmpty == true)
+    #expect(value.attentionWorkspaceIDs == [workspace.id])
+
+    try value.acknowledgeWorkspace(workspace.id)
+    #expect(value.attentionStickyWorkspaceID == nil)
+    #expect(value.attentionWorkspaceIDs.isEmpty)
+    #expect(SidebarLiftedProjection.project(snapshot: value, query: "").attention.isEmpty)
+}
+
 @Test func softCloseReopenAndClearPreserveExplicitRecoverySemantics() throws {
     let first = workspace(panes: 1)
     let second = workspace(panes: 1)

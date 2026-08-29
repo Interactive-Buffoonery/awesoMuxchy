@@ -1666,11 +1666,12 @@ private final class ApplicationState: @unchecked Sendable {
                 guard let self, self.attentionAcknowledgementGeneration == generation,
                       self.snapshot.selectedWorkspaceID == workspaceID,
                       self.runtimes[workspaceID]?.focusedPaneID == paneID,
-                      (try? self.snapshot.acknowledgePane(paneID, in: workspaceID)) != nil
+                      (try? self.snapshot.acknowledgePane(
+                          paneID, in: workspaceID, passively: true
+                      )) == true
                 else { return }
                 self.rebuildWorkspaceContextMenu(workspaceID)
                 self.refreshLiftedRows(); self.updateSidebarVisibility(); self.persist()
-                self.announceAttentionReturnIfNeeded(workspaceID, wasAttention: true)
             }
         }
     }
@@ -2187,7 +2188,12 @@ private final class ApplicationState: @unchecked Sendable {
 
     func select(_ workspaceID: UUID) {
         guard let runtime = runtimes[workspaceID], let stack else { return }
+        let previousSticky = snapshot.attentionStickyWorkspaceID
+        let previousAttention = snapshot.attentionWorkspaceIDs
         try? snapshot.selectWorkspace(workspaceID)
+        if previousAttention != snapshot.attentionWorkspaceIDs {
+            refreshLiftedRows()
+        }
         runtime.pageName.withCString { stack.setVisibleChild(name: $0) }
         for (id, row) in rows { row.setActive(isActive: id == workspaceID) }
         for (id, row) in railRows { row.setActive(isActive: id == workspaceID) }
@@ -2199,6 +2205,9 @@ private final class ApplicationState: @unchecked Sendable {
         for (id, row) in pinnedRows { setAccessibleSelected(row, id == workspaceID) }
         title?.label = snapshot.workspace(id: workspaceID).map(SidebarWorkspaceTitle.resolve) ?? ""
         updateChrome(workspaceID); focus(runtime.focusedPaneID); persist()
+        if let previousSticky, previousSticky != snapshot.attentionStickyWorkspaceID {
+            announceAttentionReturnIfNeeded(previousSticky, wasAttention: true)
+        }
     }
 
     private func updateChrome(_ workspaceID: UUID) {
@@ -2740,8 +2749,14 @@ private final class ApplicationState: @unchecked Sendable {
     }
 
     private func selectRelative(_ offset: Int) {
+        let previousSticky = snapshot.attentionStickyWorkspaceID
+        let previousAttention = snapshot.attentionWorkspaceIDs
         guard (try? snapshot.selectRelativeWorkspace(offset: offset)) != nil, let id = snapshot.selectedWorkspaceID else { return }
         select(id)
+        if previousAttention != snapshot.attentionWorkspaceIDs { refreshLiftedRows() }
+        if let previousSticky, previousSticky != snapshot.attentionStickyWorkspaceID {
+            announceAttentionReturnIfNeeded(previousSticky, wasAttention: true)
+        }
     }
 
     private func focusRelative(_ offset: Int, _ runtime: WorkspaceRuntime) {
@@ -2749,6 +2764,11 @@ private final class ApplicationState: @unchecked Sendable {
               (try? snapshot.focusRelativePane(offset: offset, in: workspaceID)) != nil,
               let id = snapshot.workspace(id: workspaceID)?.focusedPaneID else { return }
         focus(id)
+        // focus(_:) sees the already-mutated pane identity, so its callback's
+        // change detector correctly reports no second mutation. Persist and
+        // refresh the pane-owned row/footer projection at this command boundary.
+        refreshWorkspaceRowPresentation(workspaceID)
+        persist()
     }
 }
 

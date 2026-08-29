@@ -225,11 +225,18 @@ help, and agent context while preserving the compact reference geometry.
   current workspace count, and direct application-action QA proved exact first
   workspace routing. The remote X11 synthetic-input limitation prevented a
   trustworthy held-Control screenshot; physical held-key QA remains pending.
-- Needs Input acknowledgement is pane-scoped and persistent: a focused waiting
-  pane acknowledges only after a guarded 500 ms dwell, while Ctrl-Shift-K and
-  the row action acknowledge every waiting pane in that workspace immediately.
-  Fast selection/focus changes invalidate the pending dwell. Per-workspace
-  notification mute overrides also persist and use exact Mute/Unmute wording.
+- Needs Input acknowledgement is pane-scoped and persistent. Arrival order is
+  now driven by the authoritative transition-updated ID list, so later arrivals
+  append without displacing existing rows and the projection cannot resurrect
+  an acknowledged pane from stale raw agent state. A guarded 500 ms passive
+  dwell acknowledges only the focused pane, retains the selected row through a
+  runtime-only sticky until navigation away, and refuses to clear permission or
+  explicit-input prompts. Ctrl-Shift-K and the row action deliberately clear
+  every waiting pane immediately. Fast selection/focus changes invalidate the
+  pending dwell; the sticky is never serialized. Per-workspace notification
+  mute overrides also persist and use exact Mute/Unmute wording. Seventy Swift
+  tests and full preflight cover the transition model; physical dwell timing and
+  spoken return announcements remain real-app QA gaps.
 - Sidebar and adjacent footer styling now live in an owned focused GTK
   stylesheet with Catppuccin Mocha/Latte and high-contrast ramps derived from
   the pinned design tokens. System appearance, explicit Light/Dark,

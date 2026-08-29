@@ -471,17 +471,13 @@ public enum SidebarLiftedProjection {
 
         let pinned = snapshot.pinnedWorkspaceIDs.compactMap { liftedByID[$0] }
         let pinnedSet = Set(pinned.map { $0.row.id })
-        let eligibleAttention = snapshot.workspaces.filter { workspace in
-            !workspace.isSoftClosed
-                && !pinnedSet.contains(workspace.id)
-                && workspace.layout.panes.contains { $0.agentState == .needsAttention }
-        }.map(\.id)
-        let eligibleSet = Set(eligibleAttention)
-        var attentionOrder = snapshot.attentionWorkspaceIDs.filter {
-            eligibleSet.contains($0) && !pinnedSet.contains($0)
+        // Membership and arrival order both come from the snapshot's single
+        // reconciled list. Re-deriving membership from raw pane state here
+        // would resurrect a passively or explicitly acknowledged row whose
+        // attention producer has not yet emitted its clearing transition.
+        let attentionOrder = snapshot.attentionWorkspaceIDs.filter {
+            liftedByID[$0] != nil && !pinnedSet.contains($0)
         }
-        let knownAttention = Set(attentionOrder)
-        attentionOrder.append(contentsOf: eligibleAttention.filter { !knownAttention.contains($0) })
         let attention = attentionOrder.compactMap { liftedByID[$0] }
         let liftedSet = pinnedSet.union(attention.map { $0.row.id })
 

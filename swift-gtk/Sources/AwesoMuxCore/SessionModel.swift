@@ -4,6 +4,24 @@ public enum AgentState: String, Codable, CaseIterable, Sendable {
     case idle, running, waiting, thinking, output, needsAttention, done, error
 }
 
+public enum AttentionReason: String, Codable, CaseIterable, Sendable {
+    case bell
+    case desktopNotification
+    case permissionPrompt
+    case userInputRequired
+    case processError
+    case unknown
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        self = AttentionReason(rawValue: try container.decode(String.self)) ?? .unknown
+    }
+
+    public var awaitsExplicitAnswer: Bool {
+        self == .permissionPrompt || self == .userInputRequired
+    }
+}
+
 public enum SessionOwnership: String, Codable, Sendable {
     case local
     case remoteZmx
@@ -23,6 +41,7 @@ public struct PaneSnapshot: Codable, Equatable, Identifiable, Sendable {
     public var workingDirectory: String
     public var agent: String?
     public var agentState: AgentState
+    public var attentionReason: AttentionReason?
     public var ownership: SessionOwnership
 
     public init(
@@ -31,6 +50,7 @@ public struct PaneSnapshot: Codable, Equatable, Identifiable, Sendable {
         workingDirectory: String,
         agent: String? = nil,
         agentState: AgentState = .idle,
+        attentionReason: AttentionReason? = nil,
         ownership: SessionOwnership = .local
     ) {
         self.id = id
@@ -38,6 +58,7 @@ public struct PaneSnapshot: Codable, Equatable, Identifiable, Sendable {
         self.workingDirectory = workingDirectory
         self.agent = agent
         self.agentState = agentState
+        self.attentionReason = attentionReason
         self.ownership = ownership
     }
 }
@@ -178,6 +199,11 @@ public struct SessionSnapshot: Codable, Equatable, Sendable {
     public var groups: [WorkspaceGroupSnapshot]
     public var pinnedWorkspaceIDs: [UUID]
     public var attentionWorkspaceIDs: [UUID]
+    /// Runtime-only hold that keeps the selected row in Needs Input after the
+    /// passive read dwell. It is deliberately omitted from CodingKeys so a
+    /// relaunch rebuilds lift state from live attention instead of restoring a
+    /// stale selection gesture.
+    public var attentionStickyWorkspaceID: UUID?
     public var recentlyClosedWorkspaces: [RecentlyClosedWorkspaceRecord]
 
     public var workspaces: [WorkspaceSnapshot] {
@@ -190,6 +216,7 @@ public struct SessionSnapshot: Codable, Equatable, Sendable {
         groups: [WorkspaceGroupSnapshot] = [],
         pinnedWorkspaceIDs: [UUID] = [],
         attentionWorkspaceIDs: [UUID] = [],
+        attentionStickyWorkspaceID: UUID? = nil,
         recentlyClosedWorkspaces: [RecentlyClosedWorkspaceRecord] = []
     ) {
         self.schemaVersion = schemaVersion
@@ -197,6 +224,7 @@ public struct SessionSnapshot: Codable, Equatable, Sendable {
         self.groups = groups
         self.pinnedWorkspaceIDs = pinnedWorkspaceIDs
         self.attentionWorkspaceIDs = attentionWorkspaceIDs
+        self.attentionStickyWorkspaceID = attentionStickyWorkspaceID
         self.recentlyClosedWorkspaces = recentlyClosedWorkspaces
     }
 
@@ -212,6 +240,7 @@ public struct SessionSnapshot: Codable, Equatable, Sendable {
             groups: try values.decodeIfPresent([WorkspaceGroupSnapshot].self, forKey: .groups) ?? [],
             pinnedWorkspaceIDs: try values.decodeIfPresent([UUID].self, forKey: .pinnedWorkspaceIDs) ?? [],
             attentionWorkspaceIDs: try values.decodeIfPresent([UUID].self, forKey: .attentionWorkspaceIDs) ?? [],
+            attentionStickyWorkspaceID: nil,
             recentlyClosedWorkspaces: try values.decodeIfPresent([RecentlyClosedWorkspaceRecord].self, forKey: .recentlyClosedWorkspaces) ?? []
         )
     }
@@ -243,7 +272,8 @@ public struct SessionSnapshot: Codable, Equatable, Sendable {
         guard Set(pinnedWorkspaceIDs).count == pinnedWorkspaceIDs.count,
               Set(attentionWorkspaceIDs).count == attentionWorkspaceIDs.count,
               pinnedWorkspaceIDs.allSatisfy(Set(workspaceIDs).contains),
-              attentionWorkspaceIDs.allSatisfy(Set(workspaceIDs).contains)
+              attentionWorkspaceIDs.allSatisfy(Set(workspaceIDs).contains),
+              attentionStickyWorkspaceID.map(Set(workspaceIDs).contains) ?? true
         else { throw SessionValidationError.invalidSidebarProjectionIDs }
         guard Set(recentlyClosedWorkspaces.map(\.workspaceID)).count == recentlyClosedWorkspaces.count,
               recentlyClosedWorkspaces.count <= 20,
