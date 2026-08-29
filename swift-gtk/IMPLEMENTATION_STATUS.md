@@ -64,6 +64,9 @@ geometry and state styling have also passed a real-window visual correction.
   branch, dirty/ahead/behind, PR, and failing/running CI chips plus branch,
   browser, copy, Files, and discovered-editor actions. Remote panes suppress
   local actions and show a remote indicator.
+  A separate valid zero-group profile verifies the no-focused-pane boundary:
+  no path bar or context chips are fabricated, the centered recovery action is
+  exposed, fixed sidebar chrome remains, and the footer reports `0 agents`.
 - The pinned sidebar footer now includes Quick Settings, Help & Feedback,
   state-prioritized agent counts, and an expandable activity list that returns
   to the exact workspace/pane. System/Light/Dark and notification mute persist

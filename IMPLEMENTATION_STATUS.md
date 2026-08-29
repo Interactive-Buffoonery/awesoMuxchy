@@ -52,6 +52,10 @@ help, and agent context while preserving the compact reference geometry.
   installed editors, Files, and copy actions off the GTK thread. Git and `gh`
   use argv-only bounded processes with prompts disabled, capped output, hard
   timeout fallback, HTTPS-only remote actions, and stale-identity rejection.
+  A real zero-group/no-selection profile verifies the neutral absent state:
+  the focused footer and all path/Git/PR/CI/remote chips disappear instead of
+  presenting disabled placeholders, while the empty-workspace recovery action
+  and truthful `0 agents` sidebar footer remain.
 - The sidebar footer now matches the reference control set: Quick Settings,
   Help & Feedback, live thinking/output/attention chips, total agents, and an
   expandable agent activity panel that routes back to the exact pane. Theme

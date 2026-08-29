@@ -1,5 +1,21 @@
 # Visual QA
 
+## 2026-08-29 — SwiftGtk4 empty workspace and absent focused context
+
+- Linux image: [zero groups / no focused pane context](swift-gtk/progress/25-empty-neutral-footer/zero-groups-no-focused-context-x11.png).
+- Reference: empty-sidebar recovery, empty workspace, zero-agent footer, and
+  neutral/absent focused-footer behavior at macOS baseline
+  `fed33ff47c559344fc6db6fa53f16e75fcc4a116`.
+- Behavior: a separate valid schema-v2 profile contains zero groups and no
+  selected workspace. The real app shows fixed search/create chrome, the
+  centered `WELCOME TO AWESOMUX` recovery action, and the truthful `0 agents`
+  footer. With no focused pane, path/Git/PR/CI/remote chips and the adjacent
+  focused footer are absent rather than rendered as disabled placeholders.
+- Inspection: the 1440×852 X11/GLX PNG was inspected at original resolution.
+  The 296 px sidebar and titlebar boundary remain stable; the empty surface is
+  centered and no terminal or fabricated context is shown.
+- Privacy: the profile contains no workspaces, paths, panes, or terminal data.
+
 ## 2026-08-29 — SwiftGtk4 high-contrast interactions
 
 - Linux images: [high-contrast Quick settings](swift-gtk/progress/24-high-contrast-interactions/quick-settings-x11.png)
