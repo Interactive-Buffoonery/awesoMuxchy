@@ -175,6 +175,14 @@ geometry and state styling have also passed a real-window visual correction.
   routes, dynamically gate move/close during filtering, confirm destructive
   close, and keep a creation row after each expanded group's workspaces.
   Automatic tint cycling and the awesoMux/mauve exception are tested.
+- Group creation and rename now use one transient modal sheet owned by the main
+  window. The shared pure draft matches the reference's input clamp,
+  sanitization feedback, duplicate and mixed-script validation, exact copy,
+  and disabled-action hints. The catalog's `New Workspace Group` action is now
+  implemented and disabled only while a sheet is active. Live AT-SPI verified
+  create and rename headings, field/action names, duplicate rejection,
+  successful persisted mutations, command recovery, and crash-free teardown;
+  both 420-point Latte sheets were inspected under X11/GLX.
 - The expanded header now uses separate 30-point primary and 24-point options
   segments; the collapsed rail uses a 40-point creation menu. Default versus
   current-directory creation resolve different directory/group contexts at

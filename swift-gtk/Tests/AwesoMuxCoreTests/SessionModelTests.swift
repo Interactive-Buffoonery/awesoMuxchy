@@ -582,6 +582,33 @@ private func snapshot(_ workspaces: [WorkspaceSnapshot]) -> SessionSnapshot {
     #expect(WorkspaceRenameDraft.sanitized("  Review\nReady  ") == "ReviewReady")
 }
 
+@Test func workspaceGroupNameDraftMatchesReferenceValidationAndFeedback() {
+    let empty = WorkspaceGroupNameDraft(typedName: "", existingGroupNames: ["Local"])
+    #expect(!empty.canSubmit)
+    #expect(empty.validationMessage == "Enter a group name.")
+    #expect(WorkspaceGroupNameDraft.createEmptyHint
+        == "Enter a workspace group name to enable Create")
+    #expect(WorkspaceGroupNameDraft.renameEmptyHint
+        == "Enter a workspace group name to enable Save")
+
+    let duplicate = WorkspaceGroupNameDraft(typedName: "lócal", existingGroupNames: ["Local"])
+    #expect(!duplicate.canSubmit)
+    #expect(duplicate.validationMessage == "\"lócal\" already exists.")
+
+    let mixed = WorkspaceGroupNameDraft(typedName: "Lοcal", existingGroupNames: [])
+    #expect(!mixed.canSubmit)
+    #expect(mixed.validationMessage
+        == "Mixing Latin with Cyrillic or Greek letters isn't allowed here — use one alphabet.")
+
+    let adjusted = WorkspaceGroupNameDraft(typedName: "  Field Ops  ", existingGroupNames: [])
+    #expect(adjusted.canSubmit)
+    #expect(adjusted.sanitizedName == "Field Ops")
+    #expect(adjusted.sanitizationFeedback?.contains("\u{2068}Field Ops\u{2069}") == true)
+    #expect(WorkspaceGroupNameDraft.clampedInput(
+        String(repeating: "a", count: WorkspaceGroupNameDraft.inputScalarLimit + 1)
+    ).unicodeScalars.count == WorkspaceGroupNameDraft.inputScalarLimit)
+}
+
 @Test func workspaceAcknowledgementAndNotificationOverridesPersistIndependently() throws {
     let waitingPane = PaneSnapshot(title: "Approval", workingDirectory: "/tmp", agentState: .needsAttention)
     let quietPane = PaneSnapshot(title: "Shell", workingDirectory: "/tmp")

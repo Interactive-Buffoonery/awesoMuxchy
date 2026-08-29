@@ -560,27 +560,14 @@ public extension SessionSnapshot {
     }
 
     private func availableGroupName(_ rawName: String, excluding groupID: UUID? = nil) throws -> String {
-        let name = ChromeText.sanitized(rawName, limit: 120)
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !name.isEmpty else { throw SessionMutationError.invalidGroupName }
-        guard !Self.hasSuspiciousScriptMixing(rawName) else { throw SessionMutationError.suspiciousGroupName }
-        guard !groups.contains(where: {
-            $0.id != groupID && $0.name.compare(name, options: [.caseInsensitive, .diacriticInsensitive]) == .orderedSame
-        }) else { throw SessionMutationError.duplicateGroupName }
-        return name
-    }
-
-    private static func hasSuspiciousScriptMixing(_ value: String) -> Bool {
-        var latin = false, greek = false, cyrillic = false
-        for scalar in value.unicodeScalars {
-            switch scalar.value {
-            case 0x0041...0x024F: latin = true
-            case 0x0370...0x03FF: greek = true
-            case 0x0400...0x052F: cyrillic = true
-            default: break
-            }
-        }
-        return (latin && (greek || cyrillic)) || (greek && cyrillic)
+        let draft = WorkspaceGroupNameDraft(
+            typedName: rawName,
+            existingGroupNames: groups.lazy.filter { $0.id != groupID }.map(\.name)
+        )
+        guard !draft.sanitizedName.isEmpty else { throw SessionMutationError.invalidGroupName }
+        guard !draft.isMixedScript else { throw SessionMutationError.suspiciousGroupName }
+        guard !draft.isDuplicate else { throw SessionMutationError.duplicateGroupName }
+        return draft.sanitizedName
     }
 }
 

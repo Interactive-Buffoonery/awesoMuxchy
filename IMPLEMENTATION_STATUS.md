@@ -170,6 +170,14 @@ help, and agent context while preserving the compact reference geometry.
   per-group `New Workspace in Group` row that disappears while filtering.
   Automatic unfiltered-index tint cycling reserves mauve for awesoMux and
   peach for attention, while explicit colors remain authoritative.
+- Workspace-group create and rename now share one main-window-owned modal sheet
+  and the reference draft policy: bounded input, sanitized saved form,
+  case/diacritic-insensitive duplicate rejection, mixed-script rejection,
+  inline feedback, and exact Create/Save accessibility hints. `New Workspace
+  Group` is routed through the command catalog instead of remaining disabled.
+  Live AT-SPI created `Research`, renamed it to `Product`, verified persisted
+  state and command gating, and left the app alive; both owned Latte sheets
+  were captured and inspected.
 - The expanded create header is a 30-point primary plus 24-point options split
   control, and the collapsed rail uses a 40-point menu. The default and
   current-directory commands now have distinct group/directory semantics and

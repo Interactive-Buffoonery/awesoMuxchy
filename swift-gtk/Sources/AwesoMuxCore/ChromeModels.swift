@@ -303,6 +303,71 @@ public enum WorkspaceRenameDraft {
     }
 }
 
+public struct WorkspaceGroupNameDraft: Equatable, Sendable {
+    public static let inputScalarLimit = 4_096
+    public static let createEmptyHint = "Enter a workspace group name to enable Create"
+    public static let renameEmptyHint = "Enter a workspace group name to enable Save"
+
+    public let typedName: String
+    public let sanitizedName: String
+    public let isDuplicate: Bool
+    public let isMixedScript: Bool
+
+    public init(typedName: String, existingGroupNames: some Sequence<String>) {
+        let bounded = Self.clampedInput(typedName)
+        let sanitized = ChromeText.sanitized(bounded, limit: 120)
+        self.typedName = bounded
+        sanitizedName = sanitized
+        isMixedScript = Self.hasSuspiciousScriptMixing(bounded)
+        isDuplicate = !sanitized.isEmpty && existingGroupNames.contains { existing in
+            ChromeText.sanitized(existing, limit: 120).compare(
+                sanitized, options: [.caseInsensitive, .diacriticInsensitive]
+            ) == .orderedSame
+        }
+    }
+
+    public static func clampedInput(_ input: String) -> String {
+        String(input.unicodeScalars.prefix(inputScalarLimit))
+    }
+
+    public var canSubmit: Bool { validationMessage == nil }
+
+    public var validationMessage: String? {
+        if sanitizedName.isEmpty {
+            return typedName.isEmpty ? "Enter a group name." : "Enter a visible group name."
+        }
+        if isMixedScript {
+            return "Mixing Latin with Cyrillic or Greek letters isn't allowed here — use one alphabet."
+        }
+        if isDuplicate { return "\"\(sanitizedName)\" already exists." }
+        return nil
+    }
+
+    public var sanitizationFeedback: String? {
+        guard canSubmit, !typedName.utf8.elementsEqual(sanitizedName.utf8) else { return nil }
+        return "Some characters or spacing will be adjusted. This name will be saved as “\u{2068}\(sanitizedName)\u{2069}”."
+    }
+
+    public var spokenSanitizationFeedback: String? {
+        sanitizationFeedback?
+            .replacingOccurrences(of: "\u{2068}", with: "")
+            .replacingOccurrences(of: "\u{2069}", with: "")
+    }
+
+    private static func hasSuspiciousScriptMixing(_ value: String) -> Bool {
+        var latin = false, greek = false, cyrillic = false
+        for scalar in value.unicodeScalars {
+            switch scalar.value {
+            case 0x0041...0x024F: latin = true
+            case 0x0370...0x03FF: greek = true
+            case 0x0400...0x052F: cyrillic = true
+            default: continue
+            }
+        }
+        return (latin && (greek || cyrillic)) || (greek && cyrillic)
+    }
+}
+
 public struct SidebarGroupSection: Equatable, Sendable {
     public let id: UUID
     public let name: String

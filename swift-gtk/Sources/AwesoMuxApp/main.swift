@@ -268,8 +268,8 @@ private final class ApplicationState: @unchecked Sendable {
     private var searchKeyController: EventControllerKey?
     private var sidebarNavigationKeyController: EventControllerKey?
     private var globalModifierKeyController: EventControllerKey?
-    private var workspaceRenameWindow: WindowRef?
-    private var workspaceRenameKeyController: EventControllerKey?
+    private var activeSheetWindow: WindowRef?
+    private var activeSheetKeyController: EventControllerKey?
     private var isWorkspaceJumpModifierHeld = false
     private let sidebarDragNonce = UUID().uuidString
     private var activeSidebarDrag: SidebarDragItem?
@@ -2051,22 +2051,39 @@ private final class ApplicationState: @unchecked Sendable {
         announceWorkspaceReorder(workspaceID)
     }
 
-    private func dismissWorkspaceRenameWindow() {
-        let presented = workspaceRenameWindow
-        if let presented, let controller = workspaceRenameKeyController {
+    private func dismissActiveSheet() {
+        let presented = activeSheetWindow
+        if let presented, let controller = activeSheetKeyController {
             gtk_widget_remove_controller(presented.widget_ptr, controller.event_controller_ptr)
         }
-        workspaceRenameKeyController = nil
+        activeSheetKeyController = nil
         presented?.close()
-        workspaceRenameWindow = nil
+        activeSheetWindow = nil
         refreshCommandEnablement()
     }
 
+    private func installActiveSheetDismissal(on window: WindowRef) {
+        let keys = EventControllerKey()
+        keys.onKeyPressed { [weak self] _, keyval, _, _ in
+            guard keyval == UInt(GDK_KEY_Escape) else { return false }
+            self?.dismissActiveSheet(); return true
+        }
+        _ = keys.ref()
+        activeSheetKeyController = keys
+        gtk_widget_add_controller(window.widget_ptr, keys.event_controller_ptr)
+        window.onCloseRequest { [weak self] _ in
+            self?.activeSheetWindow = nil
+            self?.activeSheetKeyController = nil
+            self?.refreshCommandEnablement()
+            return false
+        }
+    }
+
     func presentWorkspaceNameDialog(_ workspaceID: UUID) {
-        if let workspaceRenameWindow { workspaceRenameWindow.present(); return }
+        if let activeSheetWindow { activeSheetWindow.present(); return }
         guard let workspace = snapshot.workspace(id: workspaceID), let parent = window else { return }
         let currentTitle = SidebarWorkspaceTitle.resolve(workspace: workspace)
-        let window = WindowRef(); workspaceRenameWindow = window
+        let window = WindowRef(); activeSheetWindow = window
         window.title = "Rename Workspace"; window.setDefaultSize(width: 420, height: 190)
         window.setTransientFor(parent: parent); window.set(modal: true)
         window.setDestroyWithParent(setting: true); window.set(resizable: false)
@@ -2098,28 +2115,15 @@ private final class ApplicationState: @unchecked Sendable {
             guard !proposed.isEmpty else { return }
             if proposed == WorkspaceRenameDraft.sanitized(currentTitle)
                 || self.renameWorkspace(workspaceID, to: proposed) {
-                self.dismissWorkspaceRenameWindow()
+                self.dismissActiveSheet()
             }
         }
-        cancel.onClicked { [weak self] _ in self?.dismissWorkspaceRenameWindow() }
+        cancel.onClicked { [weak self] _ in self?.dismissActiveSheet() }
         confirm.onClicked { _ in submit() }
         entry.onChanged { _ in updateSaveState() }
         entry.onActivate { _ in submit() }
         window.set(defaultWidget: confirm)
-        let keys = EventControllerKey()
-        keys.onKeyPressed { [weak self] _, keyval, _, _ in
-            guard keyval == UInt(GDK_KEY_Escape) else { return false }
-            self?.dismissWorkspaceRenameWindow(); return true
-        }
-        _ = keys.ref()
-        workspaceRenameKeyController = keys
-        gtk_widget_add_controller(window.widget_ptr, keys.event_controller_ptr)
-        window.onCloseRequest { [weak self] _ in
-            self?.workspaceRenameWindow = nil
-            self?.workspaceRenameKeyController = nil
-            self?.refreshCommandEnablement()
-            return false
-        }
+        installActiveSheetDismissal(on: window)
         actions.append(child: cancel); actions.append(child: confirm)
         box.append(child: heading); box.append(child: nameLabel); box.append(child: entry); box.append(child: actions)
         updateSaveState(); refreshCommandEnablement()
@@ -2606,7 +2610,7 @@ private final class ApplicationState: @unchecked Sendable {
         root.setMarginTop(margin: 16); root.setMarginBottom(margin: 16)
         let search = SearchEntryRef(); search.setPlaceholder(text: "Search workspaces and actions...")
         let results = BoxRef(orientation: .vertical, spacing: 3)
-        let implemented: Set<CommandID> = [.newWorkspace, .newWorkspaceInCurrentDirectory,
+        let implemented: Set<CommandID> = [.newWorkspace, .newWorkspaceInCurrentDirectory, .newWorkspaceGroup,
             .renameWorkspace, .acknowledgeWorkspace, .togglePinWorkspace,
             .closeWorkspace, .clearWorkspace, .reopenClosedWorkspace,
             .previousWorkspace, .nextWorkspace, .previousPane, .nextPane,
@@ -2687,7 +2691,7 @@ private final class ApplicationState: @unchecked Sendable {
     }
 
     func installCommands(on application: Gtk.ApplicationRef) {
-        let implemented: Set<CommandID> = [.newWorkspace, .newWorkspaceInCurrentDirectory,
+        let implemented: Set<CommandID> = [.newWorkspace, .newWorkspaceInCurrentDirectory, .newWorkspaceGroup,
             .renameWorkspace, .acknowledgeWorkspace, .togglePinWorkspace,
             .closeWorkspace, .clearWorkspace, .reopenClosedWorkspace,
             .previousWorkspace, .nextWorkspace, .previousPane, .nextPane,
@@ -2703,6 +2707,7 @@ private final class ApplicationState: @unchecked Sendable {
                 action.set(enabled: implemented.contains(definition.id)
                     && (definition.id != .reopenClosedWorkspace || !snapshot.recentlyClosedWorkspaces.isEmpty)
                     && (definition.id != .renameWorkspace || snapshot.selectedWorkspaceID != nil)
+                    && (definition.id != .newWorkspaceGroup || activeSheetWindow == nil)
                     && (definition.id.workspaceJumpIndex.map { workspaceJumpOrder().indices.contains($0) } ?? true))
                 action.onActivate { [weak self] _, _ in self?.perform(definition.id) }
                 application.add(action: action)
@@ -2719,8 +2724,9 @@ private final class ApplicationState: @unchecked Sendable {
     private func refreshCommandEnablement() {
         pruneExpiredClosedWorkspaces()
         commandActions[.renameWorkspace]?.set(
-            enabled: snapshot.selectedWorkspaceID != nil && workspaceRenameWindow == nil
+            enabled: snapshot.selectedWorkspaceID != nil && activeSheetWindow == nil
         )
+        commandActions[.newWorkspaceGroup]?.set(enabled: activeSheetWindow == nil)
         commandActions[.reopenClosedWorkspace]?.set(enabled: !snapshot.recentlyClosedWorkspaces.isEmpty)
         for command in CommandID.allCases {
             if let index = command.workspaceJumpIndex {
@@ -2746,6 +2752,7 @@ private final class ApplicationState: @unchecked Sendable {
     private func perform(_ command: CommandID) {
         if command == .newWorkspace { createDefaultWorkspace(); return }
         if command == .newWorkspaceInCurrentDirectory { createWorkspaceInCurrentDirectory(); return }
+        if command == .newWorkspaceGroup { presentGroupNameDialog(); return }
         if command == .reopenClosedWorkspace { reopenMostRecentlyClosedWorkspace(); return }
         if command == .focusSidebar { focusSidebar(); return }
         if command == .toggleSidebarWidth { toggleSidebarWidth(); return }
@@ -2842,25 +2849,83 @@ private final class ApplicationState: @unchecked Sendable {
     }
 
     func presentGroupNameDialog(groupID: UUID? = nil) {
+        if let activeSheetWindow { activeSheetWindow.present(); return }
         let current = groupID.flatMap { id in snapshot.groups.first(where: { $0.id == id })?.name } ?? ""
-        let window = WindowRef(); window.title = groupID == nil ? "New Workspace Group" : "Rename Workspace Group"
-        window.setDefaultSize(width: 420, height: 170)
-        let box = BoxRef(orientation: .vertical, spacing: 12)
+        guard groupID == nil || !current.isEmpty, let parent = window else { return }
+        let isCreating = groupID == nil
+        let sheetTitle = isCreating ? "New Workspace Group" : "Rename Workspace Group"
+        let window = WindowRef(); activeSheetWindow = window
+        window.title = sheetTitle; window.setDefaultSize(width: 420, height: 220)
+        window.setTransientFor(parent: parent); window.set(modal: true)
+        window.setDestroyWithParent(setting: true); window.set(resizable: false)
+        window.add(cssClass: "aw-sheet"); applyThemeClasses(to: window)
+        let box = BoxRef(orientation: .vertical, spacing: 16)
+        box.add(cssClass: "aw-sheet"); applyThemeClasses(to: box)
         box.setMarginStart(margin: 20); box.setMarginEnd(margin: 20)
         box.setMarginTop(margin: 20); box.setMarginBottom(margin: 20)
-        let heading = LabelRef(str: window.title ?? "Workspace Group"); heading.add(cssClass: "aw-menu-title"); heading.xalign = 0
-        let entry = EntryRef(); entry.text = current; entry.setPlaceholder(text: "Workspace group name")
+        setAccessibleLabel(box, sheetTitle)
+        let headingText = isCreating ? sheetTitle : "Rename '\(ChromeText.sanitized(current, limit: 120))'"
+        let heading = makeAccessibleLabel(headingText, role: GTK_ACCESSIBLE_ROLE_HEADING)
+        heading.add(cssClass: "aw-menu-title"); heading.xalign = 0
+        let nameLabel = LabelRef(str: "Name"); nameLabel.add(cssClass: "aw-sheet-label"); nameLabel.xalign = 0
+        let entry = EntryRef(); entry.text = WorkspaceGroupNameDraft.clampedInput(current)
+        entry.setPlaceholder(text: "Group name"); entry.add(cssClass: "aw-sheet-entry")
+        setAccessibleLabel(entry, "Workspace group name")
+        let feedback = LabelRef(str: ""); feedback.add(cssClass: "aw-sheet-feedback")
+        feedback.xalign = 0; feedback.set(wrap: true); feedback.set(visible: false)
         let actions = BoxRef(orientation: .horizontal, spacing: 8); actions.setHalign(align: .end)
-        let cancel = ButtonRef(label: "Cancel"); let confirm = ButtonRef(label: groupID == nil ? "Create" : "Rename")
-        cancel.onClicked { [window] _ in window.close() }
-        confirm.onClicked { [weak self, window, entry] _ in
-            guard let self else { return }
-            if let groupID { self.renameGroup(groupID, to: entry.text ?? "") }
-            else { self.createGroup(named: entry.text ?? "") }
-            window.close()
+        let cancel = ButtonRef(label: "Cancel"); let confirm = ButtonRef(label: isCreating ? "Create" : "Save")
+        cancel.add(cssClass: "aw-sheet-secondary"); confirm.add(cssClass: "aw-sheet-primary")
+        let existingNames = snapshot.groups.compactMap { group in
+            group.id == groupID ? nil : group.name
         }
+        func draft() -> WorkspaceGroupNameDraft {
+            WorkspaceGroupNameDraft(typedName: entry.text ?? "", existingGroupNames: existingNames)
+        }
+        func updateState() {
+            let value = draft()
+            let message = value.validationMessage ?? value.sanitizationFeedback ?? ""
+            feedback.label = message; feedback.set(visible: !message.isEmpty)
+            if value.validationMessage == nil { feedback.remove(cssClass: "aw-error") }
+            else { feedback.add(cssClass: "aw-error") }
+            confirm.set(sensitive: value.canSubmit)
+            let fallback = isCreating
+                ? WorkspaceGroupNameDraft.createEmptyHint : WorkspaceGroupNameDraft.renameEmptyHint
+            setAccessibleDescription(confirm, value.canSubmit ? "" : (value.validationMessage ?? fallback))
+        }
+        let submit = { [weak self, entry] in
+            guard let self else { return }
+            let value = WorkspaceGroupNameDraft(
+                typedName: entry.text ?? "", existingGroupNames: existingNames
+            )
+            guard value.canSubmit else { return }
+            if !isCreating && value.sanitizedName == WorkspaceGroupNameDraft(
+                typedName: current, existingGroupNames: []
+            ).sanitizedName {
+                self.dismissActiveSheet(); return
+            }
+            let didSave: Bool
+            if let groupID { didSave = self.renameGroup(groupID, to: value.sanitizedName) }
+            else { didSave = self.createGroup(named: value.sanitizedName) != nil }
+            guard didSave else { return }
+            if let message = value.spokenSanitizationFeedback { self.announce(message) }
+            self.dismissActiveSheet()
+        }
+        cancel.onClicked { [weak self] _ in self?.dismissActiveSheet() }
+        confirm.onClicked { _ in submit() }
+        entry.onChanged { editable in
+            let raw = editable.text ?? ""
+            let bounded = WorkspaceGroupNameDraft.clampedInput(raw)
+            if raw != bounded { entry.text = bounded; return }
+            updateState()
+        }
+        entry.onActivate { _ in submit() }
+        window.set(defaultWidget: confirm)
+        installActiveSheetDismissal(on: window)
         actions.append(child: cancel); actions.append(child: confirm)
-        box.append(child: heading); box.append(child: entry); box.append(child: actions)
+        box.append(child: heading); box.append(child: nameLabel); box.append(child: entry)
+        box.append(child: feedback); box.append(child: actions)
+        updateState(); refreshCommandEnablement()
         window.set(child: box); window.present(); _ = entry.grabFocus()
     }
 
@@ -2892,13 +2957,14 @@ private final class ApplicationState: @unchecked Sendable {
         }
     }
 
-    private func renameGroup(_ groupID: UUID, to name: String) {
+    @discardableResult private func renameGroup(_ groupID: UUID, to name: String) -> Bool {
         do {
             try snapshot.renameGroup(groupID, to: name)
             groupNames[groupID]?.label = ChromeText.sanitized(name, limit: 120).uppercased()
             refreshRailGroupRoster(groupID)
             refreshWorkspaceOptionsMenus()
             persist()
+            return true
         } catch SessionMutationError.duplicateGroupName {
             let adjusted = ChromeText.sanitized(name, limit: 120).trimmingCharacters(in: .whitespacesAndNewlines)
             showInformation(title: "Rename Workspace Group", body: "\"\(adjusted)\" already exists.")
@@ -2907,6 +2973,7 @@ private final class ApplicationState: @unchecked Sendable {
         } catch {
             showInformation(title: "Rename Workspace Group", body: name.isEmpty ? "Enter a group name." : "Enter a visible group name.")
         }
+        return false
     }
 
     private func setGroupColor(_ groupID: UUID, color: WorkspaceGroupColor?) {
