@@ -117,6 +117,76 @@ private extension AgentState {
     }
 }
 
+public enum SidebarAgentKind: String, Equatable, Sendable {
+    case claude, codex, openCode, pi, grok, shell
+
+    public var symbol: String {
+        switch self {
+        case .claude: "✳"
+        case .codex: "↻"
+        case .openCode: "[ ]"
+        case .pi: "π"
+        case .grok: "◉"
+        case .shell: ">_"
+        }
+    }
+
+    static func resolve(_ agent: String?) -> SidebarAgentKind {
+        let normalized = agent.map { ChromeText.sanitized($0, limit: 80).lowercased() } ?? ""
+        if normalized.contains("claude") { return .claude }
+        if normalized.contains("codex") { return .codex }
+        if normalized.contains("opencode") || normalized.contains("open code") { return .openCode }
+        if normalized == "pi" || normalized.hasPrefix("pi ") { return .pi }
+        if normalized.contains("grok") { return .grok }
+        return .shell
+    }
+}
+
+public struct SidebarAgentTilePresentation: Equatable, Sendable {
+    public let kind: SidebarAgentKind
+    public let name: String
+    public let state: AgentState
+
+    public var symbol: String { kind.symbol }
+    public var showsBadge: Bool { state != .idle }
+    public var stateToken: String { state == .needsAttention ? "needs" : state.rawValue }
+
+    public var badgeSymbol: String {
+        switch state {
+        case .needsAttention: "!"
+        case .error: "×"
+        case .done: "✓"
+        case .output: "•"
+        case .waiting: "Ⅱ"
+        case .running: "▶"
+        case .thinking: "◔"
+        case .idle: ""
+        }
+    }
+
+    public var accessibilityLabel: String { "\(name), \(state.accessibilityLabel)" }
+
+    public static func project(agent: String?, state: AgentState) -> SidebarAgentTilePresentation {
+        let sanitized = agent.map { ChromeText.sanitized($0, limit: 80) }
+        let name = sanitized.flatMap { $0.isEmpty ? nil : $0 } ?? "Shell"
+        return SidebarAgentTilePresentation(kind: .resolve(sanitized), name: name, state: state)
+    }
+
+    public static func project(pane: PaneSnapshot) -> SidebarAgentTilePresentation {
+        project(agent: pane.agent, state: pane.agentState)
+    }
+
+    public static func project(workspace: WorkspaceSnapshot) -> SidebarAgentTilePresentation {
+        let priority: [AgentState] = [
+            .needsAttention, .error, .output, .thinking, .waiting, .running, .done, .idle,
+        ]
+        let panes = workspace.layout.panes
+        let winning = priority.lazy.compactMap { state in panes.first { $0.agentState == state } }.first
+            ?? panes.first
+        return winning.map { project(pane: $0) } ?? project(agent: nil, state: .idle)
+    }
+}
+
 public struct SidebarGroupSection: Equatable, Sendable {
     public let id: UUID
     public let name: String

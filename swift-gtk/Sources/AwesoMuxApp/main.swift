@@ -614,15 +614,14 @@ private final class ApplicationState: @unchecked Sendable {
             row.set(visible: true)
             row.remove(cssClass: "aw-lifted-attention"); row.remove(cssClass: "aw-lifted-pinned")
             if attention.contains(id) {
-                row.add(cssClass: "aw-lifted-attention"); row.set(iconName: "dialog-warning-symbolic")
+                row.add(cssClass: "aw-lifted-attention")
                 let name = snapshot.workspace(id: id)?.name ?? "Workspace"
                 row.setTooltip(text: "Needs input: \(ChromeText.sanitized(name, limit: 120))")
             } else if pinned.contains(id) {
-                row.add(cssClass: "aw-lifted-pinned"); row.set(iconName: "emblem-favorite-symbolic")
+                row.add(cssClass: "aw-lifted-pinned")
                 let name = snapshot.workspace(id: id)?.name ?? "Workspace"
                 row.setTooltip(text: "Pinned: \(ChromeText.sanitized(name, limit: 120))")
             } else {
-                row.set(iconName: "utilities-terminal-symbolic")
                 row.setTooltip(text: ChromeText.sanitized(snapshot.workspace(id: id)?.name ?? "Workspace", limit: 120))
             }
             if let previous {
@@ -759,8 +758,8 @@ private final class ApplicationState: @unchecked Sendable {
         let groupColor = SidebarTintProjection.resolvedColor(for: group, unfilteredIndex: groupIndex)
         row.add(cssClass: "aw-\(groupColor.rawValue)")
         let content = BoxRef(orientation: .horizontal, spacing: 10)
-        let shell = LabelRef(str: ">_"); shell.add(cssClass: "aw-shell"); shell.setSizeRequest(width: 32, height: 32)
-        content.append(child: shell)
+        let agentTile = SidebarAgentTilePresentation.project(workspace: workspace)
+        content.append(child: makeAgentTile(agentTile, size: 32))
         let details = BoxRef(orientation: .vertical, spacing: 2); details.setHexpand(expand: true)
         let name = LabelRef(str: SidebarWorkspaceTitle.resolve(workspace: workspace))
         name.add(cssClass: "aw-row-title"); name.xalign = 0; name.setEllipsize(mode: PangoEllipsizeMode(rawValue: 3))
@@ -776,7 +775,7 @@ private final class ApplicationState: @unchecked Sendable {
         let safeName = SidebarWorkspaceTitle.resolve(workspace: workspace)
         setAccessibleLabel(row, safeName)
         let paneDescription = workspace.layout.paneCount > 1 ? ", \(workspace.layout.paneCount) panes" : ""
-        setAccessibleDescription(row, "Workspace in \(ChromeText.sanitized(group.name, limit: 120)); \(location)\(paneDescription)")
+        setAccessibleDescription(row, "Workspace in \(ChromeText.sanitized(group.name, limit: 120)); \(location)\(paneDescription); \(agentTile.accessibilityLabel)")
         installWorkspaceContextMenu(on: row, workspaceID: workspace.id, groupID: groupID)
         installWorkspacePanePeek(on: row, workspace: workspace)
         rows[workspace.id] = row; metadata[workspace.id] = meta; workspaceTitles[workspace.id] = name
@@ -786,13 +785,14 @@ private final class ApplicationState: @unchecked Sendable {
 
     func makeRailRow(workspace: WorkspaceSnapshot) -> ToggleButtonRef {
         let button = ToggleButtonRef()
-        button.set(iconName: "utilities-terminal-symbolic")
         button.add(cssClass: "aw-rail-row")
         button.setSizeRequest(width: 40, height: 40)
+        let agentTile = SidebarAgentTilePresentation.project(workspace: workspace)
+        button.set(child: makeAgentTile(agentTile, size: 28, collapsed: true))
         let displayedTitle = SidebarWorkspaceTitle.resolve(workspace: workspace)
         button.setTooltip(text: displayedTitle)
         setAccessibleLabel(button, displayedTitle)
-        setAccessibleDescription(button, "Workspace")
+        setAccessibleDescription(button, "Workspace; \(agentTile.accessibilityLabel)")
         button.onClicked { [weak self] _ in self?.select(workspace.id) }
         railRows[workspace.id] = button
         return button
@@ -825,23 +825,29 @@ private final class ApplicationState: @unchecked Sendable {
         }
     }
 
-    private func paneStateGlyph(_ state: AgentState) -> String {
-        switch state {
-        case .needsAttention: "!"
-        case .error: "×"
-        case .thinking, .waiting: "…"
-        case .running: "▶"
-        case .output: "↗"
-        case .done: "✓"
-        case .idle: "○"
+    private func makeAgentTile(
+        _ presentation: SidebarAgentTilePresentation, size: Int, collapsed: Bool = false
+    ) -> OverlayRef {
+        let tile = OverlayRef(); tile.add(cssClass: "aw-agent-tile")
+        tile.setSizeRequest(width: collapsed ? size : size + 5, height: collapsed ? size : size + 5)
+        let symbol = LabelRef(str: presentation.symbol); symbol.add(cssClass: "aw-agent-symbol")
+        symbol.add(cssClass: "aw-agent-\(presentation.kind.rawValue.lowercased())")
+        symbol.setSizeRequest(width: size, height: size)
+        symbol.setHalign(align: collapsed ? .center : .start)
+        symbol.setValign(align: collapsed ? .center : .start)
+        tile.set(child: symbol)
+        if presentation.showsBadge {
+            let loudGlyph = [.needsAttention, .error].contains(presentation.state)
+            let badgeText = collapsed && !loudGlyph ? "" : presentation.badgeSymbol
+            let badge = LabelRef(str: badgeText); badge.add(cssClass: "aw-agent-status")
+            badge.add(cssClass: "aw-agent-status-\(presentation.stateToken)")
+            if collapsed { badge.add(cssClass: "aw-agent-status-collapsed") }
+            badge.setSizeRequest(width: collapsed ? 13 : 14, height: collapsed ? 13 : 14)
+            badge.setHalign(align: .end); badge.setValign(align: .end)
+            tile.addOverlay(widget: badge)
         }
-    }
-
-    private func panePeekRollupState(_ workspace: WorkspaceSnapshot) -> AgentState {
-        let priority: [AgentState] = [
-            .needsAttention, .error, .output, .thinking, .waiting, .running, .done, .idle,
-        ]
-        return priority.first { state in workspace.layout.panes.contains { $0.agentState == state } } ?? .idle
+        setAccessibleLabel(tile, presentation.accessibilityLabel)
+        return tile
     }
 
     private func configureWorkspacePanePeek(_ workspaceID: UUID) {
@@ -871,17 +877,15 @@ private final class ApplicationState: @unchecked Sendable {
         retainCardPointer(on: WidgetRef(box))
         box.setSizeRequest(width: 204, height: -1)
         let header = BoxRef(orientation: .horizontal, spacing: 8)
-        let rollup = panePeekRollupState(workspace)
-        let glyph = LabelRef(str: paneStateGlyph(rollup)); glyph.add(cssClass: "aw-pane-peek-header-glyph")
-        glyph.setSizeRequest(width: 28, height: 28)
+        let rollup = SidebarAgentTilePresentation.project(workspace: workspace)
         let headerText = BoxRef(orientation: .vertical, spacing: 1); headerText.setHexpand(expand: true)
         let heading = LabelRef(str: SidebarWorkspaceTitle.resolve(workspace: workspace))
         heading.add(cssClass: "aw-pane-peek-heading"); heading.xalign = 0
         heading.setEllipsize(mode: PangoEllipsizeMode(rawValue: 3)); heading.setMaxWidthChars(nChars: 18)
-        let summary = LabelRef(str: paneStateLabel(rollup)); summary.add(cssClass: "aw-pane-peek-summary")
+        let summary = LabelRef(str: paneStateLabel(rollup.state)); summary.add(cssClass: "aw-pane-peek-summary")
         summary.xalign = 0
         headerText.append(child: heading); headerText.append(child: summary)
-        header.append(child: glyph); header.append(child: headerText); box.append(child: header)
+        header.append(child: makeAgentTile(rollup, size: 28)); header.append(child: headerText); box.append(child: header)
         if let focused = workspace.layout.pane(id: workspace.focusedPaneID) {
             let prefix = focused.ownership == .remoteZmx ? "⌁  " : ""
             let location = LabelRef(str: prefix + FocusedPaneContext.displayPath(
@@ -897,12 +901,11 @@ private final class ApplicationState: @unchecked Sendable {
             let row = ButtonRef(); row.add(cssClass: "aw-pane-peek-row"); row.setHalign(align: .fill)
             let content = BoxRef(orientation: .horizontal, spacing: 8)
             let number = LabelRef(str: "\(item.paneNumber)"); number.add(cssClass: "aw-pane-peek-number")
-            let state = LabelRef(str: paneStateGlyph(item.state)); state.add(cssClass: "aw-pane-peek-active")
-            if item.isActive { state.add(cssClass: "aw-pane-peek-is-active") }
+            let paneTile = SidebarAgentTilePresentation.project(agent: item.agent, state: item.state)
             let title = LabelRef(str: item.title); title.add(cssClass: "aw-pane-peek-title"); title.xalign = 0
             title.setHexpand(expand: true); title.setEllipsize(mode: PangoEllipsizeMode(rawValue: 3))
             title.setMaxWidthChars(nChars: item.isRemote ? 12 : 18)
-            content.append(child: number); content.append(child: state); content.append(child: title)
+            content.append(child: number); content.append(child: makeAgentTile(paneTile, size: 20)); content.append(child: title)
             if item.isRemote {
                 let remote = LabelRef(str: "⌁ Remote"); remote.add(cssClass: "aw-pane-peek-meta")
                 content.append(child: remote)
@@ -1078,10 +1081,8 @@ private final class ApplicationState: @unchecked Sendable {
         let button = ToggleButtonRef(); button.add(cssClass: "aw-row"); button.setHalign(align: .fill)
         button.add(cssClass: "aw-\((item.originGroupColor ?? .blue).rawValue)")
         let content = BoxRef(orientation: .horizontal, spacing: 10)
-        let glyph = LabelRef(str: attention ? "!" : "◆"); glyph.add(cssClass: "aw-shell")
-        glyph.setSizeRequest(width: 32, height: 32)
-        if attention { glyph.add(cssClass: "aw-peach") }
-        content.append(child: glyph)
+        let agentTile = SidebarAgentTilePresentation.project(workspace: workspace)
+        content.append(child: makeAgentTile(agentTile, size: 32))
         let details = BoxRef(orientation: .vertical, spacing: 2); details.setHexpand(expand: true)
         let title = LabelRef(str: item.row.title); title.add(cssClass: "aw-row-title"); title.xalign = 0
         title.setEllipsize(mode: PangoEllipsizeMode(rawValue: 3)); title.setMaxWidthChars(nChars: 13)
@@ -1092,7 +1093,7 @@ private final class ApplicationState: @unchecked Sendable {
         details.append(child: title); details.append(child: origin); content.append(child: details); button.set(child: content)
         button.setTooltip(text: origin.label ?? "")
         setAccessibleLabel(button, item.row.title)
-        setAccessibleDescription(button, origin.label ?? "")
+        setAccessibleDescription(button, "\(origin.label ?? ""); \(agentTile.accessibilityLabel)")
         button.onClicked { [weak self] _ in self?.select(workspace.id) }
         installWorkspaceContextMenu(on: button, workspaceID: workspace.id, groupID: item.originGroupID, isLifted: true)
         liftedTitles[workspace.id] = title

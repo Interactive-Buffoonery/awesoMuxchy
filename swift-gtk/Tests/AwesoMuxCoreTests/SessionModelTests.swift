@@ -845,3 +845,29 @@ private func snapshot(_ workspaces: [WorkspaceSnapshot]) -> SessionSnapshot {
     let remoteItem = SidebarPanePeekItem.project(workspace: remoteWorkspace)[0]
     #expect(remoteItem.accessibilityLabel == "Jump to pane 1, Deploy, Claude, Running, remote, active pane")
 }
+
+@Test func sidebarAgentTileUsesProviderShapeAndHighestPriorityPaneState() {
+    #expect(SidebarAgentTilePresentation.project(agent: "Claude Code", state: .thinking).kind == .claude)
+    #expect(SidebarAgentTilePresentation.project(agent: "Codex", state: .running).kind == .codex)
+    #expect(SidebarAgentTilePresentation.project(agent: "OpenCode", state: .output).kind == .openCode)
+    #expect(SidebarAgentTilePresentation.project(agent: "Pi", state: .waiting).kind == .pi)
+    #expect(SidebarAgentTilePresentation.project(agent: "Grok", state: .error).kind == .grok)
+    let shell = SidebarAgentTilePresentation.project(agent: nil, state: .idle)
+    #expect(shell.kind == .shell)
+    #expect(shell.accessibilityLabel == "Shell, Idle")
+    #expect(!shell.showsBadge)
+
+    let calm = PaneSnapshot(title: "Shell", workingDirectory: "/tmp")
+    let needy = PaneSnapshot(
+        title: "Review", workingDirectory: "/tmp", agent: "Codex", agentState: .needsAttention
+    )
+    let workspace = WorkspaceSnapshot(
+        name: "Work", focusedPaneID: calm.id,
+        layout: .split(axis: .horizontal, fraction: 0.5, first: .pane(calm), second: .pane(needy))
+    )
+    let rollup = SidebarAgentTilePresentation.project(workspace: workspace)
+    #expect(rollup.kind == .codex)
+    #expect(rollup.badgeSymbol == "!")
+    #expect(rollup.stateToken == "needs")
+    #expect(rollup.accessibilityLabel == "Codex, Needs Attention")
+}

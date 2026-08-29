@@ -160,6 +160,15 @@ help, and agent context while preserving the compact reference geometry.
   surface exposes the same panes as explicit `Jump to pane N` actions for the
   keyboard/screen-reader path. A real Pinned-row capture was inspected; full
   physical-pointer and Orca action invocation remain pending.
+- Workspace rows, lifted Needs Input/Pinned rows, collapsed-rail controls, and
+  multi-pane peek cards now share one provider-aware tile projection. Claude,
+  Codex, OpenCode, Pi, Grok, and shell retain distinct portable shapes and
+  reference tint families; non-idle states add a second shape/glyph signal, and
+  collapsed tiles reduce quiet states to dots while preserving explicit Needs
+  Input/Error marks. Workspace rollup selects the highest-priority pane state,
+  and accessible descriptions state provider plus status. Expanded, peek, and
+  collapsed real-app renders were inspected. Runtime agent-event ingestion and
+  the complete grayscale/high-contrast state matrix remain pending.
 - Needs Input acknowledgement is pane-scoped and persistent: a focused waiting
   pane acknowledges only after a guarded 500 ms dwell, while Ctrl-Shift-K and
   the row action acknowledge every waiting pane in that workspace immediately.
@@ -214,6 +223,7 @@ help, and agent context while preserving the compact reference geometry.
 5. Continue through the root implementation order, capturing each required
    visual milestone.
 
-The verified SwiftGtk4 baseline is committed locally as `260e917`. No
-implementation source commit has been pushed; only explicitly allowed
-visual-QA commits are on the remote.
+The verified SwiftGtk4 baseline began at `260e917`. Later implementation
+ancestors were unintentionally included when visual-QA commit `6a198bc` was
+pushed; that boundary mistake is recorded above, and subsequent implementation
+and screenshot work remains local pending explicit direction.

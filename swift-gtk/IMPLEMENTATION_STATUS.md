@@ -170,7 +170,14 @@ geometry and state styling have also passed a real-window visual correction.
   over Thinking; Output is intentionally excluded. Each rail group control
   opens a native, keyboard-operable roster with named `Jump to` workspace
   actions and refreshed accessible state text.
-- The full local preflight passes 59 Swift tests after the pane-peek milestone,
+- Workspace, lifted, collapsed-rail, and pane-peek surfaces now share a pure
+  provider-tile projection. Claude, Codex, OpenCode, Pi, Grok, and shell use
+  distinct portable shapes and reference tint families, while every non-idle
+  state adds a shape/glyph badge and accessible provider/status wording.
+  Workspace rollup is pane-aware and priority-tested; expanded, peek, and rail
+  variants were inspected in the real app. Exact owned vector outlines and the
+  full grayscale/high-contrast matrix remain pending.
+- The full local preflight passes 60 Swift tests after the provider-glyph milestone,
   followed by the release build, real two-terminal title/cwd integration, and
   100 two-surface lifecycle cycles.
 
