@@ -268,6 +268,14 @@ geometry and state styling have also passed a real-window visual correction.
   append, with process-scoped payload validation, filter lockout, no-op
   rejection, one mutation per accepted drop, and theme-aware indicators.
   Exact reorder announcements are projected by tested core formatters.
+- Split Right, Split Down, and Close Pane are now exported through the GTK app
+  action/menu/palette router. A split seeds one local shell from the focused
+  cwd, preserves every surviving Ghostty surface, focuses the new pane, and
+  refreshes all pane-owned chrome. Multi-pane close selects the next traversal
+  neighbor, prunes stale acknowledgement/unanswered identities, shows the
+  exact pane-risk sheet when required, and defers detached Ghostty destruction
+  until process exit. A real two-cycle right/down split-and-confirmed-close pass
+  preserved the original pane ID and cwd and finished with a clean runtime log.
 - `Close Workspace`, `Reopen Closed Workspace`, and `Clear Workspace` now have
   persistent model semantics and awesoMux-owned Ctrl-Shift-W, Ctrl-Shift-T,
   and Ctrl-Alt-Shift-W routing. Recovery is capped at 20 entries/24 hours,

@@ -80,14 +80,19 @@ private final class ApplicationState: @unchecked Sendable {
     private final class WorkspaceRuntime {
         var groupID: UUID
         let pageName: String
+        let page: BoxRef
+        var layoutRoot: WidgetRef
         let pathBar: FocusedPanePathBar
         var focusedPaneID: UUID
         var focusedSurface: TerminalSurface
 
-        init(groupID: UUID, pageName: String, pathBar: FocusedPanePathBar,
+        init(groupID: UUID, pageName: String, page: BoxRef, layoutRoot: WidgetRef,
+             pathBar: FocusedPanePathBar,
              focusedPaneID: UUID, focusedSurface: TerminalSurface) {
             self.groupID = groupID
             self.pageName = pageName
+            self.page = page
+            self.layoutRoot = layoutRoot
             self.pathBar = pathBar
             self.focusedPaneID = focusedPaneID
             self.focusedSurface = focusedSurface
@@ -206,6 +211,7 @@ private final class ApplicationState: @unchecked Sendable {
     private(set) var focusedSurface: TerminalSurface?
     private(set) var focusedPaneID: UUID?
     private var surfacesByPane: [UUID: TerminalSurface] = [:]
+    private var retiringSurfaces: [TerminalSurface] = []
     private var workspaceByPane: [UUID: UUID] = [:]
     private var surfaceGenerationByPane: [UUID: Int] = [:]
     private var lastAgentStateChangeAt: [UUID: Foundation.Date] = [:]
@@ -793,6 +799,87 @@ private final class ApplicationState: @unchecked Sendable {
         }
     }
 
+    private func buildMountedLayout(_ layout: PaneLayout) -> WidgetRef? {
+        switch layout {
+        case let .pane(pane):
+            guard let surface = surfacesByPane[pane.id] else { return nil }
+            surface.widget.setHexpand(expand: true)
+            surface.widget.setVexpand(expand: true)
+            return surface.widget
+        case let .split(axis, fraction, first, second):
+            guard let one = buildMountedLayout(first), let two = buildMountedLayout(second) else {
+                return nil
+            }
+            let paned = PanedRef(orientation: axis == .horizontal ? .horizontal : .vertical)
+            paned.setWideHandle(wide: true)
+            paned.setStart(child: one)
+            paned.setEnd(child: two)
+            let boundedFraction = min(max(fraction, 0.1), 0.9)
+            var appliedInitialPosition = false
+            _ = paned.onNotifyMaxPosition { paned, _ in
+                guard !appliedInitialPosition else { return }
+                let extent = axis == .horizontal ? paned.getWidth() : paned.getHeight()
+                guard extent > 1 else { return }
+                paned.set(position: Int((Double(extent) * boundedFraction).rounded()))
+                appliedInitialPosition = true
+            }
+            return WidgetRef(paned)
+        }
+    }
+
+    private func remountWorkspaceLayout(_ workspaceID: UUID) -> Bool {
+        guard let workspace = snapshot.workspace(id: workspaceID),
+              let runtime = runtimes[workspaceID],
+              workspace.layout.paneIDs.allSatisfy({ surfacesByPane[$0] != nil })
+        else { return false }
+
+        // Include panes removed by the just-committed model mutation. Their
+        // surfaces still belong to this workspace until remount succeeds and
+        // must be detached before their Ghostty runtime is destroyed.
+        let mountedWidgets = workspaceByPane.compactMap { paneID, ownerID in
+            ownerID == workspaceID ? surfacesByPane[paneID]?.widget : nil
+        }
+        for widget in mountedWidgets { _ = widget.ref() }
+        if runtime.layoutRoot.getParent()?.widget_ptr == runtime.page.widget_ptr {
+            runtime.page.remove(child: runtime.layoutRoot)
+        } else if runtime.layoutRoot.getParent() != nil {
+            runtime.layoutRoot.unparent()
+        }
+        // `runtime.layoutRoot` intentionally retains the old GtkPaned tree
+        // until the replacement is mounted. Removing that root from the page
+        // therefore does not detach its terminal children by itself; release
+        // each surviving surface from the old container before reparenting it.
+        for widget in mountedWidgets where widget.getParent() != nil {
+            widget.unparent()
+        }
+        guard let root = buildMountedLayout(workspace.layout) else {
+            for widget in mountedWidgets { widget.unref() }
+            return false
+        }
+        runtime.page.prepend(child: root)
+        runtime.layoutRoot = root
+        for widget in mountedWidgets { widget.unref() }
+        return true
+    }
+
+    private func discardPaneRuntime(_ paneID: UUID) {
+        let surface = surfacesByPane.removeValue(forKey: paneID)
+        workspaceByPane.removeValue(forKey: paneID)
+        surfaceGenerationByPane.removeValue(forKey: paneID)
+        lastAgentStateChangeAt.removeValue(forKey: paneID)
+        agentEventWatchers.removeValue(forKey: paneID)?.stop()
+        guard let surface else { return }
+        surfaces.removeAll { $0 === surface }
+        surface.requestClose()
+        retiringSurfaces.append(surface)
+        timeout(add: 50) { [weak self, weak surface] in
+            guard let self, let surface else { return false }
+            guard surface.processExited else { return true }
+            self.retiringSurfaces.removeAll { $0 === surface }
+            return false
+        }
+    }
+
     func surface(for paneID: UUID) -> TerminalSurface? { surfacesByPane[paneID] }
 
     private func terminalFocused(_ paneID: UUID) {
@@ -1139,8 +1226,10 @@ private final class ApplicationState: @unchecked Sendable {
     }
 
     func install(workspace: WorkspaceSnapshot, groupID: UUID, pageName: String,
-                 pathBar: FocusedPanePathBar, focusedSurface: TerminalSurface) {
+                 page: BoxRef, layoutRoot: WidgetRef, pathBar: FocusedPanePathBar,
+                 focusedSurface: TerminalSurface) {
         runtimes[workspace.id] = WorkspaceRuntime(groupID: groupID, pageName: pageName,
+            page: page, layoutRoot: layoutRoot,
             pathBar: pathBar, focusedPaneID: workspace.focusedPaneID, focusedSurface: focusedSurface)
     }
 
@@ -2372,7 +2461,8 @@ private final class ApplicationState: @unchecked Sendable {
             let pageName = workspace.id.uuidString; _ = pageName.withCString { stack.addNamed(child: page, name: $0) }
             appendWorkspaceRow(makeRow(workspace: workspace, groupID: group.id), to: body, groupID: group.id)
             sidebarRailRows?.append(child: makeRailRow(workspace: workspace))
-            install(workspace: workspace, groupID: group.id, pageName: pageName, pathBar: pathBar, focusedSurface: focused)
+            install(workspace: workspace, groupID: group.id, pageName: pageName,
+                page: page, layoutRoot: layout.0, pathBar: pathBar, focusedSurface: focused)
         }
         guard (try? snapshot.reopenMostRecentlyClosedWorkspace()) == workspaceID else {
             if rebuiltRuntime { removeWorkspaceUI(workspace) }
@@ -2752,6 +2842,7 @@ private final class ApplicationState: @unchecked Sendable {
         let implemented: Set<CommandID> = [.newWorkspace, .newWorkspaceInCurrentDirectory, .newWorkspaceGroup,
             .renameWorkspace, .acknowledgeWorkspace, .togglePinWorkspace,
             .closeWorkspace, .clearWorkspace, .reopenClosedWorkspace,
+            .splitRight, .splitDown, .closePane,
             .previousWorkspace, .nextWorkspace, .previousPane, .nextPane,
             .jumpWorkspace1, .jumpWorkspace2, .jumpWorkspace3, .jumpWorkspace4,
             .jumpWorkspace5, .jumpWorkspace6, .jumpWorkspace7, .jumpWorkspace8,
@@ -2833,13 +2924,20 @@ private final class ApplicationState: @unchecked Sendable {
         let implemented: Set<CommandID> = [.newWorkspace, .newWorkspaceInCurrentDirectory, .newWorkspaceGroup,
             .renameWorkspace, .acknowledgeWorkspace, .togglePinWorkspace,
             .closeWorkspace, .clearWorkspace, .reopenClosedWorkspace,
+            .splitRight, .splitDown, .closePane,
             .previousWorkspace, .nextWorkspace, .previousPane, .nextPane,
             .jumpWorkspace1, .jumpWorkspace2, .jumpWorkspace3, .jumpWorkspace4,
             .jumpWorkspace5, .jumpWorkspace6, .jumpWorkspace7, .jumpWorkspace8,
             .jumpWorkspace9,
             .focusSidebar, .toggleSidebarWidth, .toggleSidebarVisibility]
-        let selectedWorkspaceCommands: Set<CommandID> = [.renameWorkspace, .closeWorkspace, .clearWorkspace]
-        let sheetCommands: Set<CommandID> = [.newWorkspaceGroup, .renameWorkspace, .closeWorkspace, .clearWorkspace]
+        let selectedWorkspaceCommands: Set<CommandID> = [
+            .renameWorkspace, .closeWorkspace, .clearWorkspace,
+            .splitRight, .splitDown, .closePane,
+        ]
+        let sheetCommands: Set<CommandID> = [
+            .newWorkspaceGroup, .renameWorkspace, .closeWorkspace, .clearWorkspace,
+            .splitRight, .splitDown, .closePane,
+        ]
         let menu = GIO.Menu()
         for section in [CommandSection.file, .view, .workspace, .pane] {
             let submenu = GIO.Menu()
@@ -2874,6 +2972,11 @@ private final class ApplicationState: @unchecked Sendable {
         commandActions[.clearWorkspace]?.set(
             enabled: snapshot.selectedWorkspaceID != nil && activeSheetWindow == nil
         )
+        for command in [CommandID.splitRight, .splitDown, .closePane] {
+            commandActions[command]?.set(
+                enabled: snapshot.selectedWorkspaceID != nil && activeSheetWindow == nil
+            )
+        }
         commandActions[.reopenClosedWorkspace]?.set(enabled: !snapshot.recentlyClosedWorkspaces.isEmpty)
         for command in CommandID.allCases {
             if let index = command.workspaceJumpIndex {
@@ -2921,6 +3024,9 @@ private final class ApplicationState: @unchecked Sendable {
         case .nextWorkspace: selectRelative(1)
         case .previousPane: focusRelative(-1, runtime)
         case .nextPane: focusRelative(1, runtime)
+        case .splitRight: splitFocusedPane(.horizontal)
+        case .splitDown: splitFocusedPane(.vertical)
+        case .closePane: requestPrimaryClosePane()
         default: break
         }
     }
@@ -2994,7 +3100,8 @@ private final class ApplicationState: @unchecked Sendable {
         sidebarRailRows?.append(child: makeRailRow(workspace: workspace))
         groupCounts[group.id]?.label = "\(snapshot.groups.first(where: { $0.id == group.id })?.workspaces.filter { !$0.isSoftClosed }.count ?? 0)"
         refreshGroupActionEnablement()
-        install(workspace: workspace, groupID: group.id, pageName: pageName, pathBar: pathBar, focusedSurface: surface)
+        install(workspace: workspace, groupID: group.id, pageName: pageName,
+            page: page, layoutRoot: surface.widget, pathBar: pathBar, focusedSurface: surface)
         refreshCommandEnablement()
         select(workspace.id)
     }
@@ -3266,6 +3373,96 @@ private final class ApplicationState: @unchecked Sendable {
         persist()
     }
 
+    private func splitFocusedPane(_ axis: SplitAxis) {
+        guard activeSheetWindow == nil,
+              let workspaceID = snapshot.selectedWorkspaceID,
+              let workspace = snapshot.workspace(id: workspaceID),
+              let focusedPane = workspace.layout.pane(id: workspace.focusedPaneID),
+              focusedPane.ownership == .local
+        else { return }
+
+        let pane = PaneSnapshot(
+            title: "Primary terminal",
+            workingDirectory: focusedPane.workingDirectory,
+            ownership: .local
+        )
+        guard makeSurface(
+            pane: pane,
+            workspaceID: workspaceID,
+            label: "\(workspace.name) \(pane.title)",
+            description: "New terminal pane in the \(workspace.name) workspace"
+        ) != nil else { return }
+
+        do {
+            try snapshot.splitFocusedPane(in: workspaceID, axis: axis, newPane: pane)
+        } catch {
+            discardPaneRuntime(pane.id)
+            return
+        }
+        guard remountWorkspaceLayout(workspaceID) else {
+            discardPaneRuntime(pane.id)
+            return
+        }
+        refreshWorkspaceAgentTile(workspaceID)
+        refreshWorkspaceRowPresentation(workspaceID)
+        refreshLiftedRows()
+        sidebarFooter?.update(AgentFooterSummary(snapshot: snapshot))
+        rebuildWorkspaceContextMenu(workspaceID)
+        persist()
+        focus(pane.id)
+        announce(axis == .horizontal ? "Split pane right" : "Split pane down")
+    }
+
+    private func requestPrimaryClosePane() {
+        guard activeSheetWindow == nil,
+              let workspaceID = snapshot.selectedWorkspaceID,
+              let workspace = snapshot.workspace(id: workspaceID),
+              let paneIndex = workspace.layout.paneIDs.firstIndex(of: workspace.focusedPaneID)
+        else { return }
+        guard workspace.layout.paneCount > 1 else {
+            requestSoftCloseWorkspace(workspaceID)
+            return
+        }
+
+        let risks = closeRiskInputs(for: workspace)
+        let isRisk = risks.indices.contains(paneIndex)
+            && WorkspaceCloseRiskPolicy.decision(risks[paneIndex]).isRisk
+        guard isRisk else {
+            closeFocusedPaneNow(workspaceID)
+            return
+        }
+        let displayedTitle = SidebarWorkspaceTitle.resolve(workspace: workspace)
+        presentDestructiveConfirmation(
+            title: DestructiveClosePresentation.closePaneTitle(displayedTitle),
+            bodyText: DestructiveClosePresentation.closePaneBody(displayedTitle),
+            keyboardHint: DestructiveClosePresentation.closePaneHint,
+            destructiveTitle: "Close Pane"
+        ) { [weak self] in self?.closeFocusedPaneNow(workspaceID) }
+    }
+
+    private func closeFocusedPaneNow(_ workspaceID: UUID) {
+        guard let workspace = snapshot.workspace(id: workspaceID) else { return }
+        let closingPaneID = workspace.focusedPaneID
+        guard (try? snapshot.closeFocusedPane(in: workspaceID)) == .closePane(closingPaneID),
+              remountWorkspaceLayout(workspaceID),
+              let updated = snapshot.workspace(id: workspaceID),
+              let nextSurface = surfacesByPane[updated.focusedPaneID],
+              let runtime = runtimes[workspaceID]
+        else { return }
+
+        discardPaneRuntime(closingPaneID)
+        runtime.focusedPaneID = updated.focusedPaneID
+        runtime.focusedSurface = nextSurface
+        refreshWorkspaceAgentTile(workspaceID)
+        refreshWorkspaceRowPresentation(workspaceID)
+        refreshLiftedRows()
+        sidebarFooter?.update(AgentFooterSummary(snapshot: snapshot))
+        rebuildWorkspaceContextMenu(workspaceID)
+        persist()
+        focus(updated.focusedPaneID)
+        announce("Pane closed")
+    }
+
     private func selectRelative(_ offset: Int) {
         let previousSticky = snapshot.attentionStickyWorkspaceID
         let previousAttention = snapshot.attentionWorkspaceIDs
@@ -3480,7 +3677,8 @@ private func buildWindow(for application: Gtk.ApplicationRef) {
             let pageName = workspace.id.uuidString; _ = pageName.withCString { stack.addNamed(child: page, name: $0) }
             state.appendWorkspaceRow(state.makeRow(workspace: workspace, groupID: group.id), to: body, groupID: group.id)
             railRows.append(child: state.makeRailRow(workspace: workspace))
-            state.install(workspace: workspace, groupID: group.id, pageName: pageName, pathBar: pathBar, focusedSurface: focused)
+            state.install(workspace: workspace, groupID: group.id, pageName: pageName,
+                page: page, layoutRoot: layout.0, pathBar: pathBar, focusedSurface: focused)
         }
     }
 

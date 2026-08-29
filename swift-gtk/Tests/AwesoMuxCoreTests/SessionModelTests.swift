@@ -92,10 +92,29 @@ private func snapshot(_ workspaces: [WorkspaceSnapshot]) -> SessionSnapshot {
     #expect(value.workspaces[0].layout.paneIDs == [initial.focusedPaneID, newPane.id])
     #expect(value.workspaces[0].focusedPaneID == newPane.id)
 
+    value.groups[0].workspaces[0].acknowledgedAttentionPaneIDs = [newPane.id]
+    value.unansweredTurnPaneIDs.insert(newPane.id)
+
     let decision = try value.closeFocusedPane(in: initial.id)
     #expect(decision == .closePane(newPane.id))
     #expect(value.workspaces[0].layout.paneIDs == [initial.focusedPaneID])
     #expect(value.workspaces[0].focusedPaneID == initial.focusedPaneID)
+    #expect(value.workspaces[0].acknowledgedAttentionPaneIDs.isEmpty)
+    #expect(!value.unansweredTurnPaneIDs.contains(newPane.id))
+    _ = try value.validated()
+}
+
+@Test func closingFocusedPaneChoosesItsNextTraversalNeighbor() throws {
+    let initial = workspace(panes: 3)
+    let paneIDs = initial.layout.paneIDs
+    var value = snapshot([initial])
+    try value.focusPane(paneIDs[1], in: initial.id)
+
+    let decision = try value.closeFocusedPane(in: initial.id)
+
+    #expect(decision == .closePane(paneIDs[1]))
+    #expect(value.workspaces[0].layout.paneIDs == [paneIDs[0], paneIDs[2]])
+    #expect(value.workspaces[0].focusedPaneID == paneIDs[2])
 }
 
 @Test func selectingWorkspaceRejectsSoftClosedTarget() {
@@ -742,6 +761,11 @@ private func snapshot(_ workspaces: [WorkspaceSnapshot]) -> SessionSnapshot {
     ) == .indeterminate)
 
     let isolated = "\u{2068}Review\u{2069}"
+    #expect(DestructiveClosePresentation.closePaneTitle("Review") == "Close pane in \(isolated)?")
+    #expect(DestructiveClosePresentation.closePaneBody("Review")
+        == "The active pane in \(isolated) has activity that will be interrupted. Closing the pane will terminate the running process.")
+    #expect(DestructiveClosePresentation.closePaneHint
+        == "Press ⌘Return to close pane. Esc cancels.")
     #expect(DestructiveClosePresentation.closeWorkspaceTitle("Review") == "Close \(isolated)?")
     #expect(DestructiveClosePresentation.closeWorkspaceBody("Review")
         == "\(isolated) has activity that will be interrupted. Closing will terminate the running process.")

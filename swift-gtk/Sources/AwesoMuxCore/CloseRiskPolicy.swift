@@ -135,6 +135,7 @@ public enum WorkspaceCloseRiskPolicy {
 }
 
 public enum DestructiveClosePresentation {
+    public static let closePaneHint = "Press ⌘Return to close pane. Esc cancels."
     public static let closeWorkspaceHint = "Press ⌘Return to close workspace. Esc cancels."
     public static let closeGroupHint = "Press ⌘Return to close group. Esc cancels."
     public static let clearWorkspaceHint = "Press ⌘Return to clear workspace. Esc cancels."
@@ -149,6 +150,14 @@ public enum DestructiveClosePresentation {
 
     public static func closeWorkspaceTitle(_ rawTitle: String) -> String {
         "Close \(isolatedTitle(rawTitle))?"
+    }
+
+    public static func closePaneTitle(_ rawTitle: String) -> String {
+        "Close pane in \(isolatedTitle(rawTitle))?"
+    }
+
+    public static func closePaneBody(_ rawTitle: String) -> String {
+        "The active pane in \(isolatedTitle(rawTitle)) has activity that will be interrupted. Closing the pane will terminate the running process."
     }
 
     public static func closeWorkspaceBody(_ rawTitle: String) -> String {

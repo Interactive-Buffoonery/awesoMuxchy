@@ -511,22 +511,30 @@ public extension SessionSnapshot {
 
     mutating func closeFocusedPane(in workspaceID: UUID) throws -> CloseDecision {
         var decision: CloseDecision?
+        var closedPaneID: UUID?
         let visibleCount = workspaces.filter { !$0.isSoftClosed }.count
         try updateWorkspace(id: workspaceID) { workspace in
+            let paneIDs = workspace.layout.paneIDs
             decision = ClosePolicy.primaryClose(
                 workspace: workspace,
                 visibleWorkspaceCount: visibleCount
             )
             guard case let .closePane(paneID) = decision else { return }
+            closedPaneID = paneID
             guard let updated = workspace.layout.removingPane(id: paneID) else {
                 throw SessionMutationError.paneNotFound(paneID)
             }
             workspace.layout = updated
-            guard let nextFocus = updated.paneIDs.first else {
+            let remainingPaneIDs = paneIDs.filter { $0 != paneID }
+            guard let closedIndex = paneIDs.firstIndex(of: paneID),
+                  !remainingPaneIDs.isEmpty else {
                 throw SessionMutationError.paneNotFound(paneID)
             }
-            workspace.focusedPaneID = nextFocus
+            workspace.focusedPaneID = remainingPaneIDs[min(closedIndex, remainingPaneIDs.count - 1)]
+            workspace.acknowledgedAttentionPaneIDs.removeAll { $0 == paneID }
         }
+        if let closedPaneID { unansweredTurnPaneIDs.remove(closedPaneID) }
+        reconcileAttentionWorkspaceIDs()
         return decision ?? .closeWindow
     }
 

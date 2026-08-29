@@ -291,6 +291,18 @@ help, and agent context while preserving the compact reference geometry.
   surface exposes the same panes as explicit `Jump to pane N` actions for the
   keyboard/screen-reader path. A real Pinned-row capture was inspected; full
   physical-pointer and Orca action invocation remain pending.
+- `Split Right`, `Split Down`, and the primary `Close Pane` route are now real
+  GTK application actions and command-palette entries. Both split directions
+  inherit the focused local pane cwd, mint and focus exactly one Ghostty
+  surface, remount the authoritative layout without recreating surviving
+  terminals, and refresh the row, peek, agent, accessibility, and focused-pane
+  footer projections. Multi-pane close uses pane-specific live risk evidence
+  and exact reference confirmation copy; the last pane continues through the
+  existing soft-close workspace path. Closed surfaces are detached, generation
+  invalidated, asked to exit, and retained until Ghostty reports process exit,
+  avoiding synchronous GL teardown races. A clean real-app sequence exercised
+  Split Right → confirmed Close → Split Down → confirmed Close, preserved the
+  original pane identity/cwd, and emitted no GTK or runtime diagnostics.
 - Workspace rows, lifted Needs Input/Pinned rows, collapsed-rail controls, and
   multi-pane peek cards now share one provider-aware tile projection. Claude,
   Codex, OpenCode, Pi, Grok, and shell retain distinct owned scalable marks and
@@ -413,7 +425,8 @@ help, and agent context while preserving the compact reference geometry.
 
 1. Add the foreground-shell capability signal needed to gate inserted Git/gh
    commands as precisely as macOS does.
-2. Implement product-level split/close/recreate commands and teardown-race coverage.
+2. Implement split resize/reflow and direct pane-index focus commands on the
+   now-live split/close lifecycle.
 3. Physically verify pointer reorder and insertion indicators. Dynamic group
    menu enablement plus both left/right hidden attention reveal paths and timed
    retraction are captured and inspected.
