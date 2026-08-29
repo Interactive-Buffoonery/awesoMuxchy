@@ -1,5 +1,31 @@
 # Visual QA
 
+## 2026-08-29 — SwiftGtk4 sidebar search states
+
+- Linux images: [active title highlight](swift-gtk/progress/16-sidebar-search/active-highlight-x11.png)
+  and [no-matches panel](swift-gtk/progress/16-sidebar-search/no-matches-x11.png).
+- Reference: `SidebarSearchProjection.swift`, `SidebarView.swift`, and the
+  search/no-results localization catalog at macOS baseline
+  `fed33ff47c559344fc6db6fa53f16e75fcc4a116`.
+- Captured content size: 1440 × 852 on the verified X11/GLX path with two live,
+  independently rendered Ghostty panes.
+- Search behavior: the real GTK entry was edited through its named AT-SPI
+  `EditableText` interface. `review` projected only the Pinned match and
+  rendered its visible title range bold/underlined; `no such workspace`
+  rendered the exact query-bearing no-matches copy and working `Clear search`
+  action without mutating group disclosure.
+- Accessibility verification: AT-SPI exposed the entry as `Search sessions`
+  with `Text` and `EditableText`, and the no-results action as `Clear search`
+  with one named `Click` action. Invoking that action through AT-SPI returned
+  `true` and the entry's accessible text became empty.
+- Verification: both PNGs were opened and inspected at original resolution.
+  Search filtering, highlighting, no-results presentation, and accessible clear
+  routing were exercised in the real app; model coverage remains part of the
+  passing 70-test/full-preflight baseline.
+- Privacy: every group, workspace, provider, query, prompt, and path in the
+  fixture is synthetic. No terminal history, typed command, clipboard data,
+  credential, arbitrary agent output, or private path is shown.
+
 ## 2026-08-28 — SwiftGtk4 focused-footer long text
 
 - Linux image: [long repository path, branch, and dirty state](swift-gtk/progress/15-focused-footer-long-text/long-path-branch-dirty-x11.png).

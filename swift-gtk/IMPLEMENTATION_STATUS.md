@@ -127,6 +127,11 @@ geometry and state styling have also passed a real-window visual correction.
   no-matches copy and a working `Clear search` action. Escape clears or returns
   focus to the terminal, Up/Down moves a distinct current-result outline, and
   Return selects that workspace using projection order.
+- Real X11/GLX inspection now covers active Pinned-title highlighting and the
+  exact query-bearing no-matches panel. The live entry exposes `Text` and
+  `EditableText` under the `Search sessions` AT-SPI identity; `Clear search`
+  exposes a named action whose AT-SPI invocation returned true and emptied the
+  entry.
 - Visible title/location search matches now use tested case- and
   diacritic-insensitive UTF-8 byte ranges, applied as bold underlined Pango
   attributes to regular and lifted rows. Hidden-token matches remain truthful

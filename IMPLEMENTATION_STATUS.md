@@ -123,6 +123,10 @@ help, and agent context while preserving the compact reference geometry.
   title/location matches. GTK applies bold underlined Pango attributes to
   regular and lifted rows and clears them transactionally with the query;
   agent/state/group-only matches remain visible without inventing a highlight.
+- Real X11/GLX captures now cover a visible Pinned title highlight and the exact
+  query-bearing no-matches panel. The live `Search sessions` entry was edited
+  through AT-SPI `EditableText`; AT-SPI exposed `Clear search` as a named action,
+  and invoking it returned true and emptied the accessible text value.
 - The zero-group state now presents the reference first-launch workspace
   guidance and New Workspace action in the content area, with Reopen Closed
   Workspace appearing only when recovery exists. The 60-point rail renders
