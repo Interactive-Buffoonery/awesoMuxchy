@@ -169,6 +169,20 @@ help, and agent context while preserving the compact reference geometry.
   and accessible descriptions state provider plus status. Expanded, peek, and
   collapsed real-app renders were inspected. Runtime agent-event ingestion and
   the complete grayscale/high-contrast state matrix remain pending.
+- Expanded regular and lifted rows now reserve a stable trailing slot for a
+  24-point sibling close button that reveals on pointer or keyboard focus;
+  its click route cannot fall through to workspace selection. Group headers
+  use the same sibling-overlay rule and replace the count with `Close Group`
+  on hover/focus, while an expanded empty group leaves the action visible.
+  Filtering and collapsed group bodies suppress unsafe/resting variants through
+  a tested pure policy. Real hover renders and a soft-close/reopen round trip
+  were inspected without blank wrapper rows.
+- The collapsed rail now derives Control-1…9 digits and actions from the same
+  unfiltered lifted-first projection used to render its rows. A tested display
+  policy keeps digits hidden in expanded mode, action enablement follows the
+  current workspace count, and direct application-action QA proved exact first
+  workspace routing. The remote X11 synthetic-input limitation prevented a
+  trustworthy held-Control screenshot; physical held-key QA remains pending.
 - Needs Input acknowledgement is pane-scoped and persistent: a focused waiting
   pane acknowledges only after a guarded 500 ms dwell, while Ctrl-Shift-K and
   the row action acknowledge every waiting pane in that workspace immediately.

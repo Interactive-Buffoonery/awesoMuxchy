@@ -187,6 +187,38 @@ public struct SidebarAgentTilePresentation: Equatable, Sendable {
     }
 }
 
+public enum SidebarJumpNumberDisplay: Equatable, Sendable {
+    case hidden
+    case overlay
+    case belowTile
+
+    public static func resolve(
+        collapsed: Bool, alwaysShow: Bool, primaryModifierHeld: Bool
+    ) -> SidebarJumpNumberDisplay {
+        guard collapsed else { return .hidden }
+        if alwaysShow { return .belowTile }
+        return primaryModifierHeld ? .overlay : .hidden
+    }
+}
+
+public enum SidebarGroupClosePolicy {
+    public static func showsCloseButton(
+        pointerOrFocusInside: Bool,
+        isCollapsedRail: Bool,
+        isFiltering: Bool,
+        hasResolvedGroup: Bool,
+        isGroupEmpty: Bool,
+        isGroupCollapsed: Bool,
+        isDragActive: Bool
+    ) -> Bool {
+        let restsVisible = isGroupEmpty && !isGroupCollapsed && !isDragActive
+        return (pointerOrFocusInside || restsVisible)
+            && !isCollapsedRail
+            && !isFiltering
+            && hasResolvedGroup
+    }
+}
+
 public struct SidebarGroupSection: Equatable, Sendable {
     public let id: UUID
     public let name: String

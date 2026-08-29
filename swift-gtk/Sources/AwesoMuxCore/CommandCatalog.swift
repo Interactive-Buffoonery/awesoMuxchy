@@ -13,12 +13,36 @@ public enum CommandID: String, CaseIterable, Codable, Sendable {
     case splitDown
     case previousWorkspace
     case nextWorkspace
+    case jumpWorkspace1
+    case jumpWorkspace2
+    case jumpWorkspace3
+    case jumpWorkspace4
+    case jumpWorkspace5
+    case jumpWorkspace6
+    case jumpWorkspace7
+    case jumpWorkspace8
+    case jumpWorkspace9
     case previousPane
     case nextPane
     case commandPalette
     case keyboardShortcuts
     case toggleSidebarWidth
     case toggleSidebarVisibility
+
+    public var workspaceJumpIndex: Int? {
+        switch self {
+        case .jumpWorkspace1: 0
+        case .jumpWorkspace2: 1
+        case .jumpWorkspace3: 2
+        case .jumpWorkspace4: 3
+        case .jumpWorkspace5: 4
+        case .jumpWorkspace6: 5
+        case .jumpWorkspace7: 6
+        case .jumpWorkspace8: 7
+        case .jumpWorkspace9: 8
+        default: nil
+        }
+    }
 }
 
 public enum ShortcutModifier: String, Codable, CaseIterable, Hashable, Sendable {
@@ -105,6 +129,24 @@ public enum CommandCatalog {
               defaultChord: chord("[", .control, .shift)),
         .init(id: .nextWorkspace, action: "Next Workspace", section: .workspace,
               defaultChord: chord("]", .control, .shift)),
+        .init(id: .jumpWorkspace1, action: "Jump to Workspace 1", section: .workspace,
+              defaultChord: chord("1", .control)),
+        .init(id: .jumpWorkspace2, action: "Jump to Workspace 2", section: .workspace,
+              defaultChord: chord("2", .control)),
+        .init(id: .jumpWorkspace3, action: "Jump to Workspace 3", section: .workspace,
+              defaultChord: chord("3", .control)),
+        .init(id: .jumpWorkspace4, action: "Jump to Workspace 4", section: .workspace,
+              defaultChord: chord("4", .control)),
+        .init(id: .jumpWorkspace5, action: "Jump to Workspace 5", section: .workspace,
+              defaultChord: chord("5", .control)),
+        .init(id: .jumpWorkspace6, action: "Jump to Workspace 6", section: .workspace,
+              defaultChord: chord("6", .control)),
+        .init(id: .jumpWorkspace7, action: "Jump to Workspace 7", section: .workspace,
+              defaultChord: chord("7", .control)),
+        .init(id: .jumpWorkspace8, action: "Jump to Workspace 8", section: .workspace,
+              defaultChord: chord("8", .control)),
+        .init(id: .jumpWorkspace9, action: "Jump to Workspace 9", section: .workspace,
+              defaultChord: chord("9", .control)),
         .init(id: .previousPane, action: "Previous Pane", section: .pane,
               defaultChord: chord("[", .control, .alt)),
         .init(id: .nextPane, action: "Next Pane", section: .pane,

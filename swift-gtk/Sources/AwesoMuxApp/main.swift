@@ -4,6 +4,7 @@ import CGtk
 import Dispatch
 import Foundation
 import GIO
+import Gdk
 import GLib
 import GLibObject
 import Gtk
@@ -56,6 +57,105 @@ private final class ApplicationState: @unchecked Sendable {
         }
     }
 
+    private final class WorkspaceRowChrome {
+        let root: OverlayRef
+        let row: ToggleButtonRef
+        let close: ButtonRef
+        let motion: EventControllerMotion
+        let focus: EventControllerFocus
+        private var pointerInside = false
+        private var focusInside = false
+
+        init(row: ToggleButtonRef, onClose: @escaping () -> Void) {
+            self.row = row
+            root = OverlayRef(); root.add(cssClass: "aw-workspace-row")
+            root.setHalign(align: .fill); root.set(child: row)
+            close = ButtonRef(label: "×"); close.add(cssClass: "aw-row-close")
+            close.setSizeRequest(width: 24, height: 24)
+            close.setHalign(align: .end); close.setValign(align: .center)
+            close.setMarginEnd(margin: 8); close.set(visible: false)
+            close.setTooltip(text: "Close Workspace"); setAccessibleLabel(close, "Close Workspace")
+            close.onClicked { _ in onClose() }
+            root.addOverlay(widget: close)
+
+            motion = EventControllerMotion(); focus = EventControllerFocus()
+            motion.onEnter { [weak self] _, _, _ in self?.pointerInside = true; self?.refresh() }
+            motion.onLeave { [weak self] _ in self?.pointerInside = false; self?.refresh() }
+            focus.onEnter { [weak self] _ in self?.focusInside = true; self?.refresh() }
+            focus.onLeave { [weak self] _ in self?.focusInside = false; self?.refresh() }
+            _ = motion.ref(); _ = focus.ref()
+            gtk_widget_add_controller(root.widget_ptr, motion.event_controller_ptr)
+            gtk_widget_add_controller(root.widget_ptr, focus.event_controller_ptr)
+        }
+
+        private func refresh() { close.set(visible: pointerInside || focusInside) }
+
+        func detach() {
+            gtk_widget_remove_controller(root.widget_ptr, motion.event_controller_ptr)
+            gtk_widget_remove_controller(root.widget_ptr, focus.event_controller_ptr)
+            root.unparent()
+        }
+    }
+
+    private final class GroupHeaderChrome {
+        let root: OverlayRef
+        let close: ButtonRef
+        let count: LabelRef
+        let motion: EventControllerMotion
+        let focus: EventControllerFocus
+        var isFiltering = false { didSet { refresh() } }
+        var isEmpty: Bool { didSet { refresh() } }
+        var isCollapsed: Bool { didSet { refresh() } }
+        var isDragActive = false { didSet { refresh() } }
+        private var pointerInside = false
+        private var focusInside = false
+
+        init(
+            disclosure: ButtonRef, count: LabelRef, isEmpty: Bool, isCollapsed: Bool,
+            onClose: @escaping () -> Void
+        ) {
+            self.count = count; self.isEmpty = isEmpty; self.isCollapsed = isCollapsed
+            root = OverlayRef(); root.add(cssClass: "aw-group-header")
+            root.setHalign(align: .fill); root.setHexpand(expand: true); root.set(child: disclosure)
+            close = ButtonRef(label: "×"); close.add(cssClass: "aw-group-close")
+            close.setSizeRequest(width: 24, height: 24)
+            close.setHalign(align: .end); close.setValign(align: .center)
+            close.setMarginEnd(margin: 2); close.setTooltip(text: "Close Group")
+            setAccessibleLabel(close, "Close Group")
+            close.onClicked { _ in onClose() }
+            root.addOverlay(widget: close)
+
+            motion = EventControllerMotion(); focus = EventControllerFocus()
+            motion.onEnter { [weak self] _, _, _ in self?.pointerInside = true; self?.refresh() }
+            motion.onLeave { [weak self] _ in self?.pointerInside = false; self?.refresh() }
+            focus.onEnter { [weak self] _ in self?.focusInside = true; self?.refresh() }
+            focus.onLeave { [weak self] _ in self?.focusInside = false; self?.refresh() }
+            _ = motion.ref(); _ = focus.ref()
+            gtk_widget_add_controller(root.widget_ptr, motion.event_controller_ptr)
+            gtk_widget_add_controller(root.widget_ptr, focus.event_controller_ptr)
+            refresh()
+        }
+
+        func refresh() {
+            let visible = SidebarGroupClosePolicy.showsCloseButton(
+                pointerOrFocusInside: pointerInside || focusInside,
+                isCollapsedRail: false,
+                isFiltering: isFiltering,
+                hasResolvedGroup: true,
+                isGroupEmpty: isEmpty,
+                isGroupCollapsed: isCollapsed,
+                isDragActive: isDragActive
+            )
+            close.set(visible: visible); count.set(visible: !visible)
+        }
+
+        func detach() {
+            gtk_widget_remove_controller(root.widget_ptr, motion.event_controller_ptr)
+            gtk_widget_remove_controller(root.widget_ptr, focus.event_controller_ptr)
+            root.unparent()
+        }
+    }
+
     let terminalRuntime: TerminalRuntime
     private(set) var snapshot: SessionSnapshot
     private let store: SessionStore
@@ -71,7 +171,9 @@ private final class ApplicationState: @unchecked Sendable {
     private var surfaceGenerationByPane: [UUID: Int] = [:]
     private var runtimes: [UUID: WorkspaceRuntime] = [:]
     private var rows: [UUID: ToggleButtonRef] = [:]
+    private var regularRowChrome: [UUID: WorkspaceRowChrome] = [:]
     private var railRows: [UUID: ToggleButtonRef] = [:]
+    private var railJumpNumberLabels: [UUID: LabelRef] = [:]
     private var railGroupRows: [UUID: MenuButtonRef] = [:]
     private var railGroupAttentionLabels: [UUID: LabelRef] = [:]
     private var metadata: [UUID: LabelRef] = [:]
@@ -86,6 +188,7 @@ private final class ApplicationState: @unchecked Sendable {
     private var groupAttentionLabels: [UUID: LabelRef] = [:]
     private var groupCreateRows: [UUID: ButtonRef] = [:]
     private var groupDisclosures: [UUID: ButtonRef] = [:]
+    private var groupHeaderChrome: [UUID: GroupHeaderChrome] = [:]
     private var groupMoveUpActions: [UUID: ButtonRef] = [:]
     private var groupMoveDownActions: [UUID: ButtonRef] = [:]
     private var groupCloseActions: [UUID: ButtonRef] = [:]
@@ -99,6 +202,7 @@ private final class ApplicationState: @unchecked Sendable {
     private var pinnedSectionBody: BoxRef?
     private var attentionRows: [UUID: ToggleButtonRef] = [:]
     private var pinnedRows: [UUID: ToggleButtonRef] = [:]
+    private var liftedRowChrome: [UUID: WorkspaceRowChrome] = [:]
     private var liftedTitles: [UUID: LabelRef] = [:]
     private var workspaceContextControllers: [UUID: GestureClick] = [:]
     private var workspaceContextPopovers: [UUID: PopoverRef] = [:]
@@ -147,6 +251,8 @@ private final class ApplicationState: @unchecked Sendable {
     private var sidebarMotionController: EventControllerMotion?
     private var searchKeyController: EventControllerKey?
     private var sidebarNavigationKeyController: EventControllerKey?
+    private var globalModifierKeyController: EventControllerKey?
+    private var isWorkspaceJumpModifierHeld = false
     private var lastWorkspaceCreateAt: ContinuousClock.Instant?
     private var context = FocusedPaneContextCoordinator()
     private var actions: [GIO.SimpleAction] = []
@@ -367,6 +473,7 @@ private final class ApplicationState: @unchecked Sendable {
             collapsedSidebarWidget?.set(visible: false)
             expandedSidebarWidget?.set(visible: true)
         }
+        refreshRailJumpNumbers()
     }
 
     func makePathBar() -> FocusedPanePathBar {
@@ -559,6 +666,7 @@ private final class ApplicationState: @unchecked Sendable {
               let group = snapshot.groups.first(where: { $0.id == groupID }) else { return }
         groupBodies[groupID]?.set(visible: !group.isCollapsed)
         groupChevrons[groupID]?.label = group.isCollapsed ? "›" : "⌄"
+        groupHeaderChrome[groupID]?.isCollapsed = group.isCollapsed
         refreshGroupAttention(groupID)
         if let disclosure = groupDisclosures[groupID] { setAccessibleExpanded(disclosure, !group.isCollapsed) }
         persist()
@@ -582,13 +690,20 @@ private final class ApplicationState: @unchecked Sendable {
         let visibleGroupIDs = Set(projection.groups.map(\.id))
         for group in snapshot.groups {
             for id in workspaceIDsByGroup[group.id] ?? [] {
-                rows[id]?.set(visible: regularWorkspaceIDs.contains(id))
+                let visible = regularWorkspaceIDs.contains(id)
+                rows[id]?.set(visible: visible); regularRowChrome[id]?.root.set(visible: visible)
             }
             groupRoots[group.id]?.set(visible: !projection.isFiltering || visibleGroupIDs.contains(group.id))
             groupBodies[group.id]?.set(visible: projection.isFiltering ? visibleGroupIDs.contains(group.id) : !group.isCollapsed)
         }
-        for (id, row) in attentionRows { row.set(visible: attentionWorkspaceIDs.contains(id)) }
-        for (id, row) in pinnedRows { row.set(visible: pinnedWorkspaceIDs.contains(id)) }
+        for (id, row) in attentionRows {
+            let visible = attentionWorkspaceIDs.contains(id)
+            row.set(visible: visible); liftedRowChrome[id]?.root.set(visible: visible)
+        }
+        for (id, row) in pinnedRows {
+            let visible = pinnedWorkspaceIDs.contains(id)
+            row.set(visible: visible); liftedRowChrome[id]?.root.set(visible: visible)
+        }
         attentionSectionRoot?.set(visible: !projection.attention.isEmpty)
         pinnedSectionRoot?.set(visible: !projection.pinned.isEmpty)
         refreshRailProjection(projection)
@@ -632,6 +747,7 @@ private final class ApplicationState: @unchecked Sendable {
             previous = WidgetRef(row)
         }
         for (id, row) in railRows where !visible.contains(id) { row.set(visible: false) }
+        refreshRailJumpNumbers()
         guard !projection.isFiltering else {
             for row in railGroupRows.values { row.set(visible: false) }
             return
@@ -650,6 +766,23 @@ private final class ApplicationState: @unchecked Sendable {
         }
     }
 
+    private func refreshRailJumpNumbers() {
+        let order = SidebarLiftedProjection.project(snapshot: snapshot, query: "").orderedWorkspaceIDs
+        let indexed = Dictionary(
+            uniqueKeysWithValues: order.prefix(9).enumerated().map { ($0.element, $0.offset + 1) }
+        )
+        let display = SidebarJumpNumberDisplay.resolve(
+            collapsed: preferences.sidebarWidth < SidebarWidthPolicy.railThreshold,
+            alwaysShow: false,
+            primaryModifierHeld: isWorkspaceJumpModifierHeld
+        )
+        for (id, label) in railJumpNumberLabels {
+            guard let index = indexed[id] else { label.set(visible: false); continue }
+            label.label = "\(index)"
+            label.set(visible: display == .overlay)
+        }
+    }
+
     func attachSearch(entry: SearchEntryRef, noMatches: BoxRef, description: LabelRef) {
         sidebarSearchEntry = entry
         noMatchesRoot = noMatches
@@ -662,6 +795,31 @@ private final class ApplicationState: @unchecked Sendable {
 
     func retainSidebarNavigationController(_ controller: EventControllerKey) {
         sidebarNavigationKeyController = controller
+    }
+
+    func retainGlobalModifierController(_ controller: EventControllerKey) {
+        globalModifierKeyController = controller
+    }
+
+    func handleGlobalKeyPressed(_ keyval: UInt, state: Gdk.ModifierType) -> Bool {
+        let held = keyval == UInt(GDK_KEY_Control_L)
+            || keyval == UInt(GDK_KEY_Control_R)
+            || state.contains(.controlMask)
+        if held != isWorkspaceJumpModifierHeld {
+            isWorkspaceJumpModifierHeld = held
+            refreshRailJumpNumbers()
+        }
+        return false
+    }
+
+    func handleGlobalKeyReleased(_ keyval: UInt, state: Gdk.ModifierType) {
+        let held = keyval != UInt(GDK_KEY_Control_L)
+            && keyval != UInt(GDK_KEY_Control_R)
+            && state.contains(.controlMask)
+        if held != isWorkspaceJumpModifierHeld {
+            isWorkspaceJumpModifierHeld = held
+            refreshRailJumpNumbers()
+        }
     }
 
     private func sidebarNavigationWidgets() -> [WidgetRef] {
@@ -751,13 +909,13 @@ private final class ApplicationState: @unchecked Sendable {
             pathBar: pathBar, focusedPaneID: workspace.focusedPaneID, focusedSurface: focusedSurface)
     }
 
-    func makeRow(workspace: WorkspaceSnapshot, groupID: UUID) -> ToggleButtonRef {
+    func makeRow(workspace: WorkspaceSnapshot, groupID: UUID) -> OverlayRef {
         let row = ToggleButtonRef(); row.add(cssClass: "aw-row"); row.setHalign(align: .fill)
         let groupIndex = snapshot.groups.firstIndex(where: { $0.id == groupID }) ?? 0
         let group = snapshot.groups[groupIndex]
         let groupColor = SidebarTintProjection.resolvedColor(for: group, unfilteredIndex: groupIndex)
         row.add(cssClass: "aw-\(groupColor.rawValue)")
-        let content = BoxRef(orientation: .horizontal, spacing: 10)
+        let content = BoxRef(orientation: .horizontal, spacing: 10); content.setMarginEnd(margin: 28)
         let agentTile = SidebarAgentTilePresentation.project(workspace: workspace)
         content.append(child: makeAgentTile(agentTile, size: 32))
         let details = BoxRef(orientation: .vertical, spacing: 2); details.setHexpand(expand: true)
@@ -780,7 +938,9 @@ private final class ApplicationState: @unchecked Sendable {
         installWorkspacePanePeek(on: row, workspace: workspace)
         rows[workspace.id] = row; metadata[workspace.id] = meta; workspaceTitles[workspace.id] = name
         if !(workspaceIDsByGroup[groupID] ?? []).contains(workspace.id) { workspaceIDsByGroup[groupID, default: []].append(workspace.id) }
-        return row
+        let chrome = WorkspaceRowChrome(row: row) { [weak self] in self?.softCloseWorkspace(workspace.id) }
+        regularRowChrome[workspace.id] = chrome
+        return chrome.root
     }
 
     func makeRailRow(workspace: WorkspaceSnapshot) -> ToggleButtonRef {
@@ -788,13 +948,22 @@ private final class ApplicationState: @unchecked Sendable {
         button.add(cssClass: "aw-rail-row")
         button.setSizeRequest(width: 40, height: 40)
         let agentTile = SidebarAgentTilePresentation.project(workspace: workspace)
-        button.set(child: makeAgentTile(agentTile, size: 28, collapsed: true))
+        let content = OverlayRef()
+        content.set(child: makeAgentTile(agentTile, size: 28, collapsed: true))
+        let jumpNumber = LabelRef(str: ""); jumpNumber.add(cssClass: "aw-jump-overlay")
+        jumpNumber.setSizeRequest(width: 40, height: 40)
+        jumpNumber.setHalign(align: .center); jumpNumber.setValign(align: .center)
+        jumpNumber.set(visible: false)
+        content.addOverlay(widget: jumpNumber)
+        button.set(child: content)
         let displayedTitle = SidebarWorkspaceTitle.resolve(workspace: workspace)
         button.setTooltip(text: displayedTitle)
         setAccessibleLabel(button, displayedTitle)
         setAccessibleDescription(button, "Workspace; \(agentTile.accessibilityLabel)")
         button.onClicked { [weak self] _ in self?.select(workspace.id) }
         railRows[workspace.id] = button
+        railJumpNumberLabels[workspace.id] = jumpNumber
+        refreshRailJumpNumbers()
         return button
     }
 
@@ -1076,11 +1245,11 @@ private final class ApplicationState: @unchecked Sendable {
         }
     }
 
-    func makeLiftedRow(_ item: LiftedSidebarWorkspaceRow, attention: Bool) -> ToggleButtonRef? {
+    func makeLiftedRow(_ item: LiftedSidebarWorkspaceRow, attention: Bool) -> OverlayRef? {
         guard let workspace = snapshot.workspace(id: item.row.id) else { return nil }
         let button = ToggleButtonRef(); button.add(cssClass: "aw-row"); button.setHalign(align: .fill)
         button.add(cssClass: "aw-\((item.originGroupColor ?? .blue).rawValue)")
-        let content = BoxRef(orientation: .horizontal, spacing: 10)
+        let content = BoxRef(orientation: .horizontal, spacing: 10); content.setMarginEnd(margin: 28)
         let agentTile = SidebarAgentTilePresentation.project(workspace: workspace)
         content.append(child: makeAgentTile(agentTile, size: 32))
         let details = BoxRef(orientation: .vertical, spacing: 2); details.setHexpand(expand: true)
@@ -1098,7 +1267,9 @@ private final class ApplicationState: @unchecked Sendable {
         installWorkspaceContextMenu(on: button, workspaceID: workspace.id, groupID: item.originGroupID, isLifted: true)
         liftedTitles[workspace.id] = title
         if attention { attentionRows[workspace.id] = button } else { pinnedRows[workspace.id] = button }
-        return button
+        let chrome = WorkspaceRowChrome(row: button) { [weak self] in self?.softCloseWorkspace(workspace.id) }
+        liftedRowChrome[workspace.id] = chrome
+        return chrome.root
     }
 
     private func installWorkspaceContextMenu(
@@ -1305,26 +1476,26 @@ private final class ApplicationState: @unchecked Sendable {
         else { return }
         workspaceIDsByGroup[sourceID]?.removeAll { $0 == workspaceID }
         workspaceIDsByGroup[groupID, default: []].append(workspaceID)
-        let previousDestinationRow = destination.workspaces.last.flatMap { rows[$0.id] }
-        if let row = rows[workspaceID], let body = groupBodies[groupID] {
+        let previousDestinationRow = destination.workspaces.last.flatMap { regularRowChrome[$0.id]?.root }
+        if let row = rows[workspaceID], let chrome = regularRowChrome[workspaceID], let body = groupBodies[groupID] {
             if let controller = workspaceContextControllers.removeValue(forKey: workspaceID) {
                 gtk_widget_remove_controller(row.widget_ptr, controller.event_controller_ptr)
             }
             workspaceContextPopovers.removeValue(forKey: workspaceID)?.unparent()
-            row.unparent()
+            chrome.root.unparent()
             for color in WorkspaceGroupColor.allCases { row.remove(cssClass: "aw-\(color.rawValue)") }
             let destinationIndex = snapshot.groups.firstIndex(where: { $0.id == groupID }) ?? 0
             let color = SidebarTintProjection.resolvedColor(for: destination, unfilteredIndex: destinationIndex)
             row.add(cssClass: "aw-\(color.rawValue)")
-            body.append(child: row)
-            body.reorderChildAfter(child: row, sibling: previousDestinationRow)
+            body.append(child: chrome.root)
+            body.reorderChildAfter(child: chrome.root, sibling: previousDestinationRow)
             installWorkspaceContextMenu(on: row, workspaceID: workspaceID, groupID: groupID)
         }
         runtimes[workspaceID]?.groupID = groupID
         groupCounts[sourceID]?.label = "\(snapshot.groups.first(where: { $0.id == sourceID })?.workspaces.filter { !$0.isSoftClosed }.count ?? 0)"
         groupCounts[groupID]?.label = "\(snapshot.groups.first(where: { $0.id == groupID })?.workspaces.filter { !$0.isSoftClosed }.count ?? 0)"
         let affected = (workspaceIDsByGroup[sourceID] ?? []) + (workspaceIDsByGroup[groupID] ?? [])
-        refreshLiftedRows()
+        refreshLiftedRows(); refreshGroupActionEnablement()
         performOnGTKMain { [weak self] in for id in affected { self?.rebuildWorkspaceContextMenu(id) } }
         persist()
     }
@@ -1333,7 +1504,8 @@ private final class ApplicationState: @unchecked Sendable {
         let closesLastWorkspace = snapshot.workspaces.filter({ !$0.isSoftClosed }).count == 1
         guard let groupID = snapshot.groups.first(where: { $0.workspaces.contains { $0.id == workspaceID } })?.id,
               (try? snapshot.softCloseWorkspace(workspaceID)) != nil else { return }
-        rows[workspaceID]?.set(visible: false); railRows[workspaceID]?.set(visible: false)
+        rows[workspaceID]?.set(visible: false); regularRowChrome[workspaceID]?.root.set(visible: false)
+        liftedRowChrome[workspaceID]?.root.set(visible: false); railRows[workspaceID]?.set(visible: false)
         dismissWorkspacePanePeek(workspaceID)
         groupCounts[groupID]?.label = "\(snapshot.groups.first(where: { $0.id == groupID })?.workspaces.filter { !$0.isSoftClosed }.count ?? 0)"
         refreshLiftedRows(); refreshCommandEnablement()
@@ -1365,7 +1537,8 @@ private final class ApplicationState: @unchecked Sendable {
             if rebuiltRuntime { removeWorkspaceUI(workspace) }
             return
         }
-        rows[workspaceID]?.set(visible: true); railRows[workspaceID]?.set(visible: true)
+        rows[workspaceID]?.set(visible: true); regularRowChrome[workspaceID]?.root.set(visible: true)
+        railRows[workspaceID]?.set(visible: true)
         reorderGroupRows(group.id)
         groupCounts[group.id]?.label = "\(group.workspaces.filter { !$0.isSoftClosed }.count)"
         refreshLiftedRows(); refreshCommandEnablement(); select(workspaceID)
@@ -1373,12 +1546,12 @@ private final class ApplicationState: @unchecked Sendable {
 
     private func reorderGroupRows(_ groupID: UUID) {
         guard let body = groupBodies[groupID], let group = snapshot.groups.first(where: { $0.id == groupID }) else { return }
-        var previous: ToggleButtonRef?
+        var previous: OverlayRef?
         for workspace in group.workspaces where !workspace.isSoftClosed {
-            guard let row = rows[workspace.id] else { continue }
-            if let previous { body.reorderChildAfter(child: row, sibling: previous) }
-            else { body.reorderChildAfter(child: WidgetRef(row), sibling: nil as WidgetRef?) }
-            previous = row
+            guard let root = regularRowChrome[workspace.id]?.root else { continue }
+            if let previous { body.reorderChildAfter(child: root, sibling: previous) }
+            else { body.reorderChildAfter(child: WidgetRef(root), sibling: nil as WidgetRef?) }
+            previous = root
         }
         if let create = groupCreateRows[groupID] {
             if let previous { body.reorderChildAfter(child: WidgetRef(create), sibling: WidgetRef(previous)) }
@@ -1412,7 +1585,7 @@ private final class ApplicationState: @unchecked Sendable {
               let removed = try? snapshot.clearWorkspace(workspaceID) else { return }
         removeWorkspaceUI(removed)
         groupCounts[groupID]?.label = "\(snapshot.groups.first(where: { $0.id == groupID })?.workspaces.filter { !$0.isSoftClosed }.count ?? 0)"
-        refreshLiftedRows(); refreshCommandEnablement()
+        refreshLiftedRows(); refreshGroupActionEnablement(); refreshCommandEnablement()
         if let selected = snapshot.selectedWorkspaceID { select(selected) }
         else { refreshEmptyState(); persist() }
     }
@@ -1431,7 +1604,10 @@ private final class ApplicationState: @unchecked Sendable {
             surfaceGenerationByPane.removeValue(forKey: paneID)
         }
         surfaces.removeAll { surface in paneSurfaces.contains { $0 === surface } }
-        runtimes.removeValue(forKey: workspace.id); rows.removeValue(forKey: workspace.id)?.unparent()
+        runtimes.removeValue(forKey: workspace.id); rows.removeValue(forKey: workspace.id)
+        regularRowChrome.removeValue(forKey: workspace.id)?.detach()
+        liftedRowChrome.removeValue(forKey: workspace.id)?.detach()
+        railJumpNumberLabels.removeValue(forKey: workspace.id)
         metadata.removeValue(forKey: workspace.id); workspaceTitles.removeValue(forKey: workspace.id)
         regularPinActions.removeValue(forKey: workspace.id)
         if let rail = railRows.removeValue(forKey: workspace.id) { sidebarRailRows?.remove(child: rail) }
@@ -1446,15 +1622,16 @@ private final class ApplicationState: @unchecked Sendable {
         for (id, row) in attentionRows {
             if workspacePanePeekHosts[id]?.widget_ptr == row.widget_ptr { removeWorkspacePanePeek(id) }
             if let controller = liftedContextControllers[id] { gtk_widget_remove_controller(row.widget_ptr, controller.event_controller_ptr) }
-            liftedContextPopovers[id]?.unparent(); row.unparent()
+            liftedContextPopovers[id]?.unparent(); liftedRowChrome.removeValue(forKey: id)?.detach()
         }
         for (id, row) in pinnedRows {
             if workspacePanePeekHosts[id]?.widget_ptr == row.widget_ptr { removeWorkspacePanePeek(id) }
             if let controller = liftedContextControllers[id] { gtk_widget_remove_controller(row.widget_ptr, controller.event_controller_ptr) }
-            liftedContextPopovers[id]?.unparent(); row.unparent()
+            liftedContextPopovers[id]?.unparent(); liftedRowChrome.removeValue(forKey: id)?.detach()
         }
         attentionRows.removeAll(); pinnedRows.removeAll()
         liftedTitles.removeAll()
+        liftedRowChrome.removeAll()
         liftedPinActions.removeAll(); liftedContextControllers.removeAll(); liftedContextPopovers.removeAll()
         let projection = SidebarLiftedProjection.project(snapshot: snapshot, query: sidebarSearchEntry?.text ?? "")
         for item in projection.attention {
@@ -1527,7 +1704,14 @@ private final class ApplicationState: @unchecked Sendable {
         content.append(child: chevron); content.append(child: marker); content.append(child: name)
         content.append(child: attention); content.append(child: count)
         disclosure.set(child: content); disclosure.onClicked { [weak self] _ in self?.toggleGroup(projection.id) }
-        header.append(child: disclosure)
+        let groupChrome = GroupHeaderChrome(
+            disclosure: disclosure,
+            count: count,
+            isEmpty: group.workspaces.isEmpty,
+            isCollapsed: group.isCollapsed
+        ) { [weak self] in self?.presentCloseGroupConfirmation(group.id) }
+        groupHeaderChrome[group.id] = groupChrome
+        header.append(child: groupChrome.root)
 
         let options = MenuButtonRef(); options.add(cssClass: "aw-group-options")
         options.set(iconName: "view-more-symbolic"); options.set(alwaysShowArrow: false); options.set(hasFrame: false)
@@ -1572,10 +1756,10 @@ private final class ApplicationState: @unchecked Sendable {
         return (root, body)
     }
 
-    func appendWorkspaceRow(_ row: ToggleButtonRef, to body: BoxRef, groupID: UUID) {
-        body.append(child: row)
+    func appendWorkspaceRow(_ root: OverlayRef, to body: BoxRef, groupID: UUID) {
+        body.append(child: root)
         if let create = groupCreateRows[groupID] {
-            body.reorderChildAfter(child: WidgetRef(create), sibling: WidgetRef(row))
+            body.reorderChildAfter(child: WidgetRef(create), sibling: WidgetRef(root))
         }
     }
 
@@ -1694,11 +1878,17 @@ private final class ApplicationState: @unchecked Sendable {
             .renameWorkspace, .acknowledgeWorkspace, .togglePinWorkspace,
             .closeWorkspace, .clearWorkspace, .reopenClosedWorkspace,
             .previousWorkspace, .nextWorkspace, .previousPane, .nextPane,
+            .jumpWorkspace1, .jumpWorkspace2, .jumpWorkspace3, .jumpWorkspace4,
+            .jumpWorkspace5, .jumpWorkspace6, .jumpWorkspace7, .jumpWorkspace8,
+            .jumpWorkspace9,
             .toggleSidebarWidth, .toggleSidebarVisibility]
         var commandRows: [(String, ButtonRef)] = []
         for definition in CommandCatalog.definitions where implemented.contains(definition.id) {
             let button = ButtonRef(label: definition.action)
             button.add(cssClass: "aw-menu-row"); button.setHalign(align: .fill)
+            if let index = definition.id.workspaceJumpIndex {
+                button.set(sensitive: workspaceJumpOrder().indices.contains(index))
+            }
             button.onClicked { [weak self, window] _ in
                 window.close(); self?.perform(definition.id)
             }
@@ -1723,6 +1913,9 @@ private final class ApplicationState: @unchecked Sendable {
             .renameWorkspace, .acknowledgeWorkspace, .togglePinWorkspace,
             .closeWorkspace, .clearWorkspace, .reopenClosedWorkspace,
             .previousWorkspace, .nextWorkspace, .previousPane, .nextPane,
+            .jumpWorkspace1, .jumpWorkspace2, .jumpWorkspace3, .jumpWorkspace4,
+            .jumpWorkspace5, .jumpWorkspace6, .jumpWorkspace7, .jumpWorkspace8,
+            .jumpWorkspace9,
             .toggleSidebarWidth, .toggleSidebarVisibility]
         let menu = GIO.Menu()
         for section in [CommandSection.file, .view, .workspace, .pane] {
@@ -1730,7 +1923,8 @@ private final class ApplicationState: @unchecked Sendable {
             for definition in CommandCatalog.definitions where definition.section == section {
                 let action = GIO.SimpleAction(name: definition.id.rawValue, parameterType: nil as VariantTypeRef?)
                 action.set(enabled: implemented.contains(definition.id)
-                    && (definition.id != .reopenClosedWorkspace || !snapshot.recentlyClosedWorkspaces.isEmpty))
+                    && (definition.id != .reopenClosedWorkspace || !snapshot.recentlyClosedWorkspaces.isEmpty)
+                    && (definition.id.workspaceJumpIndex.map { workspaceJumpOrder().indices.contains($0) } ?? true))
                 action.onActivate { [weak self] _, _ in self?.perform(definition.id) }
                 application.add(action: action)
                 commandActions[definition.id] = action
@@ -1746,6 +1940,11 @@ private final class ApplicationState: @unchecked Sendable {
     private func refreshCommandEnablement() {
         pruneExpiredClosedWorkspaces()
         commandActions[.reopenClosedWorkspace]?.set(enabled: !snapshot.recentlyClosedWorkspaces.isEmpty)
+        for command in CommandID.allCases {
+            if let index = command.workspaceJumpIndex {
+                commandActions[command]?.set(enabled: workspaceJumpOrder().indices.contains(index))
+            }
+        }
     }
 
     private func pruneExpiredClosedWorkspaces() {
@@ -1768,6 +1967,7 @@ private final class ApplicationState: @unchecked Sendable {
         if command == .reopenClosedWorkspace { reopenMostRecentlyClosedWorkspace(); return }
         if command == .toggleSidebarWidth { toggleSidebarWidth(); return }
         if command == .toggleSidebarVisibility { toggleSidebarVisibility(); return }
+        if let index = command.workspaceJumpIndex { selectWorkspace(atFlatIndex: index); return }
         guard let selected = snapshot.selectedWorkspaceID, let runtime = runtimes[selected] else { return }
         switch command {
         case .renameWorkspace: presentWorkspaceNameDialog(selected)
@@ -1776,13 +1976,26 @@ private final class ApplicationState: @unchecked Sendable {
         case .closeWorkspace: softCloseWorkspace(selected)
         case .clearWorkspace: presentClearWorkspaceConfirmation(selected)
         case .reopenClosedWorkspace: break
-        case .toggleSidebarWidth, .toggleSidebarVisibility: break
+        case .toggleSidebarWidth, .toggleSidebarVisibility,
+             .jumpWorkspace1, .jumpWorkspace2, .jumpWorkspace3, .jumpWorkspace4,
+             .jumpWorkspace5, .jumpWorkspace6, .jumpWorkspace7, .jumpWorkspace8,
+             .jumpWorkspace9: break
         case .previousWorkspace: selectRelative(-1)
         case .nextWorkspace: selectRelative(1)
         case .previousPane: focusRelative(-1, runtime)
         case .nextPane: focusRelative(1, runtime)
         default: break
         }
+    }
+
+    private func workspaceJumpOrder() -> [UUID] {
+        SidebarLiftedProjection.project(snapshot: snapshot, query: "").orderedWorkspaceIDs
+    }
+
+    private func selectWorkspace(atFlatIndex index: Int) {
+        let order = workspaceJumpOrder()
+        guard order.indices.contains(index) else { return }
+        select(order[index])
     }
 
     private var selectedOwningGroup: WorkspaceGroupSnapshot? {
@@ -1838,7 +2051,9 @@ private final class ApplicationState: @unchecked Sendable {
         body.set(visible: true)
         sidebarRailRows?.append(child: makeRailRow(workspace: workspace))
         groupCounts[group.id]?.label = "\(snapshot.groups.first(where: { $0.id == group.id })?.workspaces.filter { !$0.isSoftClosed }.count ?? 0)"
+        refreshGroupActionEnablement()
         install(workspace: workspace, groupID: group.id, pageName: pageName, pathBar: pathBar, focusedSurface: surface)
+        refreshCommandEnablement()
         select(workspace.id)
     }
 
@@ -1941,6 +2156,9 @@ private final class ApplicationState: @unchecked Sendable {
             groupMoveDownActions[group.id]?.set(sensitive: !isSidebarFiltering && index < snapshot.groups.count - 1)
             groupCloseActions[group.id]?.set(sensitive: !isSidebarFiltering)
             groupCreateRows[group.id]?.set(visible: !isSidebarFiltering && !group.isCollapsed)
+            groupHeaderChrome[group.id]?.isFiltering = isSidebarFiltering
+            groupHeaderChrome[group.id]?.isEmpty = group.workspaces.isEmpty
+            groupHeaderChrome[group.id]?.isCollapsed = group.isCollapsed
         }
     }
 
@@ -2001,11 +2219,15 @@ private final class ApplicationState: @unchecked Sendable {
             surfaces.removeAll { surface in paneSurfaces.contains { $0 === surface } }
             runtimes.removeValue(forKey: workspace.id)
             rows.removeValue(forKey: workspace.id)
+            regularRowChrome.removeValue(forKey: workspace.id)?.detach()
+            liftedRowChrome.removeValue(forKey: workspace.id)?.detach()
+            railJumpNumberLabels.removeValue(forKey: workspace.id)
             metadata.removeValue(forKey: workspace.id)
             workspaceTitles.removeValue(forKey: workspace.id)
             regularPinActions.removeValue(forKey: workspace.id)
             if let rail = railRows.removeValue(forKey: workspace.id) { sidebarRailRows?.remove(child: rail) }
         }
+        groupHeaderChrome.removeValue(forKey: groupID)?.detach()
         if let root = groupRoots.removeValue(forKey: groupID) { groupsContainer?.remove(child: root) }
         if let railGroup = railGroupRows.removeValue(forKey: groupID) { sidebarRailRows?.remove(child: railGroup) }
         railGroupAttentionLabels.removeValue(forKey: groupID)
@@ -2269,6 +2491,19 @@ private func buildWindow(for application: Gtk.ApplicationRef) {
         edgeTab: edgeTab,
         host: sidebarHost
     )
+    let modifierKeys = EventControllerKey()
+    modifierKeys.onKeyPressed { [weak state] _, keyval, _, modifiers in
+        state?.handleGlobalKeyPressed(keyval, state: modifiers) ?? false
+    }
+    modifierKeys.onKeyReleased { [weak state] _, keyval, _, modifiers in
+        state?.handleGlobalKeyReleased(keyval, state: modifiers)
+    }
+    gtk_event_controller_set_propagation_phase(
+        modifierKeys.event_controller_ptr, GTK_PHASE_CAPTURE
+    )
+    _ = modifierKeys.ref()
+    state.retainGlobalModifierController(modifierKeys)
+    gtk_widget_add_controller(window.widget_ptr, modifierKeys.event_controller_ptr)
     main.append(child: sidebarHost); root.append(child: main)
     window.set(child: root); window.present()
     state.filter("")

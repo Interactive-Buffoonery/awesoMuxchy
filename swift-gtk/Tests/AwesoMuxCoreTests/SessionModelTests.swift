@@ -871,3 +871,43 @@ private func snapshot(_ workspaces: [WorkspaceSnapshot]) -> SessionSnapshot {
     #expect(rollup.stateToken == "needs")
     #expect(rollup.accessibilityLabel == "Codex, Needs Attention")
 }
+
+@Test func collapsedJumpNumbersRevealOnlyForTheConfiguredMode() {
+    #expect(SidebarJumpNumberDisplay.resolve(
+        collapsed: false, alwaysShow: true, primaryModifierHeld: true
+    ) == .hidden)
+    #expect(SidebarJumpNumberDisplay.resolve(
+        collapsed: true, alwaysShow: false, primaryModifierHeld: false
+    ) == .hidden)
+    #expect(SidebarJumpNumberDisplay.resolve(
+        collapsed: true, alwaysShow: false, primaryModifierHeld: true
+    ) == .overlay)
+    #expect(SidebarJumpNumberDisplay.resolve(
+        collapsed: true, alwaysShow: true, primaryModifierHeld: false
+    ) == .belowTile)
+    #expect(CommandID.jumpWorkspace1.workspaceJumpIndex == 0)
+    #expect(CommandID.jumpWorkspace9.workspaceJumpIndex == 8)
+    #expect(CommandID.nextWorkspace.workspaceJumpIndex == nil)
+}
+
+@Test func groupCloseAffordanceReplacesCountOnlyWhenSafeAndDiscoverable() {
+    func shows(
+        hover: Bool = false, rail: Bool = false, filtering: Bool = false,
+        resolved: Bool = true, empty: Bool = false, collapsed: Bool = false,
+        dragging: Bool = false
+    ) -> Bool {
+        SidebarGroupClosePolicy.showsCloseButton(
+            pointerOrFocusInside: hover, isCollapsedRail: rail, isFiltering: filtering,
+            hasResolvedGroup: resolved, isGroupEmpty: empty,
+            isGroupCollapsed: collapsed, isDragActive: dragging
+        )
+    }
+    #expect(!shows())
+    #expect(shows(hover: true))
+    #expect(shows(empty: true))
+    #expect(!shows(hover: true, rail: true))
+    #expect(!shows(hover: true, filtering: true))
+    #expect(!shows(hover: true, resolved: false))
+    #expect(!shows(empty: true, collapsed: true))
+    #expect(!shows(empty: true, dragging: true))
+}

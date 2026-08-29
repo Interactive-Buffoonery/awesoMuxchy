@@ -177,7 +177,14 @@ geometry and state styling have also passed a real-window visual correction.
   Workspace rollup is pane-aware and priority-tested; expanded, peek, and rail
   variants were inspected in the real app. Exact owned vector outlines and the
   full grayscale/high-contrast matrix remain pending.
-- The full local preflight passes 60 Swift tests after the provider-glyph milestone,
+- Expanded regular/lifted rows now use sibling overlays for hover/focus-revealed
+  24-point close controls, preserving the row's selection hit target. Group
+  headers replace their count with a separately focusable close action under a
+  tested filter/collapse/empty/drag safety policy. The collapsed rail exposes
+  Control-1…9 actions and transient digits from one lifted-first order. Real
+  hover and close/reopen renders were inspected; physical held-Control input
+  remains pending because synthetic X11 input does not reach this session.
+- The full local preflight passes 62 Swift tests after the row-chrome milestone,
   followed by the release build, real two-terminal title/cwd integration, and
   100 two-surface lifecycle cycles.
 
