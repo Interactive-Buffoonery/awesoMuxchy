@@ -1,5 +1,37 @@
 # Visual QA
 
+## 2026-08-28 — SwiftGtk4 Needs Input transition
+
+- Linux images: [selected workspace in Needs Input](swift-gtk/progress/14-needs-input-transition/selected-needs-input-x11.png)
+  and [acknowledged workspace returned to its origin group](swift-gtk/progress/14-needs-input-transition/returned-to-origin-x11.png).
+- Reference: `SidebarAttentionProjection.swift`,
+  `SelectionAcknowledgementCoordinator.swift`, and the Needs Input transition
+  handling in `SidebarView.swift` at macOS baseline
+  `fed33ff47c559344fc6db6fa53f16e75fcc4a116`.
+- Behavior exercised: the exported real `Acknowledge Workspace` application
+  action acknowledged the selected pane, removed the workspace from the
+  synthetic section, restored the same row inside its unchanged origin group,
+  and kept both real Ghostty surfaces alive. The persisted synthetic fixture
+  changed from one ordered attention workspace and zero acknowledged panes to
+  zero attention workspaces and one acknowledged pane.
+- Model correction: Needs Input membership and arrival order now come from one
+  authoritative reconciled list. A selected row remains sticky after the
+  passive 500 ms read dwell until navigation away, while permission and
+  explicit-input prompts refuse passive acknowledgement. The sticky is
+  runtime-only and is not restored from JSON.
+- Verification: both 1440 × 852 images were opened and inspected at original
+  resolution on the verified X11/GLX path. Seventy Swift tests cover arrival
+  order, repeat signals, sticky dwell/demotion, blocking prompts, projection
+  membership, and persistence boundaries. Full local preflight, release
+  terminal integration, and 100 two-surface lifecycle cycles pass.
+- Remaining interaction evidence: remote synthetic focus could not reliably
+  move focus between the two real terminal surfaces, so the passive dwell's
+  physical timing and its spoken return announcement remain keyboard/Orca QA
+  items rather than being inferred from this explicit-action capture.
+- Privacy: the profile contains only synthetic workspace, pane, provider, and
+  state data. No terminal history, typed commands, clipboard data, credentials,
+  arbitrary agent output, or private path is shown.
+
 ## 2026-08-28 — SwiftGtk4 agent activity routing
 
 - Linux images: [expanded grouped activity panel](swift-gtk/progress/13-agent-activity-routing/expanded-activity-panel-x11.png),
