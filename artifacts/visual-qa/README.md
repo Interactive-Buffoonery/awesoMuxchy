@@ -13,7 +13,9 @@
   caps workspace results at 50, exposes curated suggestions for a bare query,
   and maps a leading `>` to actions-only mode. Bare Return has no implicit
   target; Up/Down clamps from either edge, Return opens the exact selected
-  workspace/action, and Escape dismisses.
+  workspace/action, and Escape dismisses. A tested follow-up geometry policy
+  preserves the 520×420 card when space permits, applies a 16-point inset in
+  narrow windows, and scrolls keyboard-selected results into view.
 - Real-app QA: AT-SPI invoked the collapsed 40-point `Search` action, found one
   editable `Command palette search`, verified `WORKSPACES` and `SUGGESTED`
   sections plus result positions, entered `> split`, and observed only the two
@@ -26,7 +28,7 @@
   `Baseline`/`awesoMux`/`/tmp` fixture, exact placeholder, separate result
   sections/counts, no selected result before user input, footer keyboard hints,
   border, rounded corners, and complete shadow without terminal pixels.
-- Verification: full preflight passes the text baseline, all 119 Swift tests,
+- Verification: full preflight passes the text baseline, all 121 Swift tests,
   warnings-as-errors and release builds, single-window and dynamic-command
   probes, both forced-termination cases, terminal integration, and 100
   two-surface lifecycle cycles.

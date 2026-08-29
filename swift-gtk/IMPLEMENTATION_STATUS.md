@@ -206,7 +206,10 @@ geometry and state styling have also passed a real-window visual correction.
   Bare Return remains inert until selection; Up/Down, Return, and Escape use a
   tested clamped policy and exact target routing. Real AT-SPI opened it through
   collapsed Search, verified editable unified/actions-only results and result
-  positions, and a privacy-safe 606×506 Latte popup surface was inspected.
+  positions, and a privacy-safe 606×506 Latte popup surface was inspected. Its
+  tested geometry keeps the preferred 520×420 card at normal sizes, applies a
+  16-point inset on narrow windows, and keeps arrow-selected rows within the
+  native scroll viewport.
 - Visible title/location search matches now use tested case- and
   diacritic-insensitive fuzzy scoring with word-boundary/contiguous bonuses,
   bounded gap penalties, and best-alignment selection. Every matched UTF-8 byte

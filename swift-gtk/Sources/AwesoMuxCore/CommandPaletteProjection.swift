@@ -48,6 +48,30 @@ public enum CommandPaletteSelectionPolicy {
     }
 }
 
+public struct CommandPaletteGeometry: Equatable, Sendable {
+    public static let preferredWidth = 520
+    public static let preferredHeight = 420
+    public static let edgeInset = 16
+
+    public let width: Int
+    public let height: Int
+    public let anchorX: Int
+    public let anchorY: Int
+
+    public static func fit(parentWidth: Int, parentHeight: Int) -> Self {
+        let safeWidth = max(1, parentWidth)
+        let safeHeight = max(1, parentHeight)
+        let width = min(preferredWidth, max(1, safeWidth - edgeInset * 2))
+        let height = min(preferredHeight, max(1, safeHeight - edgeInset * 2))
+        return Self(
+            width: width,
+            height: height,
+            anchorX: safeWidth / 2,
+            anchorY: max(0, (safeHeight - height) / 2)
+        )
+    }
+}
+
 /// A GTK-neutral projection of the pinned unified command-palette contract.
 /// Workspaces precede actions, filtering is fuzzy and stable, and a leading
 /// `>` enters the reference actions-only namespace.

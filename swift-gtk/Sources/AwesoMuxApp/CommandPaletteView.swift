@@ -1,9 +1,11 @@
 import AwesoMuxCore
+import CGraphene
 import CGtk
 import Gdk
 import GLib
 import Gtk
 import Pango
+import struct Graphene.RectRef
 
 final class CommandPaletteController: @unchecked Sendable {
     let popover = PopoverRef()
@@ -12,6 +14,7 @@ final class CommandPaletteController: @unchecked Sendable {
     private let search = SearchEntryRef()
     private let mode = LabelRef(str: "›")
     private let results = BoxRef(orientation: .vertical, spacing: 0)
+    private let scroller = ScrolledWindowRef()
     private let resultCount = LabelRef(str: "0 results")
     private let snapshot: SessionSnapshot
     private let definitions: [CommandDefinition]
@@ -46,13 +49,11 @@ final class CommandPaletteController: @unchecked Sendable {
         selectedIndex = projection.defaultSelectionIndex
 
         root.add(cssClass: "aw-palette")
-        root.setSizeRequest(width: 520, height: 420)
         setAccessibleLabel(root, "Command Palette")
         setAccessibleDescription(
             root, "Type to search workspaces and actions. Press Escape to dismiss."
         )
         root.append(child: makeSearchHeader())
-        let scroller = ScrolledWindowRef()
         scroller.setVexpand(expand: true)
         scroller.set(child: results)
         root.append(child: scroller)
@@ -85,10 +86,12 @@ final class CommandPaletteController: @unchecked Sendable {
 
     func present() {
         if let parent = popover.getParent() {
-            let width = max(parent.getWidth(), 520)
-            let height = max(parent.getHeight(), 420)
+            let geometry = CommandPaletteGeometry.fit(
+                parentWidth: parent.getWidth(), parentHeight: parent.getHeight()
+            )
+            root.setSizeRequest(width: geometry.width, height: geometry.height)
             var rectangle = GdkRectangle(
-                x: Int32(width / 2), y: Int32(max(0, (height - 420) / 2)),
+                x: Int32(geometry.anchorX), y: Int32(geometry.anchorY),
                 width: 1, height: 1
             )
             withUnsafePointer(to: &rectangle) {
@@ -268,6 +271,27 @@ final class CommandPaletteController: @unchecked Sendable {
             if selected { button.add(cssClass: "aw-palette-selected") }
             else { button.remove(cssClass: "aw-palette-selected") }
             setAccessibleSelected(button, selected)
+        }
+        scrollSelectionIntoView()
+    }
+
+    private func scrollSelectionIntoView() {
+        guard let selectedIndex, resultButtons.indices.contains(selectedIndex) else { return }
+        var storage = graphene_rect_t()
+        let bounds: RectRef = withUnsafeMutablePointer(to: &storage) { RectRef($0) }
+        guard resultButtons[selectedIndex].computeBounds(target: results, outBounds: bounds)
+        else { return }
+        guard let adjustment = gtk_scrolled_window_get_vadjustment(scroller.scrolled_window_ptr)
+        else { return }
+        let current = gtk_adjustment_get_value(adjustment)
+        let pageSize = gtk_adjustment_get_page_size(adjustment)
+        guard pageSize > 0 else { return }
+        let rowTop = Double(bounds.y)
+        let rowBottom = rowTop + Double(bounds.height)
+        if rowTop < current {
+            gtk_adjustment_set_value(adjustment, rowTop)
+        } else if rowBottom > current + pageSize {
+            gtk_adjustment_set_value(adjustment, rowBottom - pageSize)
         }
     }
 

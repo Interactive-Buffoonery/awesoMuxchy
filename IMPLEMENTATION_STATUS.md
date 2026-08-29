@@ -221,7 +221,9 @@ help, and agent context while preserving the compact reference geometry.
   routes the exact workspace or enabled command, and Escape dismisses. Real
   AT-SPI invoked collapsed Search, edited both modes, and verified section,
   result-position, and action semantics; the focused Latte capture was
-  inspected at original resolution.
+  inspected at original resolution. A tested geometry policy retains the
+  520×420 reference size when space permits and insets the card within narrow
+  windows; keyboard selection scrolls the exact selected result into view.
 - Workspace-group state now has tested safe create/rename, explicit color,
   stable-ID reorder, cross-group workspace movement, and populated close with
   deterministic replacement selection. GTK headers expose the corresponding

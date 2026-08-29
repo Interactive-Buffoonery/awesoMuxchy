@@ -2,6 +2,30 @@ import Foundation
 import Testing
 @testable import AwesoMuxCore
 
+@Test func commandPaletteGeometryUsesPreferredSizeAndCentersInLargeParent() {
+    #expect(
+        CommandPaletteGeometry.fit(parentWidth: 1440, parentHeight: 852)
+            == CommandPaletteGeometry(
+                width: 520, height: 420, anchorX: 720, anchorY: 216
+            )
+    )
+}
+
+@Test func commandPaletteGeometryFitsWithinNarrowParentInsets() {
+    #expect(
+        CommandPaletteGeometry.fit(parentWidth: 360, parentHeight: 300)
+            == CommandPaletteGeometry(
+                width: 328, height: 268, anchorX: 180, anchorY: 16
+            )
+    )
+    #expect(
+        CommandPaletteGeometry.fit(parentWidth: 20, parentHeight: 20)
+            == CommandPaletteGeometry(
+                width: 1, height: 1, anchorX: 10, anchorY: 9
+            )
+    )
+}
+
 @Test func commandPaletteUnifiesWorkspacesAndSuggestedActionsWithoutImplicitSubmission() throws {
     let first = paletteWorkspace(name: "API Server", directory: "/srv/api")
     let second = paletteWorkspace(name: "Docs", directory: "/srv/docs")
