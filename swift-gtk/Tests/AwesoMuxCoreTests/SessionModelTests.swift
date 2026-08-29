@@ -762,3 +762,22 @@ private func snapshot(_ workspaces: [WorkspaceSnapshot]) -> SessionSnapshot {
     #expect(!context.path.contains("\u{202E}"))
     #expect(!context.path.contains("\n"))
 }
+
+@Test func collapsedGroupAttentionPrioritizesActionableStatesAndExcludesOutput() {
+    let needs = PaneSnapshot(title: "Needs", workingDirectory: "/tmp", agentState: .needsAttention)
+    let error = PaneSnapshot(title: "Error", workingDirectory: "/tmp", agentState: .error)
+    let thinking = PaneSnapshot(title: "Thinking", workingDirectory: "/tmp", agentState: .thinking)
+    let output = PaneSnapshot(title: "Output", workingDirectory: "/tmp", agentState: .output)
+    let group = WorkspaceGroupSnapshot(name: "Agents", workspaces: [
+        WorkspaceSnapshot(name: "Needs", focusedPaneID: needs.id, layout: .pane(needs)),
+        WorkspaceSnapshot(name: "Error", focusedPaneID: error.id, layout: .pane(error)),
+        WorkspaceSnapshot(name: "Thinking", focusedPaneID: thinking.id, layout: .pane(thinking)),
+        WorkspaceSnapshot(name: "Output", focusedPaneID: output.id, layout: .pane(output)),
+    ])
+    let summary = CollapsedGroupAttention.resolve(group: group)
+    #expect(summary.needsAttention == 1)
+    #expect(summary.errors == 1)
+    #expect(summary.thinking == 1)
+    #expect(summary.primaryState == .needsAttention)
+    #expect(summary.accessibilityPhrase == "1 need input, 1 error, 1 thinking")
+}

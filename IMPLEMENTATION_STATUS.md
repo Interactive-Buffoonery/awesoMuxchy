@@ -138,6 +138,11 @@ help, and agent context while preserving the compact reference geometry.
   drives edge enablement. GTK reorders the existing row and collapsed rail
   projections while retaining terminal runtimes, then refreshes affected menus
   after each identity-based mutation.
+- Collapsed group headers now preserve hidden agent visibility with a tested
+  Needs Input/Error/Thinking rollup (in that priority order, excluding passive
+  Output). The 60-point rail includes group buttons whose native popovers list
+  every live workspace as an explicit keyboard/screen-reader `Jump to` action;
+  roster names and counts refresh after model mutations.
 - Needs Input acknowledgement is pane-scoped and persistent: a focused waiting
   pane acknowledges only after a guarded 500 ms dwell, while Ctrl-Shift-K and
   the row action acknowledge every waiting pane in that workspace immediately.

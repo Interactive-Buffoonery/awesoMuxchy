@@ -153,6 +153,11 @@ geometry and state styling have also passed a real-window visual correction.
   the authoritative model. Compact targets are at least 24 points. Footer
   state chips are real buttons that open a state-filtered activity panel, and
   Orca discovers the live app through AT-SPI.
+- Collapsed group attention is projected once from pane agent states and shared
+  by expanded-header and rail signals. Needs Input wins over Error, which wins
+  over Thinking; Output is intentionally excluded. Each rail group control
+  opens a native, keyboard-operable roster with named `Jump to` workspace
+  actions and refreshed accessible state text.
 
 ## Remaining vertical-slice hardening
 
@@ -161,8 +166,8 @@ geometry and state styling have also passed a real-window visual correction.
 - Automated pointer selection, hover, scroll, primary selection, and pending
   clipboard teardown tests.
 - Automated destructive-dialog interaction and restored daemon continuity.
-- Collapsed/hidden/right-side presentation, Arrow/Home/End list navigation,
-  Orca state inspection, richer group actions,
+- Collapsed/hidden/right-side presentation, pointer roster hover cards,
+  Orca state inspection, group move announcements,
   foreground-shell detection, full settings panes, and agent runtime event
   ingestion remain after this footer milestone.
 

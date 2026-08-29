@@ -71,6 +71,8 @@ private final class ApplicationState: @unchecked Sendable {
     private var runtimes: [UUID: WorkspaceRuntime] = [:]
     private var rows: [UUID: ToggleButtonRef] = [:]
     private var railRows: [UUID: ToggleButtonRef] = [:]
+    private var railGroupRows: [UUID: MenuButtonRef] = [:]
+    private var railGroupAttentionLabels: [UUID: LabelRef] = [:]
     private var metadata: [UUID: LabelRef] = [:]
     private var workspaceTitles: [UUID: LabelRef] = [:]
     private var workspaceIDsByGroup: [UUID: [UUID]] = [:]
@@ -80,6 +82,7 @@ private final class ApplicationState: @unchecked Sendable {
     private var groupCounts: [UUID: LabelRef] = [:]
     private var groupNames: [UUID: LabelRef] = [:]
     private var groupMarkers: [UUID: LabelRef] = [:]
+    private var groupAttentionLabels: [UUID: LabelRef] = [:]
     private var groupCreateRows: [UUID: ButtonRef] = [:]
     private var groupDisclosures: [UUID: ButtonRef] = [:]
     private var groupMoveUpActions: [UUID: ButtonRef] = [:]
@@ -467,6 +470,7 @@ private final class ApplicationState: @unchecked Sendable {
               let group = snapshot.groups.first(where: { $0.id == groupID }) else { return }
         groupBodies[groupID]?.set(visible: !group.isCollapsed)
         groupChevrons[groupID]?.label = group.isCollapsed ? "›" : "⌄"
+        refreshGroupAttention(groupID)
         if let disclosure = groupDisclosures[groupID] { setAccessibleExpanded(disclosure, !group.isCollapsed) }
         persist()
     }
@@ -515,7 +519,7 @@ private final class ApplicationState: @unchecked Sendable {
         let visible = Set(projection.orderedWorkspaceIDs)
         let attention = Set(projection.attention.map { $0.row.id })
         let pinned = Set(projection.pinned.map { $0.row.id })
-        var previous: ToggleButtonRef?
+        var previous: WidgetRef?
         for id in projection.orderedWorkspaceIDs {
             guard let row = railRows[id] else { continue }
             row.set(visible: true)
@@ -533,13 +537,29 @@ private final class ApplicationState: @unchecked Sendable {
                 row.setTooltip(text: ChromeText.sanitized(snapshot.workspace(id: id)?.name ?? "Workspace", limit: 120))
             }
             if let previous {
-                sidebarRailRows.reorderChildAfter(child: row, sibling: previous)
+                sidebarRailRows.reorderChildAfter(child: WidgetRef(row), sibling: previous)
             } else {
                 sidebarRailRows.reorderChildAfter(child: WidgetRef(row), sibling: nil as WidgetRef?)
             }
-            previous = row
+            previous = WidgetRef(row)
         }
         for (id, row) in railRows where !visible.contains(id) { row.set(visible: false) }
+        guard !projection.isFiltering else {
+            for row in railGroupRows.values { row.set(visible: false) }
+            return
+        }
+        let lifted = Set(projection.attention.map { $0.row.id } + projection.pinned.map { $0.row.id })
+        for group in snapshot.groups {
+            guard let groupRow = railGroupRows[group.id] else { continue }
+            groupRow.set(visible: true)
+            sidebarRailRows.reorderChildAfter(child: WidgetRef(groupRow), sibling: previous)
+            previous = WidgetRef(groupRow)
+            for workspace in group.workspaces where !workspace.isSoftClosed && !lifted.contains(workspace.id) {
+                guard let row = railRows[workspace.id] else { continue }
+                sidebarRailRows.reorderChildAfter(child: WidgetRef(row), sibling: previous)
+                previous = WidgetRef(row)
+            }
+        }
     }
 
     func attachSearch(entry: SearchEntryRef, noMatches: BoxRef, description: LabelRef) {
@@ -685,6 +705,63 @@ private final class ApplicationState: @unchecked Sendable {
         button.onClicked { [weak self] _ in self?.select(workspace.id) }
         railRows[workspace.id] = button
         return button
+    }
+
+    func makeRailGroupRow(group: WorkspaceGroupSnapshot, color: WorkspaceGroupColor?) -> MenuButtonRef {
+        let button = MenuButtonRef(); button.add(cssClass: "aw-rail-group")
+        button.set(alwaysShowArrow: false); button.set(hasFrame: false)
+        button.setSizeRequest(width: 40, height: 28)
+        let content = BoxRef(orientation: .vertical, spacing: 2)
+        let marker = LabelRef(str: "━"); marker.add(cssClass: "aw-rail-group-marker")
+        marker.add(cssClass: "aw-\((color ?? .blue).rawValue)")
+        let attention = LabelRef(str: ""); attention.add(cssClass: "aw-rail-group-attention")
+        content.append(child: marker); content.append(child: attention); button.set(child: content)
+        railGroupRows[group.id] = button; railGroupAttentionLabels[group.id] = attention
+        refreshRailGroupRoster(group.id); refreshGroupAttention(group.id)
+        return button
+    }
+
+    private func refreshRailGroupRoster(_ groupID: UUID) {
+        guard let group = snapshot.groups.first(where: { $0.id == groupID }), let button = railGroupRows[groupID] else { return }
+        let safeName = ChromeText.sanitized(group.name, limit: 120)
+        button.setTooltip(text: "\(safeName) workspace group")
+        setAccessibleLabel(button, "\(safeName) workspace group roster")
+        let roster = BoxRef(orientation: .vertical, spacing: 2); roster.add(cssClass: "aw-popover")
+        let heading = LabelRef(str: safeName.uppercased())
+        heading.add(cssClass: "aw-menu-heading"); heading.xalign = 0; roster.append(child: heading)
+        for workspace in group.workspaces where !workspace.isSoftClosed {
+            let workspaceName = ChromeText.sanitized(workspace.name, limit: 120)
+            let row = ButtonRef(label: workspaceName); row.add(cssClass: "aw-menu-row"); row.setHalign(align: .fill)
+            setAccessibleLabel(row, "Jump to \(workspaceName)")
+            row.onClicked { [weak self, button] _ in self?.select(workspace.id); button.popdown() }
+            roster.append(child: row)
+        }
+        let popover = PopoverRef(); popover.set(child: roster); button.set(popover: popover)
+    }
+
+    private func refreshGroupAttention(_ groupID: UUID) {
+        guard let group = snapshot.groups.first(where: { $0.id == groupID }) else { return }
+        let summary = CollapsedGroupAttention.resolve(group: group)
+        let visible = group.isCollapsed && summary.primaryState != nil
+        let symbol: String
+        switch summary.primaryState {
+        case .needsAttention: symbol = "!"
+        case .error: symbol = "×"
+        case .thinking: symbol = "…"
+        case nil: symbol = ""
+        }
+        groupAttentionLabels[groupID]?.label = visible ? symbol : ""
+        groupAttentionLabels[groupID]?.set(visible: visible)
+        railGroupAttentionLabels[groupID]?.label = visible ? symbol : ""
+        railGroupAttentionLabels[groupID]?.set(visible: visible)
+        let count = group.workspaces.filter { !$0.isSoftClosed }.count
+        let suffix = visible ? "; \(summary.accessibilityPhrase)" : ""
+        if let disclosure = groupDisclosures[groupID] {
+            setAccessibleDescription(disclosure, "\(count) workspaces; \(group.isCollapsed ? "Collapsed" : "Expanded")\(suffix)")
+        }
+        if let rail = railGroupRows[groupID] {
+            setAccessibleDescription(rail, "\(count) workspaces\(suffix). Open roster to choose a workspace")
+        }
     }
 
     func makeLiftedRow(_ item: LiftedSidebarWorkspaceRow, attention: Bool) -> ToggleButtonRef? {
@@ -1035,6 +1112,10 @@ private final class ApplicationState: @unchecked Sendable {
     }
 
     func refreshLiftedRows() {
+        for group in snapshot.groups {
+            refreshRailGroupRoster(group.id)
+            refreshGroupAttention(group.id)
+        }
         for (id, row) in attentionRows {
             if let controller = liftedContextControllers[id] { gtk_widget_remove_controller(row.widget_ptr, controller.event_controller_ptr) }
             liftedContextPopovers[id]?.unparent(); row.unparent()
@@ -1107,7 +1188,9 @@ private final class ApplicationState: @unchecked Sendable {
         marker.add(cssClass: "aw-\((projection.color ?? .blue).rawValue)")
         let name = LabelRef(str: projection.name.uppercased()); name.xalign = 0; name.setHexpand(expand: true)
         let count = LabelRef(str: "\(projection.rows.count)"); count.add(cssClass: "aw-count")
-        content.append(child: chevron); content.append(child: marker); content.append(child: name); content.append(child: count)
+        let attention = LabelRef(str: ""); attention.add(cssClass: "aw-group-attention")
+        content.append(child: chevron); content.append(child: marker); content.append(child: name)
+        content.append(child: attention); content.append(child: count)
         disclosure.set(child: content); disclosure.onClicked { [weak self] _ in self?.toggleGroup(projection.id) }
         header.append(child: disclosure)
 
@@ -1147,7 +1230,9 @@ private final class ApplicationState: @unchecked Sendable {
         body.append(child: create)
         groupCreateRows[group.id] = create
         groupDisclosures[group.id] = disclosure
+        groupAttentionLabels[group.id] = attention
         registerGroup(projection, root: root, body: body, chevron: chevron, count: count, name: name, marker: marker)
+        refreshGroupAttention(group.id)
         refreshGroupActionEnablement()
         return (root, body)
     }
@@ -1451,6 +1536,7 @@ private final class ApplicationState: @unchecked Sendable {
                 isExpanded: !group.isCollapsed, rows: [])
             let section = makeGroupSection(group: group, projection: projection)
             groupsContainer.append(child: section.root)
+            sidebarRailRows?.append(child: makeRailGroupRow(group: group, color: projection.color))
             refreshWorkspaceOptionsMenus()
             refreshEmptyState()
             persist()
@@ -1472,6 +1558,7 @@ private final class ApplicationState: @unchecked Sendable {
         do {
             try snapshot.renameGroup(groupID, to: name)
             groupNames[groupID]?.label = ChromeText.sanitized(name, limit: 120).uppercased()
+            refreshRailGroupRoster(groupID)
             refreshWorkspaceOptionsMenus()
             persist()
         } catch SessionMutationError.duplicateGroupName {
@@ -1579,9 +1666,12 @@ private final class ApplicationState: @unchecked Sendable {
             if let rail = railRows.removeValue(forKey: workspace.id) { sidebarRailRows?.remove(child: rail) }
         }
         if let root = groupRoots.removeValue(forKey: groupID) { groupsContainer?.remove(child: root) }
+        if let railGroup = railGroupRows.removeValue(forKey: groupID) { sidebarRailRows?.remove(child: railGroup) }
+        railGroupAttentionLabels.removeValue(forKey: groupID)
         groupBodies.removeValue(forKey: groupID); groupChevrons.removeValue(forKey: groupID)
         groupDisclosures.removeValue(forKey: groupID)
         groupCounts.removeValue(forKey: groupID); groupNames.removeValue(forKey: groupID); groupMarkers.removeValue(forKey: groupID)
+        groupAttentionLabels.removeValue(forKey: groupID)
         groupCreateRows.removeValue(forKey: groupID)
         groupMoveUpActions.removeValue(forKey: groupID); groupMoveDownActions.removeValue(forKey: groupID)
         groupCloseActions.removeValue(forKey: groupID)
@@ -1780,6 +1870,7 @@ private func buildWindow(for application: Gtk.ApplicationRef) {
         guard let group = snapshot.groups.first(where: { $0.id == projection.id }) else { continue }
         let section = state.makeGroupSection(group: group, projection: projection)
         groups.append(child: section.root)
+        railRows.append(child: state.makeRailGroupRow(group: group, color: projection.color))
         let body = section.body
 
         for workspace in group.workspaces where !workspace.isSoftClosed {

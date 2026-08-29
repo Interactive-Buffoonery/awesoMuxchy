@@ -58,6 +58,46 @@ public struct SidebarGroupSection: Equatable, Sendable {
     }
 }
 
+public enum CollapsedGroupAttentionState: String, Equatable, Sendable {
+    case needsAttention
+    case error
+    case thinking
+}
+
+public struct CollapsedGroupAttention: Equatable, Sendable {
+    public let needsAttention: Int
+    public let errors: Int
+    public let thinking: Int
+
+    public var primaryState: CollapsedGroupAttentionState? {
+        if needsAttention > 0 { return .needsAttention }
+        if errors > 0 { return .error }
+        if thinking > 0 { return .thinking }
+        return nil
+    }
+
+    public var accessibilityPhrase: String {
+        var parts: [String] = []
+        if needsAttention > 0 { parts.append("\(needsAttention) need input") }
+        if errors > 0 { parts.append("\(errors) error\(errors == 1 ? "" : "s")") }
+        if thinking > 0 { parts.append("\(thinking) thinking") }
+        return parts.joined(separator: ", ")
+    }
+
+    public static func resolve(group: WorkspaceGroupSnapshot) -> CollapsedGroupAttention {
+        var needsAttention = 0, errors = 0, thinking = 0
+        for pane in group.workspaces.lazy.filter({ !$0.isSoftClosed }).flatMap({ $0.layout.panes }) {
+            switch pane.agentState {
+            case .needsAttention: needsAttention += 1
+            case .error: errors += 1
+            case .thinking: thinking += 1
+            default: break
+            }
+        }
+        return CollapsedGroupAttention(needsAttention: needsAttention, errors: errors, thinking: thinking)
+    }
+}
+
 public struct SidebarChromeProjection: Equatable, Sendable {
     public static let width = SidebarWidthPolicy.defaultWidth
     public static let headerMinimumHeight = 48
