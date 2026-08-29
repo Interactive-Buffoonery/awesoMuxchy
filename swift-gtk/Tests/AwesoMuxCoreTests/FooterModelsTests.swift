@@ -63,20 +63,14 @@ import Testing
     #expect(AgentFooterWording.agentsTotal(count: 2) == "2 agents")
 }
 
-@Test func focusedPaneCommandInsertionRequiresVerifiedLocalIdleShellPrompt() {
+@Test func focusedPaneCommandInsertionRequiresLocalShellOwnership() {
     func allowed(
         ownership: SessionOwnership = .local,
-        agent: String? = nil,
-        promptObserved: Bool = true,
-        awayFromPrompt: Bool = false,
-        liveness: ForegroundProcessLiveness = .idleShell
+        agent: String? = nil
     ) -> Bool {
         FocusedPaneCommandGate.canInsert(
             ownership: ownership,
-            agentName: agent,
-            terminalPromptObserved: promptObserved,
-            terminalAwayFromPrompt: awayFromPrompt,
-            liveness: liveness
+            agentName: agent
         )
     }
 
@@ -84,12 +78,6 @@ import Testing
     #expect(!allowed(ownership: .remoteZmx))
     #expect(!allowed(agent: "Codex"))
     #expect(allowed(agent: "  "))
-    #expect(!allowed(promptObserved: false))
-    #expect(!allowed(awayFromPrompt: true))
-    #expect(!allowed(liveness: .busyShell))
-    #expect(!allowed(liveness: .liveCommand))
-    #expect(!allowed(liveness: .indeterminate))
-    #expect(!allowed(liveness: .exited))
 }
 
 @Test func focusedPaneFooterCommandCopyMatchesReference() {

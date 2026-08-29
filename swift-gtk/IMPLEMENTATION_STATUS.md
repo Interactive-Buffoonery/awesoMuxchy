@@ -122,12 +122,17 @@ geometry and state styling have also passed a real-window visual correction.
   Draft and review PR chips now show the exact reference suffixes. A 1440 × 852
   synthetic long-repository/branch/dirty capture was inspected with two live
   Ghostty panes and no overlap or clipping.
-- In-pane footer commands are now gated by verified focused-pane state: local
-  ownership, no declared agent, observed semantic prompt, no prompt-away bit,
-  and an idle-shell process are all required. Branch rows copy their name when
+- In-pane footer commands now match the reference shell-session rule: local
+  ownership plus no declared agent enables staging, while remote/agent panes
+  fail closed. Staged branch/PR/CI payloads never append a newline, so an active
+  command or TUI remains under user control. Branch rows copy their name when
   the gate is closed; PR/CI insertion rows are omitted and defensively re-check
   on activation. The current branch is a noninteractive row, branch rows expose
   truthful insert/copy descriptions, and PR/CI menus use exact reference copy.
+  Live AT-SPI verified the same branch row changes from `Copies the branch
+  name` for Codex to `Inserts the checkout command at the prompt` for an
+  otherwise identical local shell pane, then staged the no-newline payload
+  without executing it or producing runtime diagnostics.
 - The fixed 188-point host has been replaced by a native GTK split using the
   reference 296-point expanded default, 60-point collapsed settlement, and
   250-point mode threshold while reserving at least 480 points for terminal
@@ -387,7 +392,7 @@ geometry and state styling have also passed a real-window visual correction.
 - Automated destructive-dialog interaction and restored daemon continuity.
 - Collapsed/hidden/right-side presentation, pointer roster hover cards,
   Orca state/announcement inspection,
-  foreground-shell detection and full settings panes remain after this footer
+  full settings panes remain after this footer
   milestone.
 
 See `VIABILITY.md` for the checkpoint decision and evidence.

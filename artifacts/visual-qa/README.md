@@ -85,9 +85,17 @@
   resolved a synthetic two-branch repository. The real branch popover exposed
   `feature/preview` with the AT-SPI description `Copies the branch name`; it did
   not claim that an agent pane could receive checkout text. The shared gate now
-  requires a local non-agent pane, observed prompt, prompt-present state, and
-  idle-shell liveness. PR/CI insertion rows are omitted when that gate is shut
-  and re-check it at activation; safe open/copy actions remain available.
+  matches the reference shell-session rule: local ownership with no declared
+  agent permits staging, while remote/agent panes fail closed. Staged text never
+  includes a newline, so a command or TUI remains under user control. PR/CI
+  insertion rows are omitted when that gate is shut and every route re-checks
+  focused identity at activation; safe open/copy actions remain available.
+- Follow-up live AT-SPI used the same isolated two-branch repository: Codex
+  exposed `Copies the branch name`; removing only the declared agent exposed
+  `Inserts the checkout command at the prompt`. Invoking the latter staged the
+  no-newline payload without execution and the app stopped with clean runtime
+  output. The existing footer crop remains the relevant visual evidence because
+  this correction changes truthful menu semantics, not footer geometry.
 - Copy/accessibility: the current branch is noninteractive. PR and CI menus use
   exact `Open in Browser`, `Copy URL`, `Insert Checkout Command`, `Insert Watch
   Command`, and `Insert Failure-Log Command` wording. Branch rows describe

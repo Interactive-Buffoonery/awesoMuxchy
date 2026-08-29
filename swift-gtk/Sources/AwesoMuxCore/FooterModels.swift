@@ -254,19 +254,12 @@ public struct InstalledEditor: Equatable, Sendable {
 public enum FocusedPaneCommandGate {
     public static func canInsert(
         ownership: SessionOwnership,
-        agentName: String?,
-        terminalPromptObserved: Bool,
-        terminalAwayFromPrompt: Bool,
-        liveness: ForegroundProcessLiveness
+        agentName: String?
     ) -> Bool {
         let hasAgent = agentName.map {
             !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
         } ?? false
-        guard ownership == .local,
-              !hasAgent,
-              terminalPromptObserved,
-              !terminalAwayFromPrompt else { return false }
-        return liveness == .idleShell
+        return ownership == .local && !hasAgent
     }
 }
 

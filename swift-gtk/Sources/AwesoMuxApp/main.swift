@@ -573,13 +573,10 @@ private final class ApplicationState: @unchecked Sendable {
         guard let workspaceID = snapshot.selectedWorkspaceID,
               let workspace = snapshot.workspace(id: workspaceID),
               let pane = workspace.layout.pane(id: workspace.focusedPaneID),
-              let surface = surfacesByPane[pane.id] else { return false }
+              surfacesByPane[pane.id] != nil else { return false }
         return FocusedPaneCommandGate.canInsert(
             ownership: pane.ownership,
-            agentName: pane.agent,
-            terminalPromptObserved: surface.hasSeenPrompt,
-            terminalAwayFromPrompt: surface.needsConfirmQuit,
-            liveness: LinuxForegroundProcessProbe.liveness(for: surface)
+            agentName: pane.agent
         )
     }
 

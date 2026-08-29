@@ -118,13 +118,19 @@ help, and agent context while preserving the compact reference geometry.
   menu labels are bounded, and draft/review PR chips include the exact
   `· draft`/`· review` suffixes. A synthetic long-path/branch/dirty real-app
   capture was inspected with both Ghostty panes visible.
-- Focused-footer command staging now fails closed through one tested live gate:
-  only a local, non-agent pane with an observed prompt, no prompt-away signal,
-  and an idle shell may receive branch, PR, or CI text. Branch selection falls
-  back to copying its name when insertion is unavailable; PR/CI insertion rows
-  are omitted and re-check the gate at activation. The branch menu renders its
-  current row as noninteractive, publishes insert-vs-copy descriptions, and
-  uses the exact `Open in Browser`, `Copy URL`, and `Insert … Command` wording.
+- Focused-footer command staging now matches the reference shell-session gate:
+  a local pane with no declared agent may receive branch, PR, or CI text while
+  remote and agent-owned panes fail closed. The payload never includes a
+  newline, so a shell-session pane may safely stage text while a command or TUI
+  is active and the user still chooses whether to run it. Branch selection
+  falls back to copying its name when insertion is unavailable; PR/CI insertion
+  rows are omitted and every route re-checks the live focused identity at
+  activation. The branch menu renders its current row as noninteractive,
+  publishes insert-vs-copy descriptions, and uses the exact `Open in Browser`,
+  `Copy URL`, and `Insert … Command` wording. Live AT-SPI on the same synthetic
+  two-branch repository exposed copy-only for Codex, then exposed and invoked
+  insertion after only the declared agent was removed; the staged payload did
+  not execute and the runtime remained clean.
 - The sidebar host now uses a native GTK horizontal split with the reference
   296-point default, 60-point rail settlement, 250-point mode threshold, and a
   480-point terminal minimum. Width and last-expanded width are defensively
@@ -452,14 +458,12 @@ help, and agent context while preserving the compact reference geometry.
 
 ## Next work
 
-1. Add the foreground-shell capability signal needed to gate inserted Git/gh
-   commands as precisely as macOS does.
-2. Physically verify pointer split resizing, workspace/group reorder, and
+1. Physically verify pointer split resizing, workspace/group reorder, and
    insertion indicators. Dynamic group menu enablement plus both left/right
    hidden attention reveal paths and timed
    retraction are captured and inspected.
-3. Add bounded/coalesced persistence writes, recovery UI, and forced-termination tests.
-4. Continue through the root implementation order, capturing each required
+2. Add bounded/coalesced persistence writes, recovery UI, and forced-termination tests.
+3. Continue through the root implementation order, capturing each required
    visual milestone.
 
 The verified SwiftGtk4 baseline began at `260e917`. Later implementation
