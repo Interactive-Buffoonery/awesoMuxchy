@@ -189,7 +189,35 @@ public extension SessionSnapshot {
         let name = ChromeText.sanitized(rawName, limit: 120)
             .trimmingCharacters(in: .whitespacesAndNewlines)
         guard !name.isEmpty else { throw SessionMutationError.invalidWorkspaceName }
-        try updateWorkspace(id: workspaceID) { $0.name = name }
+        try updateWorkspace(id: workspaceID) {
+            $0.name = name
+            $0.isNameUserEdited = true
+        }
+    }
+
+    mutating func updatePanePresentation(
+        paneID: UUID,
+        workspaceID: UUID,
+        title rawTitle: String? = nil,
+        workingDirectory rawWorkingDirectory: String? = nil
+    ) throws {
+        try updateWorkspace(id: workspaceID) { workspace in
+            guard let updated = workspace.layout.replacingPane(id: paneID, with: { pane in
+                var pane = pane
+                if let rawTitle {
+                    pane.title = ChromeText.sanitized(rawTitle, limit: 512)
+                }
+                if let rawWorkingDirectory {
+                    let directory = ChromeText.sanitized(rawWorkingDirectory, limit: 4_096)
+                    guard !directory.isEmpty else { return .pane(pane) }
+                    pane.workingDirectory = directory
+                }
+                return .pane(pane)
+            }) else {
+                throw SessionMutationError.paneNotFound(paneID)
+            }
+            workspace.layout = updated
+        }
     }
 
     mutating func togglePinnedWorkspace(_ workspaceID: UUID) throws {

@@ -68,6 +68,7 @@ private final class ApplicationState: @unchecked Sendable {
     private(set) var focusedPaneID: UUID?
     private var surfacesByPane: [UUID: TerminalSurface] = [:]
     private var workspaceByPane: [UUID: UUID] = [:]
+    private var surfaceGenerationByPane: [UUID: Int] = [:]
     private var runtimes: [UUID: WorkspaceRuntime] = [:]
     private var rows: [UUID: ToggleButtonRef] = [:]
     private var railRows: [UUID: ToggleButtonRef] = [:]
@@ -378,11 +379,83 @@ private final class ApplicationState: @unchecked Sendable {
     }
 
     func makeSurface(pane: PaneSnapshot, workspaceID: UUID, label: String, description: String) -> TerminalSurface? {
+        let generation = (surfaceGenerationByPane[pane.id] ?? 0) + 1
+        surfaceGenerationByPane[pane.id] = generation
         guard let surface = terminalRuntime.makeSurface(workingDirectory: pane.workingDirectory,
             accessibleLabel: label, accessibleDescription: description,
-            onFocusChanged: { [weak self] focused in if focused { self?.terminalFocused(pane.id) } }) else { return nil }
+            onFocusChanged: { [weak self] focused in if focused { self?.terminalFocused(pane.id) } },
+            onTitleChanged: { [weak self] title in
+                performOnGTKMain { [weak self] in
+                    self?.publishPaneTitle(title, paneID: pane.id, workspaceID: workspaceID, generation: generation)
+                }
+            },
+            onWorkingDirectoryChanged: { [weak self] directory in
+                performOnGTKMain { [weak self] in
+                    self?.publishPaneWorkingDirectory(
+                        directory, paneID: pane.id, workspaceID: workspaceID, generation: generation
+                    )
+                }
+            }) else {
+            surfaceGenerationByPane.removeValue(forKey: pane.id)
+            return nil
+        }
         surfaces.append(surface); surfacesByPane[pane.id] = surface; workspaceByPane[pane.id] = workspaceID
         return surface
+    }
+
+    private func acceptsPanePublication(_ paneID: UUID, workspaceID: UUID, generation: Int) -> Bool {
+        surfaceGenerationByPane[paneID] == generation
+            && workspaceByPane[paneID] == workspaceID
+            && snapshot.workspace(id: workspaceID)?.layout.paneIDs.contains(paneID) == true
+    }
+
+    private func publishPaneTitle(_ rawTitle: String, paneID: UUID, workspaceID: UUID, generation: Int) {
+        guard acceptsPanePublication(paneID, workspaceID: workspaceID, generation: generation),
+              (try? snapshot.updatePanePresentation(
+                  paneID: paneID, workspaceID: workspaceID, title: rawTitle
+              )) != nil
+        else { return }
+        refreshWorkspaceRowPresentation(workspaceID)
+        persist()
+    }
+
+    private func publishPaneWorkingDirectory(
+        _ rawDirectory: String, paneID: UUID, workspaceID: UUID, generation: Int
+    ) {
+        guard acceptsPanePublication(paneID, workspaceID: workspaceID, generation: generation),
+              (try? snapshot.updatePanePresentation(
+                  paneID: paneID, workspaceID: workspaceID, workingDirectory: rawDirectory
+              )) != nil,
+              let workspace = snapshot.workspace(id: workspaceID), workspace.focusedPaneID == paneID
+        else { return }
+        refreshWorkspaceRowPresentation(workspaceID)
+        if snapshot.selectedWorkspaceID == workspaceID { updateChrome(workspaceID) }
+        persist()
+    }
+
+    private func refreshWorkspaceRowPresentation(_ workspaceID: UUID) {
+        guard let workspace = snapshot.workspace(id: workspaceID),
+              let pane = workspace.layout.pane(id: workspace.focusedPaneID)
+        else { return }
+        let displayedTitle = SidebarWorkspaceTitle.resolve(workspace: workspace)
+        let location = FocusedPaneContext.displayPath(
+            pane.workingDirectory, homeDirectory: NSHomeDirectory()
+        )
+        let suffix = workspace.layout.paneCount > 1 ? "  ·  ▮▮ \(workspace.layout.paneCount)" : ""
+        workspaceTitles[workspaceID]?.label = displayedTitle
+        metadata[workspaceID]?.label = location + suffix
+        railRows[workspaceID]?.setTooltip(text: displayedTitle)
+        let groupName = snapshot.groups
+            .first(where: { $0.workspaces.contains { $0.id == workspaceID } })
+            .map { ChromeText.sanitized($0.name, limit: 120) } ?? "workspace group"
+        if let row = rows[workspaceID] {
+            setAccessibleLabel(row, displayedTitle)
+            let panes = workspace.layout.paneCount > 1 ? ", \(workspace.layout.paneCount) panes" : ""
+            setAccessibleDescription(row, "Workspace in \(groupName); \(location)\(panes)")
+        }
+        if let row = railRows[workspaceID] { setAccessibleLabel(row, displayedTitle) }
+        if snapshot.selectedWorkspaceID == workspaceID { title?.label = displayedTitle }
+        refreshLiftedRows()
     }
 
     func buildLayout(_ layout: PaneLayout, workspace: WorkspaceSnapshot) -> (WidgetRef, [TerminalSurface])? {
@@ -413,6 +486,7 @@ private final class ApplicationState: @unchecked Sendable {
         if changed { try? snapshot.focusPane(paneID, in: workspaceID) }
         runtime.focusedPaneID = paneID; runtime.focusedSurface = surface
         focusedPaneID = paneID; focusedSurface = surface
+        if changed { refreshWorkspaceRowPresentation(workspaceID) }
         updateChrome(workspaceID)
         scheduleAttentionAcknowledgement(workspaceID: workspaceID, paneID: paneID)
         if changed { persist() }
@@ -673,7 +747,7 @@ private final class ApplicationState: @unchecked Sendable {
         let shell = LabelRef(str: ">_"); shell.add(cssClass: "aw-shell"); shell.setSizeRequest(width: 32, height: 32)
         content.append(child: shell)
         let details = BoxRef(orientation: .vertical, spacing: 2); details.setHexpand(expand: true)
-        let name = LabelRef(str: ChromeText.sanitized(workspace.name, limit: 120))
+        let name = LabelRef(str: SidebarWorkspaceTitle.resolve(workspace: workspace))
         name.add(cssClass: "aw-row-title"); name.xalign = 0; name.setEllipsize(mode: PangoEllipsizeMode(rawValue: 3))
         name.setMaxWidthChars(nChars: 13)
         let pane = workspace.layout.pane(id: workspace.focusedPaneID)
@@ -684,7 +758,7 @@ private final class ApplicationState: @unchecked Sendable {
         meta.setMaxWidthChars(nChars: 13)
         details.append(child: name); details.append(child: meta); content.append(child: details); row.set(child: content)
         row.onClicked { [weak self] _ in self?.select(workspace.id) }
-        let safeName = ChromeText.sanitized(workspace.name, limit: 120)
+        let safeName = SidebarWorkspaceTitle.resolve(workspace: workspace)
         setAccessibleLabel(row, safeName)
         let paneDescription = workspace.layout.paneCount > 1 ? ", \(workspace.layout.paneCount) panes" : ""
         setAccessibleDescription(row, "Workspace in \(ChromeText.sanitized(group.name, limit: 120)); \(location)\(paneDescription)")
@@ -699,8 +773,9 @@ private final class ApplicationState: @unchecked Sendable {
         button.set(iconName: "utilities-terminal-symbolic")
         button.add(cssClass: "aw-rail-row")
         button.setSizeRequest(width: 40, height: 40)
-        button.setTooltip(text: ChromeText.sanitized(workspace.name, limit: 120))
-        setAccessibleLabel(button, ChromeText.sanitized(workspace.name, limit: 120))
+        let displayedTitle = SidebarWorkspaceTitle.resolve(workspace: workspace)
+        button.setTooltip(text: displayedTitle)
+        setAccessibleLabel(button, displayedTitle)
         setAccessibleDescription(button, "Workspace")
         button.onClicked { [weak self] _ in self?.select(workspace.id) }
         railRows[workspace.id] = button
@@ -1102,7 +1177,11 @@ private final class ApplicationState: @unchecked Sendable {
         workspaceContextPopovers.removeValue(forKey: workspace.id)?.unparent()
         if let child = workspace.id.uuidString.withCString({ stack?.getChildBy(name: $0) }) { stack?.remove(child: child) }
         let paneSurfaces = workspace.layout.paneIDs.compactMap { surfacesByPane[$0] }
-        for paneID in workspace.layout.paneIDs { surfacesByPane.removeValue(forKey: paneID); workspaceByPane.removeValue(forKey: paneID) }
+        for paneID in workspace.layout.paneIDs {
+            surfacesByPane.removeValue(forKey: paneID)
+            workspaceByPane.removeValue(forKey: paneID)
+            surfaceGenerationByPane.removeValue(forKey: paneID)
+        }
         surfaces.removeAll { surface in paneSurfaces.contains { $0 === surface } }
         runtimes.removeValue(forKey: workspace.id); rows.removeValue(forKey: workspace.id)?.unparent()
         metadata.removeValue(forKey: workspace.id); workspaceTitles.removeValue(forKey: workspace.id)
@@ -1256,7 +1335,7 @@ private final class ApplicationState: @unchecked Sendable {
         for (id, row) in railRows { setAccessibleSelected(row, id == workspaceID) }
         for (id, row) in attentionRows { setAccessibleSelected(row, id == workspaceID) }
         for (id, row) in pinnedRows { setAccessibleSelected(row, id == workspaceID) }
-        title?.label = ChromeText.sanitized(snapshot.workspace(id: workspaceID)?.name ?? "", limit: 120)
+        title?.label = snapshot.workspace(id: workspaceID).map(SidebarWorkspaceTitle.resolve) ?? ""
         updateChrome(workspaceID); focus(runtime.focusedPaneID); persist()
     }
 
@@ -1483,12 +1562,16 @@ private final class ApplicationState: @unchecked Sendable {
               let group = snapshot.groups.first(where: { $0.id == groupID }),
               let body = groupBodies[group.id] else { return }
         let pane = PaneSnapshot(title: "Primary terminal", workingDirectory: directory)
-        let workspace = WorkspaceSnapshot(name: "Untitled Workspace", focusedPaneID: pane.id, layout: .pane(pane))
+        let workspace = WorkspaceSnapshot(
+            name: "Untitled Workspace", isNameUserEdited: false,
+            focusedPaneID: pane.id, layout: .pane(pane)
+        )
         guard let surface = makeSurface(pane: pane, workspaceID: workspace.id,
             label: "Untitled Workspace Primary terminal", description: "Terminal pane 1 of 1 in the Untitled Workspace workspace") else { return }
         do { try snapshot.addWorkspace(workspace, toGroup: group.id) } catch {
             surfacesByPane.removeValue(forKey: pane.id)
             workspaceByPane.removeValue(forKey: pane.id)
+            surfaceGenerationByPane.removeValue(forKey: pane.id)
             surfaces.removeAll { $0 === surface }
             return
         }
@@ -1656,6 +1739,7 @@ private final class ApplicationState: @unchecked Sendable {
             for paneID in workspace.layout.paneIDs {
                 surfacesByPane.removeValue(forKey: paneID)
                 workspaceByPane.removeValue(forKey: paneID)
+                surfaceGenerationByPane.removeValue(forKey: paneID)
             }
             surfaces.removeAll { surface in paneSurfaces.contains { $0 === surface } }
             runtimes.removeValue(forKey: workspace.id)

@@ -46,6 +46,18 @@ public struct SidebarWorkspaceRow: Equatable, Sendable {
     }
 }
 
+public enum SidebarWorkspaceTitle {
+    public static func resolve(workspace: WorkspaceSnapshot) -> String {
+        let paneTitle = ChromeText.sanitized(
+            workspace.layout.pane(id: workspace.focusedPaneID)?.title ?? "",
+            limit: 120
+        )
+        return workspace.isNameUserEdited || paneTitle.isEmpty
+            ? ChromeText.sanitized(workspace.name, limit: 120)
+            : paneTitle
+    }
+}
+
 public struct SidebarGroupSection: Equatable, Sendable {
     public let id: UUID
     public let name: String
@@ -122,7 +134,7 @@ public struct SidebarChromeProjection: Equatable, Sendable {
                         }
                     return SidebarWorkspaceRow(
                         id: workspace.id,
-                        title: ChromeText.sanitized(workspace.name, limit: 120),
+                        title: SidebarWorkspaceTitle.resolve(workspace: workspace),
                         location: FocusedPaneContext.displayPath(
                             pane?.workingDirectory ?? "",
                             homeDirectory: homeDirectory

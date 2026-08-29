@@ -3,10 +3,32 @@ import Gtk
 
 private final class TerminalCallbackBox {
     let onFocusChanged: ((Bool) -> Void)?
+    let onTitleChanged: ((String) -> Void)?
+    let onWorkingDirectoryChanged: ((String) -> Void)?
 
-    init(onFocusChanged: ((Bool) -> Void)?) {
+    init(
+        onFocusChanged: ((Bool) -> Void)?,
+        onTitleChanged: ((String) -> Void)?,
+        onWorkingDirectoryChanged: ((String) -> Void)?
+    ) {
         self.onFocusChanged = onFocusChanged
+        self.onTitleChanged = onTitleChanged
+        self.onWorkingDirectoryChanged = onWorkingDirectoryChanged
     }
+}
+
+private func terminalTitleChanged(userdata: UnsafeMutableRawPointer?, title: UnsafePointer<CChar>?) {
+    guard let userdata, let title else { return }
+    let callbacks = Unmanaged<TerminalCallbackBox>.fromOpaque(userdata).takeUnretainedValue()
+    callbacks.onTitleChanged?(String(cString: title))
+}
+
+private func terminalWorkingDirectoryChanged(
+    userdata: UnsafeMutableRawPointer?, workingDirectory: UnsafePointer<CChar>?
+) {
+    guard let userdata, let workingDirectory else { return }
+    let callbacks = Unmanaged<TerminalCallbackBox>.fromOpaque(userdata).takeUnretainedValue()
+    callbacks.onWorkingDirectoryChanged?(String(cString: workingDirectory))
 }
 
 private func terminalFocusChanged(
@@ -36,7 +58,9 @@ public final class TerminalRuntime {
         command: String? = nil,
         accessibleLabel: String,
         accessibleDescription: String,
-        onFocusChanged: ((Bool) -> Void)? = nil
+        onFocusChanged: ((Bool) -> Void)? = nil,
+        onTitleChanged: ((String) -> Void)? = nil,
+        onWorkingDirectoryChanged: ((String) -> Void)? = nil
     ) -> TerminalSurface? {
         TerminalSurface(
             runtime: self,
@@ -44,7 +68,9 @@ public final class TerminalRuntime {
             command: command,
             accessibleLabel: accessibleLabel,
             accessibleDescription: accessibleDescription,
-            onFocusChanged: onFocusChanged
+            onFocusChanged: onFocusChanged,
+            onTitleChanged: onTitleChanged,
+            onWorkingDirectoryChanged: onWorkingDirectoryChanged
         )
     }
 }
@@ -61,12 +87,19 @@ public final class TerminalSurface {
         command: String?,
         accessibleLabel: String,
         accessibleDescription: String,
-        onFocusChanged: ((Bool) -> Void)?
+        onFocusChanged: ((Bool) -> Void)?,
+        onTitleChanged: ((String) -> Void)?,
+        onWorkingDirectoryChanged: ((String) -> Void)?
     ) {
-        let callbackBox = TerminalCallbackBox(onFocusChanged: onFocusChanged)
+        let callbackBox = TerminalCallbackBox(
+            onFocusChanged: onFocusChanged,
+            onTitleChanged: onTitleChanged,
+            onWorkingDirectoryChanged: onWorkingDirectoryChanged
+        )
         let callbacks = amx_ghostty_callbacks(
             userdata: Unmanaged.passUnretained(callbackBox).toOpaque(),
-            title_changed: nil,
+            title_changed: terminalTitleChanged,
+            working_directory_changed: terminalWorkingDirectoryChanged,
             close_requested: nil,
             focus_changed: terminalFocusChanged
         )

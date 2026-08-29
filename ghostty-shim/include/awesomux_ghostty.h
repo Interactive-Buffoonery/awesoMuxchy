@@ -18,12 +18,14 @@ typedef struct amx_ghostty_app amx_ghostty_app;
 typedef struct amx_ghostty_surface amx_ghostty_surface;
 
 typedef void (*amx_ghostty_title_cb)(void *userdata, const char *title);
+typedef void (*amx_ghostty_cwd_cb)(void *userdata, const char *working_directory);
 typedef void (*amx_ghostty_close_cb)(void *userdata, bool process_alive);
 typedef void (*amx_ghostty_focus_cb)(void *userdata, bool focused);
 
 typedef struct {
   void *userdata;
   amx_ghostty_title_cb title_changed;
+  amx_ghostty_cwd_cb working_directory_changed;
   amx_ghostty_close_cb close_requested;
   amx_ghostty_focus_cb focus_changed;
 } amx_ghostty_callbacks;

@@ -92,6 +92,7 @@ public indirect enum PaneLayout: Codable, Equatable, Sendable {
 public struct WorkspaceSnapshot: Codable, Equatable, Identifiable, Sendable {
     public var id: UUID
     public var name: String
+    public var isNameUserEdited: Bool
     public var isSoftClosed: Bool
     public var focusedPaneID: UUID
     public var layout: PaneLayout
@@ -101,6 +102,7 @@ public struct WorkspaceSnapshot: Codable, Equatable, Identifiable, Sendable {
     public init(
         id: UUID = UUID(),
         name: String,
+        isNameUserEdited: Bool = true,
         isSoftClosed: Bool = false,
         focusedPaneID: UUID,
         layout: PaneLayout,
@@ -109,6 +111,7 @@ public struct WorkspaceSnapshot: Codable, Equatable, Identifiable, Sendable {
     ) {
         self.id = id
         self.name = name
+        self.isNameUserEdited = isNameUserEdited
         self.isSoftClosed = isSoftClosed
         self.focusedPaneID = focusedPaneID
         self.layout = layout
@@ -117,7 +120,7 @@ public struct WorkspaceSnapshot: Codable, Equatable, Identifiable, Sendable {
     }
 
     private enum CodingKeys: String, CodingKey {
-        case id, name, isSoftClosed, focusedPaneID, layout, notificationsMuted, acknowledgedAttentionPaneIDs
+        case id, name, isNameUserEdited, isSoftClosed, focusedPaneID, layout, notificationsMuted, acknowledgedAttentionPaneIDs
     }
 
     public init(from decoder: Decoder) throws {
@@ -125,6 +128,7 @@ public struct WorkspaceSnapshot: Codable, Equatable, Identifiable, Sendable {
         self.init(
             id: try values.decode(UUID.self, forKey: .id),
             name: try values.decode(String.self, forKey: .name),
+            isNameUserEdited: try values.decodeIfPresent(Bool.self, forKey: .isNameUserEdited) ?? true,
             isSoftClosed: try values.decodeIfPresent(Bool.self, forKey: .isSoftClosed) ?? false,
             focusedPaneID: try values.decode(UUID.self, forKey: .focusedPaneID),
             layout: try values.decode(PaneLayout.self, forKey: .layout),

@@ -143,6 +143,13 @@ help, and agent context while preserving the compact reference geometry.
   Output). The 60-point rail includes group buttons whose native popovers list
   every live workspace as an explicit keyboard/screen-reader `Jump to` action;
   roster names and counts refresh after model mutations.
+- Ghostty OSC title and working-directory actions now cross the language-neutral
+  shim into Swift callbacks. Stable pane generations reject recycled/stale
+  surfaces; sanitized updates land in the authoritative snapshot before rows,
+  search, lifted projections, accessibility labels, window title, and the
+  focused-pane footer refresh. User-renamed workspace titles remain fixed.
+  The real terminal integration emits OSC 2 and OSC 7 and requires both
+  callbacks to arrive.
 - Needs Input acknowledgement is pane-scoped and persistent: a focused waiting
   pane acknowledges only after a guarded 500 ms dwell, while Ctrl-Shift-K and
   the row action acknowledge every waiting pane in that workspace immediately.

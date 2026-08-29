@@ -71,6 +71,13 @@ static bool runtime_action(ghostty_app_t app,
       surface->callbacks.title_changed(surface->callbacks.userdata, title.title);
       return true;
     }
+    case GHOSTTY_ACTION_PWD: {
+      if (surface->callbacks.working_directory_changed == NULL) return true;
+      ghostty_action_pwd_s pwd = action.action.pwd;
+      surface->callbacks.working_directory_changed(
+          surface->callbacks.userdata, pwd.pwd);
+      return true;
+    }
     case GHOSTTY_ACTION_CLOSE_WINDOW:
       if (surface->callbacks.close_requested != NULL) {
         surface->callbacks.close_requested(surface->callbacks.userdata, false);

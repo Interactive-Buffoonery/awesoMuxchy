@@ -781,3 +781,34 @@ private func snapshot(_ workspaces: [WorkspaceSnapshot]) -> SessionSnapshot {
     #expect(summary.primaryState == .needsAttention)
     #expect(summary.accessibilityPhrase == "1 need input, 1 error, 1 thinking")
 }
+
+@Test func livePanePresentationDrivesUneditedWorkspaceTitleAndSanitizesIdentityScopedUpdates() throws {
+    let pane = PaneSnapshot(title: "Primary terminal", workingDirectory: "/tmp")
+    let dynamic = WorkspaceSnapshot(
+        name: "Untitled Workspace", isNameUserEdited: false,
+        focusedPaneID: pane.id, layout: .pane(pane)
+    )
+    var value = snapshot([dynamic])
+
+    try value.updatePanePresentation(
+        paneID: pane.id,
+        workspaceID: dynamic.id,
+        title: "build\u{202E}\nready",
+        workingDirectory: "/tmp/project\n"
+    )
+    let updated = try #require(value.workspace(id: dynamic.id))
+    #expect(updated.layout.pane(id: pane.id)?.title == "buildready")
+    #expect(updated.layout.pane(id: pane.id)?.workingDirectory == "/tmp/project")
+    #expect(SidebarWorkspaceTitle.resolve(workspace: updated) == "buildready")
+
+    try value.renameWorkspace(dynamic.id, to: "Pinned Name")
+    let renamed = try #require(value.workspace(id: dynamic.id))
+    #expect(renamed.isNameUserEdited)
+    #expect(SidebarWorkspaceTitle.resolve(workspace: renamed) == "Pinned Name")
+    let stalePaneID = UUID()
+    #expect(throws: SessionMutationError.paneNotFound(stalePaneID)) {
+        try value.updatePanePresentation(
+            paneID: stalePaneID, workspaceID: dynamic.id, title: "stale"
+        )
+    }
+}

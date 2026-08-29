@@ -34,6 +34,11 @@ geometry and state styling have also passed a real-window visual correction.
 - Sidebar rows switch complete workspaces through a native GTK stack. The
   Development workspace owns a two-pane split and Review owns an independent
   terminal, all without exposing Ghostty handles to application code.
+- The language-neutral shim forwards Ghostty title and PWD actions. Swift
+  surfaces expose typed callbacks, and the application accepts them only when
+  the pane/workspace/generation still names the live surface. One GTK-main
+  publication updates the authoritative snapshot and every title/location
+  consumer; explicit workspace renames opt out of live-title replacement.
 - Thirty-three state tests cover grouped snapshots, defensive limits, selection,
   ordering, split/focus/close mutations, command chords, round trips,
   profile-scoped paths, owner-only persistence, quarantine, and recovery.
