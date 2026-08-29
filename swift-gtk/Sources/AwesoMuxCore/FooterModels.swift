@@ -251,6 +251,34 @@ public struct InstalledEditor: Equatable, Sendable {
     public init(name: String, executable: String) { self.name = name; self.executable = executable }
 }
 
+public enum FocusedPaneCommandGate {
+    public static func canInsert(
+        ownership: SessionOwnership,
+        agentName: String?,
+        terminalPromptObserved: Bool,
+        terminalAwayFromPrompt: Bool,
+        liveness: ForegroundProcessLiveness
+    ) -> Bool {
+        let hasAgent = agentName.map {
+            !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        } ?? false
+        guard ownership == .local,
+              !hasAgent,
+              terminalPromptObserved,
+              !terminalAwayFromPrompt else { return false }
+        return liveness == .idleShell
+    }
+}
+
+public enum FocusedPaneFooterWording {
+    public static let currentBranch = "Current"
+    public static let openInBrowser = "Open in Browser"
+    public static let copyURL = "Copy URL"
+    public static let insertCheckoutCommand = "Insert Checkout Command"
+    public static let insertWatchCommand = "Insert Watch Command"
+    public static let insertFailureLogCommand = "Insert Failure-Log Command"
+}
+
 public struct TerminalFooterDetails: Equatable, Sendable {
     public let context: FocusedPaneContext
     public let repoRoot: String?

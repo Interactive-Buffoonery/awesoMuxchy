@@ -63,6 +63,44 @@ import Testing
     #expect(AgentFooterWording.agentsTotal(count: 2) == "2 agents")
 }
 
+@Test func focusedPaneCommandInsertionRequiresVerifiedLocalIdleShellPrompt() {
+    func allowed(
+        ownership: SessionOwnership = .local,
+        agent: String? = nil,
+        promptObserved: Bool = true,
+        awayFromPrompt: Bool = false,
+        liveness: ForegroundProcessLiveness = .idleShell
+    ) -> Bool {
+        FocusedPaneCommandGate.canInsert(
+            ownership: ownership,
+            agentName: agent,
+            terminalPromptObserved: promptObserved,
+            terminalAwayFromPrompt: awayFromPrompt,
+            liveness: liveness
+        )
+    }
+
+    #expect(allowed())
+    #expect(!allowed(ownership: .remoteZmx))
+    #expect(!allowed(agent: "Codex"))
+    #expect(allowed(agent: "  "))
+    #expect(!allowed(promptObserved: false))
+    #expect(!allowed(awayFromPrompt: true))
+    #expect(!allowed(liveness: .busyShell))
+    #expect(!allowed(liveness: .liveCommand))
+    #expect(!allowed(liveness: .indeterminate))
+    #expect(!allowed(liveness: .exited))
+}
+
+@Test func focusedPaneFooterCommandCopyMatchesReference() {
+    #expect(FocusedPaneFooterWording.currentBranch == "Current")
+    #expect(FocusedPaneFooterWording.openInBrowser == "Open in Browser")
+    #expect(FocusedPaneFooterWording.copyURL == "Copy URL")
+    #expect(FocusedPaneFooterWording.insertCheckoutCommand == "Insert Checkout Command")
+    #expect(FocusedPaneFooterWording.insertWatchCommand == "Insert Watch Command")
+    #expect(FocusedPaneFooterWording.insertFailureLogCommand == "Insert Failure-Log Command")
+}
+
 @Test func porcelainStatusCountsEntriesAndAheadBehind() {
     let data = Data("""
     # branch.oid 012345

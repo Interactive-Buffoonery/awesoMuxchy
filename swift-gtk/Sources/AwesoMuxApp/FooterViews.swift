@@ -39,6 +39,7 @@ final class FocusedPanePathBar: @unchecked Sendable {
         let reveal: (String) -> Void
         let openEditor: (InstalledEditor, String) -> Void
         let insertCommand: (String) -> Void
+        let canInsertCommand: () -> Bool
         let openURL: (URL) -> Void
     }
 
@@ -258,15 +259,41 @@ final class FocusedPanePathBar: @unchecked Sendable {
 
     private func branchPopover(current: String, branches: [String]) -> PopoverRef {
         let box = BoxRef(orientation: .vertical, spacing: 2)
-        box.append(child: menuButton("✓  \(current)") {})
-        for branch in branches.filter({ $0 != current }).prefix(12) {
-            box.append(child: menuButton(branch) { [weak self] in
-                self?.actions.insertCommand("git checkout \(TerminalFooterResolver.shellQuoted(branch))")
-                self?.branchMenu.popdown()
-            })
+        let currentRow = BoxRef(orientation: .horizontal, spacing: 8)
+        currentRow.add(cssClass: "aw-menu-row")
+        currentRow.append(child: ImageRef(iconName: "emblem-ok-symbolic"))
+        let currentLabel = LabelRef(str: current)
+        currentLabel.xalign = 0
+        currentLabel.setHexpand(expand: true)
+        currentLabel.setEllipsize(mode: PangoEllipsizeMode(rawValue: 2))
+        currentRow.append(child: currentLabel)
+        let currentHint = LabelRef(str: FocusedPaneFooterWording.currentBranch)
+        currentHint.add(cssClass: "aw-menu-heading")
+        currentRow.append(child: currentHint)
+        setAccessibleLabel(currentRow, "\(current), current branch")
+        box.append(child: currentRow)
+        let otherBranches = branches.filter { $0 != current }
+        for branch in otherBranches.prefix(12) {
+            let canInsert = actions.canInsertCommand()
+            let button = menuButton(branch) { [weak self] in
+                guard let self else { return }
+                if actions.canInsertCommand() {
+                    actions.insertCommand("git checkout \(TerminalFooterResolver.shellQuoted(branch))")
+                } else {
+                    actions.copy(branch)
+                }
+                branchMenu.popdown()
+            }
+            button.setTooltip(text: canInsert
+                ? "Insert `git checkout \(branch)` at the prompt"
+                : "Copy branch name")
+            setAccessibleDescription(button, canInsert
+                ? "Inserts the checkout command at the prompt"
+                : "Copies the branch name")
+            box.append(child: button)
         }
-        if branches.count > 13 {
-            let more = LabelRef(str: "+ \(branches.count - 13) more branches")
+        if otherBranches.count > 12 {
+            let more = LabelRef(str: "+ \(otherBranches.count - 12) more branches")
             more.add(cssClass: "aw-menu-disabled")
             more.xalign = 0
             box.append(child: more)
@@ -279,21 +306,41 @@ final class FocusedPanePathBar: @unchecked Sendable {
 
     private func pullRequestPopover(_ pr: PullRequestStatus) -> PopoverRef {
         let box = BoxRef(orientation: .vertical, spacing: 2)
-        box.append(child: menuButton("Open Pull Request", icon: "web-browser-symbolic") { [weak self] in self?.actions.openURL(pr.url); self?.pullRequestMenu.popdown() })
-        box.append(child: menuButton("Copy Pull Request URL", icon: "edit-copy-symbolic") { [weak self] in self?.actions.copy(pr.url.absoluteString); self?.pullRequestMenu.popdown() })
-        box.append(child: menuButton("Check Out in Pane") { [weak self] in self?.actions.insertCommand("gh pr checkout \(pr.number)"); self?.pullRequestMenu.popdown() })
+        box.append(child: menuButton(FocusedPaneFooterWording.openInBrowser, icon: "web-browser-symbolic") { [weak self] in self?.actions.openURL(pr.url); self?.pullRequestMenu.popdown() })
+        box.append(child: menuButton(FocusedPaneFooterWording.copyURL, icon: "edit-copy-symbolic") { [weak self] in self?.actions.copy(pr.url.absoluteString); self?.pullRequestMenu.popdown() })
+        if actions.canInsertCommand() {
+            box.append(child: menuButton(FocusedPaneFooterWording.insertCheckoutCommand) { [weak self] in
+                guard let self else { return }
+                if actions.canInsertCommand() {
+                    actions.insertCommand("gh pr checkout \(pr.number)")
+                } else {
+                    actions.copy(pr.url.absoluteString)
+                }
+                pullRequestMenu.popdown()
+            })
+        }
         return menuPopover(box)
     }
 
     private func ciPopover(_ ci: CIStatus) -> PopoverRef {
         let box = BoxRef(orientation: .vertical, spacing: 2)
-        box.append(child: menuButton("Open Workflow Run", icon: "web-browser-symbolic") { [weak self] in self?.actions.openURL(ci.url); self?.ciMenu.popdown() })
-        box.append(child: menuButton("Copy Workflow URL", icon: "edit-copy-symbolic") { [weak self] in self?.actions.copy(ci.url.absoluteString); self?.ciMenu.popdown() })
-        if let slug = ci.repoSlug {
+        box.append(child: menuButton(FocusedPaneFooterWording.openInBrowser, icon: "web-browser-symbolic") { [weak self] in self?.actions.openURL(ci.url); self?.ciMenu.popdown() })
+        box.append(child: menuButton(FocusedPaneFooterWording.copyURL, icon: "edit-copy-symbolic") { [weak self] in self?.actions.copy(ci.url.absoluteString); self?.ciMenu.popdown() })
+        if let slug = ci.repoSlug, actions.canInsertCommand() {
             let command = ci.state == .running
                 ? "gh run watch \(ci.runDatabaseID) --repo \(TerminalFooterResolver.shellQuoted(slug))"
                 : "gh run view \(ci.runDatabaseID) --repo \(TerminalFooterResolver.shellQuoted(slug)) --log-failed"
-            box.append(child: menuButton(ci.state == .running ? "Watch in Pane" : "Show Failure Log in Pane") { [weak self] in self?.actions.insertCommand(command); self?.ciMenu.popdown() })
+            box.append(child: menuButton(ci.state == .running
+                ? FocusedPaneFooterWording.insertWatchCommand
+                : FocusedPaneFooterWording.insertFailureLogCommand) { [weak self] in
+                guard let self else { return }
+                if actions.canInsertCommand() {
+                    actions.insertCommand(command)
+                } else {
+                    actions.copy(ci.url.absoluteString)
+                }
+                ciMenu.popdown()
+            })
         }
         return menuPopover(box)
     }

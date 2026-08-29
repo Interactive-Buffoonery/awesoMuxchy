@@ -119,6 +119,12 @@ geometry and state styling have also passed a real-window visual correction.
   Draft and review PR chips now show the exact reference suffixes. A 1440 × 852
   synthetic long-repository/branch/dirty capture was inspected with two live
   Ghostty panes and no overlap or clipping.
+- In-pane footer commands are now gated by verified focused-pane state: local
+  ownership, no declared agent, observed semantic prompt, no prompt-away bit,
+  and an idle-shell process are all required. Branch rows copy their name when
+  the gate is closed; PR/CI insertion rows are omitted and defensively re-check
+  on activation. The current branch is a noninteractive row, branch rows expose
+  truthful insert/copy descriptions, and PR/CI menus use exact reference copy.
 - The fixed 188-point host has been replaced by a native GTK split using the
   reference 296-point expanded default, 60-point collapsed settlement, and
   250-point mode threshold while reserving at least 480 points for terminal

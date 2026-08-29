@@ -118,6 +118,13 @@ help, and agent context while preserving the compact reference geometry.
   menu labels are bounded, and draft/review PR chips include the exact
   `· draft`/`· review` suffixes. A synthetic long-path/branch/dirty real-app
   capture was inspected with both Ghostty panes visible.
+- Focused-footer command staging now fails closed through one tested live gate:
+  only a local, non-agent pane with an observed prompt, no prompt-away signal,
+  and an idle shell may receive branch, PR, or CI text. Branch selection falls
+  back to copying its name when insertion is unavailable; PR/CI insertion rows
+  are omitted and re-check the gate at activation. The branch menu renders its
+  current row as noninteractive, publishes insert-vs-copy descriptions, and
+  uses the exact `Open in Browser`, `Copy URL`, and `Insert … Command` wording.
 - The sidebar host now uses a native GTK horizontal split with the reference
   296-point default, 60-point rail settlement, 250-point mode threshold, and a
   480-point terminal minimum. Width and last-expanded width are defensively

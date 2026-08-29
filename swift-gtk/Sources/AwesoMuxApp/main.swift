@@ -558,8 +558,23 @@ private final class ApplicationState: @unchecked Sendable {
             copy: { [weak self] in self?.copy($0) }, reveal: { [weak self] in self?.reveal($0) },
             openEditor: { [weak self] in self?.openEditor($0, path: $1) },
             insertCommand: { [weak self] in self?.focusedSurface?.send(text: $0) },
+            canInsertCommand: { [weak self] in self?.canInsertFocusedFooterCommand() == true },
             openURL: { [weak self] in self?.openURL($0) }
         ))
+    }
+
+    private func canInsertFocusedFooterCommand() -> Bool {
+        guard let workspaceID = snapshot.selectedWorkspaceID,
+              let workspace = snapshot.workspace(id: workspaceID),
+              let pane = workspace.layout.pane(id: workspace.focusedPaneID),
+              let surface = surfacesByPane[pane.id] else { return false }
+        return FocusedPaneCommandGate.canInsert(
+            ownership: pane.ownership,
+            agentName: pane.agent,
+            terminalPromptObserved: surface.hasSeenPrompt,
+            terminalAwayFromPrompt: surface.needsConfirmQuit,
+            liveness: LinuxForegroundProcessProbe.liveness(for: surface)
+        )
     }
 
     func makeSidebarFooter() -> SidebarStatusFooter {
