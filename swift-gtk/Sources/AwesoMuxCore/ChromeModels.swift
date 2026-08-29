@@ -22,26 +22,38 @@ public struct SidebarWorkspaceRow: Equatable, Sendable {
     public let paneCount: Int
     public let isSelected: Bool
     public let searchHaystack: String
-    public let titleMatch: Range<Int>?
-    public let locationMatch: Range<Int>?
+    public let titleMatches: [Range<Int>]
+    public let locationMatches: [Range<Int>]
+    public let searchScore: Int?
 
     public init(
         id: UUID, title: String, location: String, paneCount: Int,
         isSelected: Bool, searchHaystack: String,
-        titleMatch: Range<Int>? = nil, locationMatch: Range<Int>? = nil
+        titleMatches: [Range<Int>] = [], locationMatches: [Range<Int>] = [],
+        searchScore: Int? = nil
     ) {
         self.id = id; self.title = title; self.location = location
         self.paneCount = paneCount; self.isSelected = isSelected
         self.searchHaystack = searchHaystack
-        self.titleMatch = titleMatch; self.locationMatch = locationMatch
+        self.titleMatches = titleMatches; self.locationMatches = locationMatches
+        self.searchScore = searchScore
     }
 
-    func matching(_ query: String) -> SidebarWorkspaceRow {
-        SidebarWorkspaceRow(
+    func matching(_ query: String) -> SidebarWorkspaceRow? {
+        let titleMatch = SidebarFuzzyMatcher.match(query: query, in: title)
+        let locationMatch = SidebarFuzzyMatcher.match(query: query, in: location)
+        let titleContainsQuery = SidebarSearchProjection.normalized(title).contains(query)
+        let locationContainsQuery = SidebarSearchProjection.normalized(location).contains(query)
+        let matchesHiddenToken = searchHaystack.contains(query)
+            && !titleContainsQuery && !locationContainsQuery
+        guard titleMatch != nil || locationMatch != nil || matchesHiddenToken else { return nil }
+        let visibleScore = max(titleMatch?.score ?? Int.min, locationMatch?.score ?? Int.min)
+        return SidebarWorkspaceRow(
             id: id, title: title, location: location, paneCount: paneCount,
             isSelected: isSelected, searchHaystack: searchHaystack,
-            titleMatch: SidebarSearchProjection.matchRange(in: title, query: query),
-            locationMatch: SidebarSearchProjection.matchRange(in: location, query: query)
+            titleMatches: matchesHiddenToken ? [] : titleMatch?.ranges ?? [],
+            locationMatches: matchesHiddenToken ? [] : locationMatch?.ranges ?? [],
+            searchScore: matchesHiddenToken || visibleScore == Int.min ? 0 : visibleScore
         )
     }
 }
@@ -437,7 +449,7 @@ public struct SidebarChromeProjection: Equatable, Sendable {
                 rows: group.workspaces.compactMap { workspace in
                     guard !workspace.isSoftClosed else { return nil }
                     let pane = workspace.layout.pane(id: workspace.focusedPaneID)
-                    let searchValues = [group.name, workspace.name]
+                    let searchValues = [workspace.name]
                         + workspace.layout.panes.flatMap { pane in
                             [pane.title, pane.workingDirectory, pane.ownership.searchToken,
                              pane.agent ?? "", pane.agentState.searchToken]
@@ -627,7 +639,15 @@ public enum SidebarSearchProjection {
         }
 
         let groups = source.groups.compactMap { group -> SidebarGroupSection? in
-            let rows = group.rows.filter { $0.searchHaystack.contains(needle) }.map { $0.matching(query) }
+            let groupMatches = normalized(group.name).contains(needle)
+            let rows = groupMatches ? group.rows : group.rows.enumerated().compactMap {
+                index, row -> (Int, SidebarWorkspaceRow)? in
+                row.matching(needle).map { (index, $0) }
+            }.sorted { lhs, rhs in
+                let lhsScore = lhs.1.searchScore ?? Int.min
+                let rhsScore = rhs.1.searchScore ?? Int.min
+                return lhsScore == rhsScore ? lhs.0 < rhs.0 : lhsScore > rhsScore
+            }.map(\.1)
             guard !rows.isEmpty else { return nil }
             return SidebarGroupSection(
                 id: group.id,
@@ -654,19 +674,6 @@ public enum SidebarSearchProjection {
             .joined(separator: " ")
     }
 
-    public static func matchRange(in value: String, query: String) -> Range<Int>? {
-        let cleanQuery = ChromeText.sanitized(query, limit: 8_192)
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !cleanQuery.isEmpty,
-              let range = value.range(
-                of: cleanQuery,
-                options: [.caseInsensitive, .diacriticInsensitive],
-                locale: .current
-              ) else { return nil }
-        let lower = value.utf8.distance(from: value.utf8.startIndex, to: range.lowerBound)
-        let upper = value.utf8.distance(from: value.utf8.startIndex, to: range.upperBound)
-        return lower..<upper
-    }
 }
 
 private extension SessionOwnership {

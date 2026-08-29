@@ -159,10 +159,12 @@ geometry and state styling have also passed a real-window visual correction.
   exposes a named action whose AT-SPI invocation returned true and emptied the
   entry.
 - Visible title/location search matches now use tested case- and
-  diacritic-insensitive UTF-8 byte ranges, applied as bold underlined Pango
-  attributes to regular and lifted rows. Hidden-token matches remain truthful
-  without falsely highlighting unrelated visible text; multi-token/fuzzy
-  highlight ranges remain pending.
+  diacritic-insensitive fuzzy scoring with word-boundary/contiguous bonuses,
+  bounded gap penalties, and best-alignment selection. Every matched UTF-8 byte
+  range is applied as a bold underlined Pango attribute to regular and lifted
+  rows. Score order has a stable source-order tie-breaker; whole-group and
+  hidden workspace/provider/state/SSH matches retain authoritative order and
+  remain truthful without falsely highlighting unrelated visible text.
 - A tested empty-workspace presentation now drives the centered first-launch
   guidance, primary New Workspace action, conditional Reopen Closed Workspace,
   and the collapsed rail's dashed 40-point creation control. Sidebar

@@ -149,6 +149,13 @@ help, and agent context while preserving the compact reference geometry.
   title/location matches. GTK applies bold underlined Pango attributes to
   regular and lifted rows and clears them transactionally with the query;
   agent/state/group-only matches remain visible without inventing a highlight.
+- Visible title and location search now uses the project-owned ordered-character
+  fuzzy scorer, including word-boundary and contiguous-run bonuses, bounded gap
+  penalties, best-alignment selection, and every matched UTF-8/Pango range.
+  Results sort by score with source order as the stable tie-breaker; whole-group
+  and hidden workspace/provider/state/SSH matches preserve their authoritative
+  order without inventing visible highlights. Focused coverage includes
+  diacritics, later better alignments, oversized queries, and hidden-only hits.
 - Real X11/GLX captures now cover a visible Pinned title highlight and the exact
   query-bearing no-matches panel. The live `Search sessions` entry was edited
   through AT-SPI `EditableText`; AT-SPI exposed `Clear search` as a named action,

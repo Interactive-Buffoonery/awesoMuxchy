@@ -50,18 +50,22 @@ private enum LinuxForegroundProcessProbe {
     }
 }
 
-private func applySearchMatch(_ range: Swift.Range<Int>?, to label: LabelRef) {
-    guard let range else { label.setAttributes(attrs: nil as Pango.AttrListRef?); return }
+private func applySearchMatches(_ ranges: [Swift.Range<Int>], to label: LabelRef) {
+    guard !ranges.isEmpty else { label.setAttributes(attrs: nil as Pango.AttrListRef?); return }
     let attributes = Pango.AttrList()
-    if var weight = Pango.attrWeightNew(weight: PangoWeight(rawValue: 700)) {
-        weight.startIndex = UInt32(range.lowerBound)
-        weight.endIndex = UInt32(range.upperBound)
-        attributes.insert(attr: weight)
-    }
-    if var underline = Pango.attrUnderlineNew(underline: PangoUnderline(rawValue: 1)) {
-        underline.startIndex = UInt32(range.lowerBound)
-        underline.endIndex = UInt32(range.upperBound)
-        attributes.insert(attr: underline)
+    for range in ranges {
+        guard range.lowerBound >= 0, range.upperBound >= range.lowerBound,
+              range.upperBound <= Int(UInt32.max) else { continue }
+        if var weight = Pango.attrWeightNew(weight: PangoWeight(rawValue: 700)) {
+            weight.startIndex = UInt32(range.lowerBound)
+            weight.endIndex = UInt32(range.upperBound)
+            attributes.insert(attr: weight)
+        }
+        if var underline = Pango.attrUnderlineNew(underline: PangoUnderline(rawValue: 1)) {
+            underline.startIndex = UInt32(range.lowerBound)
+            underline.endIndex = UInt32(range.upperBound)
+            attributes.insert(attr: underline)
+        }
     }
     label.setAttributes(attrs: attributes)
 }
@@ -860,9 +864,9 @@ private final class ApplicationState: @unchecked Sendable {
         let projectedRows = projection.attention.map(\.row) + projection.pinned.map(\.row)
             + projection.groups.flatMap(\.rows)
         let projectedByID = Dictionary(uniqueKeysWithValues: projectedRows.map { ($0.id, $0) })
-        for (id, label) in workspaceTitles { applySearchMatch(projectedByID[id]?.titleMatch, to: label) }
-        for (id, label) in metadata { applySearchMatch(projectedByID[id]?.locationMatch, to: label) }
-        for (id, label) in liftedTitles { applySearchMatch(projectedByID[id]?.titleMatch, to: label) }
+        for (id, label) in workspaceTitles { applySearchMatches(projectedByID[id]?.titleMatches ?? [], to: label) }
+        for (id, label) in metadata { applySearchMatches(projectedByID[id]?.locationMatches ?? [], to: label) }
+        for (id, label) in liftedTitles { applySearchMatches(projectedByID[id]?.titleMatches ?? [], to: label) }
         let visibleGroupIDs = Set(projection.groups.map(\.id))
         for (index, group) in projection.groups.enumerated() {
             if let disclosure = groupDisclosures[group.id] {
@@ -1774,7 +1778,7 @@ private final class ApplicationState: @unchecked Sendable {
         let details = BoxRef(orientation: .vertical, spacing: 2); details.setHexpand(expand: true)
         let title = LabelRef(str: item.row.title); title.add(cssClass: "aw-row-title"); title.xalign = 0
         title.setEllipsize(mode: PangoEllipsizeMode(rawValue: 3)); title.setMaxWidthChars(nChars: 13)
-        applySearchMatch(item.row.titleMatch, to: title)
+        applySearchMatches(item.row.titleMatches, to: title)
         let origin = LabelRef(str: attention ? "Needs input from \(item.originGroupName)" : "Pinned from \(item.originGroupName)")
         origin.add(cssClass: "aw-lifted-origin"); origin.xalign = 0
         origin.setEllipsize(mode: PangoEllipsizeMode(rawValue: 3)); origin.setMaxWidthChars(nChars: 18)

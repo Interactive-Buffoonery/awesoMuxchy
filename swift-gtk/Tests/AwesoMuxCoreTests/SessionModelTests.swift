@@ -435,18 +435,66 @@ private func snapshot(_ workspaces: [WorkspaceSnapshot]) -> SessionSnapshot {
 
     let title = SidebarSearchProjection.project(snapshot: value, query: "resume", homeDirectory: "/home/test")
         .groups.first?.rows.first
-    #expect(title?.titleMatch == 0..<8)
-    #expect(title?.locationMatch == nil)
+    #expect(title?.titleMatches == [0..<1, 1..<3, 3..<4, 4..<5, 5..<6, 6..<8])
+    #expect(title?.locationMatches == [])
 
     let location = SidebarSearchProjection.project(snapshot: value, query: "cafe", homeDirectory: "/home/test")
         .groups.first?.rows.first
-    #expect(location?.titleMatch == nil)
-    #expect(location?.locationMatch == 6..<11)
+    #expect(location?.titleMatches == [])
+    #expect(location?.locationMatches == [6..<7, 7..<8, 8..<9, 9..<11])
 
     let hiddenToken = SidebarSearchProjection.project(snapshot: value, query: "local", homeDirectory: "/home/test")
         .groups.first?.rows.first
-    #expect(hiddenToken?.titleMatch == nil)
-    #expect(hiddenToken?.locationMatch == nil)
+    #expect(hiddenToken?.titleMatches == [])
+    #expect(hiddenToken?.locationMatches == [])
+}
+
+@Test func sidebarFuzzyMatcherScoresBoundariesAndPublishesEveryUTF8Range() throws {
+    let initials = try #require(SidebarFuzzyMatcher.match(query: "cc", in: "Claude Code"))
+    #expect(initials.ranges == [0..<1, 7..<8])
+
+    let accented = try #require(SidebarFuzzyMatcher.match(query: "cafe", in: "Café"))
+    #expect(accented.ranges == [0..<1, 1..<2, 2..<3, 3..<5])
+
+    let later = try #require(SidebarFuzzyMatcher.match(query: "cod", in: "cxxxxxxxxx Code"))
+    #expect(later.ranges == [11..<12, 12..<13, 13..<14])
+
+    let boundary = try #require(SidebarFuzzyMatcher.match(query: "p", in: "Foo Project"))
+    let midword = try #require(SidebarFuzzyMatcher.match(query: "p", in: "Floppy"))
+    #expect(boundary.score > midword.score)
+    #expect(SidebarFuzzyMatcher.match(
+        query: String(repeating: "a", count: SidebarFuzzyMatcher.maximumQueryLength + 1),
+        in: "anything"
+    ) == nil)
+}
+
+@Test func sidebarFuzzySearchOrdersScoresStablyAndKeepsBroadHiddenFields() {
+    let weakPane = PaneSnapshot(title: "cxxxxxxxxxod", workingDirectory: "/tmp")
+    let strongPane = PaneSnapshot(title: "Code", workingDirectory: "/tmp")
+    let weak = WorkspaceSnapshot(name: "cxxxxxxxxxod", focusedPaneID: weakPane.id, layout: .pane(weakPane))
+    let strong = WorkspaceSnapshot(name: "Code", focusedPaneID: strongPane.id, layout: .pane(strongPane))
+    let remotePane = PaneSnapshot(
+        title: "Shell", workingDirectory: "/tmp", agent: "Codex",
+        ownership: .remoteZmx
+    )
+    let remote = WorkspaceSnapshot(
+        name: "Remote", focusedPaneID: remotePane.id, layout: .pane(remotePane)
+    )
+    let value = SessionSnapshot(groups: [
+        WorkspaceGroupSnapshot(name: "Work", workspaces: [weak, strong, remote]),
+    ])
+
+    let scored = SidebarSearchProjection.project(snapshot: value, query: "cod")
+    #expect(scored.orderedWorkspaceIDs.prefix(2) == [strong.id, weak.id])
+    #expect(scored.groups[0].rows[0].titleMatches == [0..<1, 1..<2, 2..<3])
+
+    let provider = SidebarSearchProjection.project(snapshot: value, query: "codex")
+    #expect(provider.orderedWorkspaceIDs == [remote.id])
+    #expect(provider.groups[0].rows[0].titleMatches.isEmpty)
+
+    let remoteIdentity = SidebarSearchProjection.project(snapshot: value, query: "ssh")
+    #expect(remoteIdentity.orderedWorkspaceIDs == [remote.id])
+    #expect(remoteIdentity.groups[0].rows[0].locationMatches.isEmpty)
 }
 
 @Test func emptyWorkspacePresentationTracksGroupsFilteringAndRecovery() {
