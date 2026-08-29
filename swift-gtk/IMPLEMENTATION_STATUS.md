@@ -200,7 +200,9 @@ geometry and state styling have also passed a real-window visual correction.
   preference. A pure appearance policy covers GTK theme names and `GTK_THEME`
   overrides in tests. Four exact pinned Geist weights and their OFL license are
   SwiftPM resources registered process-locally through Fontconfig; real light
-  and dark GTK windows were inspected after registration.
+  and dark GTK windows were inspected after registration. A real Arabic-locale
+  X11 capture verifies direction-sensitive mirroring across the titlebar,
+  sidebar header/groups/rows, sidebar footer, focused footer, and pane boundary.
 - The expanded sidebar now handles Up/Down/Home/End as one logical visible
   sequence across lifted sections, group disclosures, workspace rows, and
   creation rows using a pure tested navigation policy. Rows, rail controls,

@@ -1,5 +1,22 @@
 # Visual QA
 
+## 2026-08-29 — SwiftGtk4 right-to-left layout
+
+- Linux image: [Arabic-locale RTL layout](swift-gtk/progress/20-rtl-layout/rtl-arabic-locale-x11.png).
+- Reference: sidebar, titlebar, split-create, row/group, footer, and focused
+  path-bar alignment contracts at macOS baseline
+  `fed33ff47c559344fc6db6fa53f16e75fcc4a116`.
+- Display and behavior: the release app ran under `ar_EG.utf8` on X11/GLX at
+  1440×852. GTK mirrored the sidebar to the right, reversed the split-create
+  segments, aligned row/group content and options for RTL, mirrored both footer
+  surfaces, and preserved the two-pane Ghostty order and divider.
+- Inspection: the PNG was inspected at original resolution. Long title/group
+  truncation, selected/attention states, fixed chrome, and pane/footer borders
+  remain intact. Runtime translation remains a separate localization phase;
+  this milestone verifies direction-sensitive layout only.
+- Privacy: the fixture and terminal prompt are synthetic; no command history,
+  clipboard content, credentials, or arbitrary agent output is shown.
+
 ## 2026-08-29 — SwiftGtk4 hidden-sidebar edge reveal
 
 - Linux images: [hidden attention edge](swift-gtk/progress/19-hidden-sidebar-reveal/hidden-attention-edge-x11.png),
