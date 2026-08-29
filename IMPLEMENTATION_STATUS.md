@@ -326,6 +326,12 @@ help, and agent context while preserving the compact reference geometry.
   activation verified Pane 2, Previous, disabled Pane 3, and Next against two
   live Ghostty surfaces with the expected persisted identities and no runtime
   diagnostics.
+- The real two-surface integration harness now overlaps 80 rapid GtkPaned
+  divider moves with 120 bounded synthetic Unicode lines containing composed,
+  combining, emoji, wide, and punctuation scalars. It restores the split,
+  requires an exact completion sentinel, then proves the surviving Ghostty
+  surface remains ready and accepts focus, input, clipboard, and close-risk
+  routing. Four consecutive X11/GLX passes completed cleanly.
 - Workspace rows, lifted Needs Input/Pinned rows, collapsed-rail controls, and
   multi-pane peek cards now share one provider-aware tile projection. Claude,
   Codex, OpenCode, Pi, Grok, and shell retain distinct owned scalable marks and
@@ -448,13 +454,12 @@ help, and agent context while preserving the compact reference geometry.
 
 1. Add the foreground-shell capability signal needed to gate inserted Git/gh
    commands as precisely as macOS does.
-2. Add rapid Unicode split-reflow stress coverage on the now-live
-   split/close/resize/focus lifecycle.
-3. Physically verify pointer reorder and insertion indicators. Dynamic group
-   menu enablement plus both left/right hidden attention reveal paths and timed
+2. Physically verify pointer split resizing, workspace/group reorder, and
+   insertion indicators. Dynamic group menu enablement plus both left/right
+   hidden attention reveal paths and timed
    retraction are captured and inspected.
-4. Add bounded/coalesced persistence writes, recovery UI, and forced-termination tests.
-5. Continue through the root implementation order, capturing each required
+3. Add bounded/coalesced persistence writes, recovery UI, and forced-termination tests.
+4. Continue through the root implementation order, capturing each required
    visual milestone.
 
 The verified SwiftGtk4 baseline began at `260e917`. Later implementation

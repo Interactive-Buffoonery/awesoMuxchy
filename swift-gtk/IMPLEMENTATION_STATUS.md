@@ -22,8 +22,11 @@ geometry and state styling have also passed a real-window visual correction.
   update Swift pane ownership; sidebar selection and direct pane clicks now
   converge on the same focused-surface route.
 - The standalone terminal integration harness passes pane independence,
-  process exit, callbacks from both focused surfaces, resize, Unicode, and
-  clipboard read/write.
+  process exit, callbacks from both focused surfaces, resize, Unicode, rapid
+  Unicode reflow during 80 divider moves, and clipboard read/write. The stress
+  route restores the split and requires the same surface to remain ready for
+  focus, input, and close-risk verification; four consecutive X11/GLX passes
+  completed cleanly.
 - Three 100-cycle, two-busy-surface stress runs pass with stable warmed peak
   memory.
 - Accessible pane labels/descriptions and keyboard-operable sidebar buttons

@@ -29,6 +29,11 @@
   Real Pane 2 → Previous → disabled Pane 3 → Next activation persisted only the
   expected depth-first identities with clean runtime output. This is behavioral
   evidence; the selected sidebar row is unchanged and needs no duplicate image.
+- The real two-surface integration now overlaps 80 GtkPaned divider moves with
+  120 bounded synthetic Unicode lines, restores the split, requires an exact
+  completion sentinel, and repeats focus/input/clipboard/close-risk checks on
+  the same live surface. Four consecutive X11/GLX passes completed cleanly;
+  this reflow stress adds behavioral evidence without exposing terminal text.
 - Inspection: the 296×852 sidebar-only Latte capture was opened at original
   resolution and shows the selected `Pane Commands` row with the two-pane
   indicator/count while fixed header/footer geometry remains stable. The
@@ -36,7 +41,7 @@
   frame, then inspected at original resolution for exact heading, body, hint,
   safe-default Cancel, and destructive action treatment.
 - Verification: full local preflight passes the text baseline, all 99 Swift
-  tests, the production build, real terminal integration, and 100 two-surface
+  tests, the production build, rapid-reflow terminal integration, and 100 two-surface
   lifecycle cycles.
 - Privacy: the profile, workspace, pane title, cwd, counts, and status are
   synthetic. The strict sidebar and sheet crops contain no terminal content,

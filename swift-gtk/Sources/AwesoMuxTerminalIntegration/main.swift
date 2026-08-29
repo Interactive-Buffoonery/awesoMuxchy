@@ -7,6 +7,7 @@ import Gtk
 
 private let clipboardToken = "awesomux-clipboard-ok"
 private let unicodePayload = "café e\u{301} 🚀 界"
+private let reflowToken = "awesomux-reflow-ok"
 
 private final class FocusRecorder {
     var focusedSurfaces: Set<Int> = []
@@ -24,8 +25,10 @@ private final class IntegrationState {
     let window: ApplicationWindowRef
     let first: TerminalSurface
     let second: TerminalSurface
+    let panes: PanedRef
     let focusRecorder: FocusRecorder
     let unicodeFile: URL
+    let reflowFile: URL
     var failed = false
     var failureReason = "none"
 
@@ -34,15 +37,19 @@ private final class IntegrationState {
         window: ApplicationWindowRef,
         first: TerminalSurface,
         second: TerminalSurface,
+        panes: PanedRef,
         focusRecorder: FocusRecorder
     ) {
         self.application = application
         self.window = window
         self.first = first
         self.second = second
+        self.panes = panes
         self.focusRecorder = focusRecorder
         unicodeFile = FileManager.default.temporaryDirectory
             .appendingPathComponent("awesomux-terminal-unicode-\(UUID().uuidString)")
+        reflowFile = FileManager.default.temporaryDirectory
+            .appendingPathComponent("awesomux-terminal-reflow-\(UUID().uuidString)")
     }
 
     func begin() -> Bool {
@@ -123,13 +130,59 @@ private final class IntegrationState {
             fail(reason: "observed idle prompt unexpectedly requires confirmation")
             return false
         }
+        beginResizeReflowStress(shellProcessID: shellProcessID)
+        return false
+    }
+
+    func beginResizeReflowStress(shellProcessID: UInt64) {
+        let quotedFile = reflowFile.path.replacingOccurrences(of: "'", with: "'\\''")
+        let payload = "awesomux reflow café é 🚀 界 — 0123456789 0123456789 0123456789"
+        let command = [
+            "i=0; while [ $i -lt 120 ]; do",
+            "printf '%s\\n' '\(payload)'; sleep 0.01; i=$((i+1)); done;",
+            "printf '%s' '\(reflowToken)' > '\(quotedFile)'",
+        ].joined(separator: " ")
+        second.send(text: command)
+        second.sendEnter()
+
+        var step = 0
+        timeout(add: 15) { [weak self] in
+            guard let self else { return false }
+            let extent = self.panes.getWidth()
+            guard extent > 400 else {
+                self.fail(reason: "split allocation unavailable during resize stress")
+                return false
+            }
+            let span = max(extent - 360, 1)
+            self.panes.set(position: 180 + ((step * 37) % span))
+            step += 1
+            if step < 80 { return true }
+            self.panes.set(position: extent / 2)
+            timeout(add: 500) { [weak self] in
+                self?.verifyResizeReflowStress(shellProcessID: shellProcessID)
+                return false
+            }
+            return false
+        }
+    }
+
+    func verifyResizeReflowStress(shellProcessID: UInt64) {
+        guard second.isReady, !second.processExited else {
+            fail(reason: "terminal surface failed during resize reflow stress")
+            return
+        }
+        guard let data = try? Data(contentsOf: reflowFile),
+              String(data: data, encoding: .utf8) == reflowToken else {
+            fail(reason: "Unicode resize reflow command did not complete")
+            return
+        }
+        second.focus()
         second.send(text: "sleep 2")
         second.sendEnter()
         timeout(add: 250) { [weak self] in
             self?.verifyCloseRisk(shellProcessID: shellProcessID)
             return false
         }
-        return false
     }
 
     func verifyCloseRisk(shellProcessID: UInt64) {
@@ -192,6 +245,7 @@ private final class IntegrationState {
             return
         }
         try? FileManager.default.removeItem(at: unicodeFile)
+        try? FileManager.default.removeItem(at: reflowFile)
         second.requestClose()
         application.quit()
     }
@@ -200,6 +254,7 @@ private final class IntegrationState {
         failed = true
         failureReason = reason
         try? FileManager.default.removeItem(at: unicodeFile)
+        try? FileManager.default.removeItem(at: reflowFile)
         application.quit()
     }
 }
@@ -255,6 +310,7 @@ private func runIntegration(application: Gtk.ApplicationRef) {
         window: window,
         first: first,
         second: second,
+        panes: panes,
         focusRecorder: focusRecorder
     )
     retainedIntegrationState = state
@@ -275,4 +331,4 @@ guard status != nil, !failed else {
     print("terminal integration: failed (\(failureReason))")
     exit(1)
 }
-print("terminal integration: passed input, Unicode, focus, resize, clipboard, environment, title/cwd callbacks, observed-prompt close-risk signals, and pane independence")
+print("terminal integration: passed input, Unicode, focus, rapid reflow resize, clipboard, environment, title/cwd callbacks, observed-prompt close-risk signals, and pane independence")
