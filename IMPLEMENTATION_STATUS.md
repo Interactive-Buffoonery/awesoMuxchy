@@ -570,8 +570,8 @@ help, and agent context while preserving the compact reference geometry.
   entry, and tears down the workspace's terminal surfaces and UI ownership.
 - A real inspected screenshot and comparison index were pushed in focused
   visual-QA commits `4149963` and `01cc8d7`. The newer multi-pane peek capture
-  is retained locally and intentionally remains unpushed pending resolution of
-  the earlier implementation-history push boundary mistake.
+  and all later inspected visual-QA artifacts were published by Sarah's
+  explicit full-branch authorization in the push ending at `928aaa2`.
 
 ## Active constraints
 
@@ -601,5 +601,6 @@ help, and agent context while preserving the compact reference geometry.
 
 The verified SwiftGtk4 baseline began at `260e917`. Later implementation
 ancestors were unintentionally included when visual-QA commit `6a198bc` was
-pushed; that boundary mistake is recorded above, and subsequent implementation
-and screenshot work remains local pending explicit direction.
+pushed; that boundary mistake is recorded above. Sarah subsequently authorized
+publishing the complete accumulated branch, and `main` was fast-forwarded
+through `928aaa2` on the verified private origin.

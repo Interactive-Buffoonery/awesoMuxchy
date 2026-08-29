@@ -16,17 +16,15 @@
 - Inspection: the PNG was opened at original resolution. The path control,
   branch chip, dirty indicator, dividers, baseline, and 38-point footer remain
   vertically aligned with no clipping or movement into the terminal surface.
-- Verification: full preflight passes the text baseline, all 129 Swift tests,
+- Verification: full preflight passes the text baseline, all 130 Swift tests,
   warnings/release builds, single-window and dynamic-command probes,
   forced-termination persistence, real terminal integration, and 100
   two-surface lifecycle cycles.
 - Privacy: the strict footer crop contains only the repository's public name,
   generic branch/status data, and product chrome. It contains no terminal
   contents, typed commands, clipboard data, credentials, or private paths.
-- Upload status: retained locally. Pushing this focused screenshot commit from
-  the current branch would also publish unapproved implementation ancestors,
-  so the standing screenshot-only authorization does not safely cover that
-  push.
+- Upload status: published to the verified private origin under Sarah's explicit
+  full-branch authorization. [Open the uploaded PNG on GitHub](https://github.com/Interactive-Buffoonery/awesomux-linux-gtk/blob/main/artifacts/visual-qa/swift-gtk/progress/47-focused-footer-targets/interactive-chip-targets-x11.png).
 
 ## 2026-08-29 — SwiftGtk4 command availability boundaries
 
