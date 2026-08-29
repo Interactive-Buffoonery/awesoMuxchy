@@ -1,5 +1,32 @@
 # Visual QA
 
+## 2026-08-29 — SwiftGtk4 owned provider vector glyphs
+
+- Linux images: [Latte provider matrix](swift-gtk/progress/27-provider-vector-glyphs/provider-vectors-light-x11.png),
+  [Mocha provider matrix](swift-gtk/progress/27-provider-vector-glyphs/provider-vectors-dark-x11.png),
+  and [HighContrast provider matrix](swift-gtk/progress/27-provider-vector-glyphs/provider-vectors-high-contrast-x11.png).
+- Reference: `DesignSystem/Atoms/AgentTile.swift` at macOS baseline
+  `fed33ff47c559344fc6db6fa53f16e75fcc4a116`.
+- Behavior and geometry: one scalable GTK drawing component now renders the
+  reference Claude eight-ray burst, Codex organic open spiral, OpenCode open
+  bracket pair, Grok three-ring knot, and shell prompt at expanded/peek/rail
+  sizes. Pi remains a semibold mono glyph. Provider hue stays on the mark over
+  one uniform elevated tile, and the existing non-color-only state badges
+  remain layered above it.
+- Inspection: all three 1440×852 real X11/GLX application captures were opened
+  at original resolution. The six identities remain visibly distinct in
+  Latte, Mocha, and HighContrast; a first light pass exposed the shell mark's
+  inherited pale color, and the final light capture verifies its corrected
+  dark foreground. Long rows, selected/attention tiles, status badges, footer
+  counts, and both real Ghostty panes remain aligned.
+- Accessibility: the glyph drawing/text child is explicitly hidden from
+  AT-SPI; the tile parent continues to expose one provider-plus-state label,
+  avoiding duplicate decorative announcements.
+- Verification: full preflight passes 83 Swift tests, release terminal
+  integration, and 100 two-surface lifecycle cycles.
+- Privacy: provider workspaces and states are synthetic. No commands, history,
+  clipboard content, credentials, or arbitrary agent output is shown.
+
 ## 2026-08-29 — SwiftGtk4 live pane-scoped agent event
 
 - Linux image: [live Grok Needs Input transition](swift-gtk/progress/26-live-agent-events/live-grok-needs-input-x11.png).
