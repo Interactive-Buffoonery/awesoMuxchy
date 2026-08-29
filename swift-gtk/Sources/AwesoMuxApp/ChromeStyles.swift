@@ -21,13 +21,22 @@ enum GTKChromeAppearance {
         )
     }
 
+    static var textScale: Double {
+        ChromeTextScalePolicy.scale(
+            xftDPI: property("gtk-xft-dpi")?.getInt() ?? -1,
+            dpiScaleOverride: ProcessInfo.processInfo.environment["GDK_DPI_SCALE"]
+        )
+    }
+
     private static var themeName: String {
         property("gtk-theme-name")?.getString() ?? ""
     }
 }
 
 enum ChromeStyles {
-    static func makeProvider() -> CSSProvider { CSSProvider(from: css) }
+    static func makeProvider() -> CSSProvider {
+        CSSProvider(from: ChromeTextScalePolicy.applying(to: css, scale: GTKChromeAppearance.textScale))
+    }
 
     private static let css = """
       .aw-root{font-family:"Geist",sans-serif;}.aw-root,.aw-content{background:#1e1e2e;}.aw-titlebar{min-height:38px;background:#11111b;border-bottom:1px solid #313244;}
