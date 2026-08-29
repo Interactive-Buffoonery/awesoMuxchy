@@ -36,6 +36,9 @@ typedef struct {
   amx_ghostty_focus_cb focus_changed;
 } amx_ghostty_callbacks;
 
+/* Must be called before GTK initialization so GTK selects desktop OpenGL. */
+AMX_GHOSTTY_API bool amx_ghostty_prepare_gtk_environment(void);
+
 AMX_GHOSTTY_API amx_ghostty_app *amx_ghostty_app_create(void);
 AMX_GHOSTTY_API void amx_ghostty_app_destroy(amx_ghostty_app *app);
 

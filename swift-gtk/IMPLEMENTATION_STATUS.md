@@ -14,8 +14,9 @@ geometry and state styling have also passed a real-window visual correction.
   owned Swift code or concurrency-suppression flags.
 - `AwesoMuxTerminal` contains every raw Ghostty handle and exposes owned Swift
   runtime/surface objects to the app and integration harnesses.
-- Two concurrent real terminals render on X11/GLX, receive focus and resize,
-  and support UTF-8 input plus GTK clipboard read/write callbacks.
+- Two concurrent real terminals render on native Wayland/EGL and X11/GLX,
+  receive focus and resize, and support UTF-8 input plus GTK clipboard
+  read/write callbacks.
 - GTK signals are disconnected before release; pending clipboard reads keep
   the host allocation alive and cannot complete against a destroyed core.
 - GTK focus-enter/leave events cross the language-neutral callback table and
@@ -27,6 +28,13 @@ geometry and state styling have also passed a real-window visual correction.
   route restores the split and requires the same surface to remain ready for
   focus, input, and close-risk verification; four consecutive X11/GLX passes
   completed cleanly.
+- The shim now prepares GTK's desktop-OpenGL environment before initialization,
+  matching canonical Ghostty's GTK 4.14/4.16 version split. The same harness
+  passes natively on COSMIC Wayland at 100%, 125%, 150%, and 200%, followed by
+  100 two-surface lifecycle cycles and an inspected 1440×888 app-owned PNG.
+- Full preflight passes all 130 Swift tests, every release/process probe, X11
+  integration plus 100 lifecycle cycles, and native Wayland integration plus
+  100 lifecycle cycles. Visual-QA commit `fd0dd22` is on the private origin.
 - Three 100-cycle, two-busy-surface stress runs pass with stable warmed peak
   memory.
 - Accessible pane labels/descriptions and keyboard-operable sidebar buttons
@@ -509,7 +517,6 @@ geometry and state styling have also passed a real-window visual correction.
 
 ## Remaining vertical-slice hardening
 
-- Native Wayland GL context creation on the current NVIDIA/COSMIC stack.
 - Real desktop IME preedit/commit and Orca inspection.
 - Automated pointer selection, hover, scroll, primary selection, physical DnD,
   and pending clipboard teardown tests.

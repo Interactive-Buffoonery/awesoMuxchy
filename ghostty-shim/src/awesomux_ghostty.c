@@ -37,6 +37,29 @@ static void clipboard_read_text_finished(GObject *source,
                                          GAsyncResult *result,
                                          void *userdata);
 
+bool amx_ghostty_prepare_gtk_environment(void) {
+  if (gtk_is_initialized()) return false;
+
+  const guint major = gtk_get_major_version();
+  const guint minor = gtk_get_minor_version();
+  /*
+   * Ghostty requires desktop OpenGL. GTK 4.14 otherwise attempts its GLES
+   * path on Wayland even when GtkGLArea limits allowed-apis to GL. Keep this
+   * version split aligned with canonical Ghostty's GTK host initialization.
+   * See https://gitlab.gnome.org/GNOME/gtk/-/issues/6589.
+   */
+  if (major > 4 || (major == 4 && minor >= 16)) {
+    return g_setenv("GDK_DISABLE", "gles-api,vulkan", true);
+  }
+  if (major == 4 && minor >= 14) {
+    return g_setenv(
+        "GDK_DEBUG",
+        "gl-disable-gles,vulkan-disable,gl-no-fractional",
+        true);
+  }
+  return g_setenv("GDK_DEBUG", "vulkan-disable", true);
+}
+
 static gboolean tick_on_main(void *data) {
   amx_ghostty_app *app = data;
   if (app != NULL && app->core != NULL) ghostty_app_tick(app->core);

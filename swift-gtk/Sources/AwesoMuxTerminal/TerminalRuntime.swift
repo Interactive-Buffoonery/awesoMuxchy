@@ -49,6 +49,11 @@ private func terminalFocusChanged(
 public final class TerminalRuntime {
     fileprivate let handle: OpaquePointer
 
+    /// Select Ghostty's supported desktop-OpenGL GTK path before GTK starts.
+    public static func prepareGTKEnvironment() -> Bool {
+        amx_ghostty_prepare_gtk_environment()
+    }
+
     public init?() {
         guard let handle = amx_ghostty_app_create() else { return nil }
         self.handle = handle

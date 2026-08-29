@@ -66,6 +66,7 @@ env GDK_BACKEND=x11 GDK_DEBUG=gl-glx DISPLAY="$qa_display" \
 env GDK_BACKEND=x11 GDK_DEBUG=gl-glx DISPLAY="$qa_display" \
   GHOSTTY_RESOURCES_DIR="$repo_root/.build/ghostty-prefix/share/ghostty" \
   "$release_bin/awesomux-lifecycle-stress"
+"$repo_root/script/test-native-wayland-terminal.sh" "$release_bin"
 
 git -C "$repo_root" diff --check
 echo "preflight: passed"

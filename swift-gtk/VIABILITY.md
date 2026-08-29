@@ -103,11 +103,12 @@ unsafe pointer is exposed to the application target.
 - The generated API surface is large and compile time is material, but the
   required wrapper layer stays small.
 
-## Known non-Swift constraint
+## Resolved non-Swift constraint
 
-Native GTK Wayland fails to create a desktop OpenGL context on the current
+Native GTK Wayland originally failed to create a desktop OpenGL context on the
 COSMIC/NVIDIA GTX 1080 Ti configuration, including a minimal two-GLArea run.
-X11/GLX under XWayland renders and passes the full harness. This failure is in
-the GTK/OpenGL platform path shared by either implementation language, so it
-does not justify discarding Swift. It remains a high-priority platform issue
-and is recorded in `PLATFORM_DIFFERENCES.md`.
+The cause was GTK 4.14 selecting its GLES path before the per-widget desktop-GL
+restriction took effect. Preparing GTK with canonical Ghostty's version-aware
+desktop-OpenGL environment selection resolves the failure. Native integration,
+100 two-surface lifecycle cycles, 100%/125%/150%/200% scale runs, and an
+inspected real-app capture now pass; X11/GLX remains covered as a regression.

@@ -31,6 +31,7 @@ private final class IntegrationState {
     let reflowFile: URL
     var failed = false
     var failureReason = "none"
+    var resizeReflowVerificationAttempts = 0
 
     init(
         application: Gtk.ApplicationRef,
@@ -173,6 +174,14 @@ private final class IntegrationState {
         }
         guard let data = try? Data(contentsOf: reflowFile),
               String(data: data, encoding: .utf8) == reflowToken else {
+            resizeReflowVerificationAttempts += 1
+            if resizeReflowVerificationAttempts < 50 {
+                timeout(add: 100) { [weak self] in
+                    self?.verifyResizeReflowStress(shellProcessID: shellProcessID)
+                    return false
+                }
+                return
+            }
             fail(reason: "Unicode resize reflow command did not complete")
             return
         }
@@ -318,6 +327,9 @@ private func runIntegration(application: Gtk.ApplicationRef) {
     timeout(add: 3_500) { [weak state] in state?.verifyReadAndRequestWrite() ?? false }
 }
 
+guard TerminalRuntime.prepareGTKEnvironment() else {
+    fatalError("Could not prepare GTK for Ghostty rendering")
+}
 let status = Application.run(
     id: "com.interactivebuffoonery.awesomux.terminal-integration",
     arguments: CommandLine.arguments,

@@ -3821,6 +3821,31 @@ private final class ApplicationState: @unchecked Sendable {
 nonisolated(unsafe) private var retainedState: ApplicationState?
 nonisolated(unsafe) private var retainedPrimaryWindow: ApplicationWindowRef?
 
+private func captureVisualQAPNG(window: ApplicationWindowRef, path: String) -> Bool {
+    let width = window.getWidth()
+    let height = window.getHeight()
+    guard width > 0, height > 0,
+          let paintable = gtk_widget_paintable_new(window.widget_ptr),
+          let snapshot = gtk_snapshot_new()
+    else { return false }
+    defer { g_object_unref(paintable) }
+
+    gdk_paintable_snapshot(paintable, snapshot, Double(width), Double(height))
+    guard let node = gtk_snapshot_free_to_node(snapshot) else { return false }
+    defer { gsk_render_node_unref(node) }
+    guard let native = gtk_widget_get_native(window.widget_ptr),
+          let surface = gtk_native_get_surface(native),
+          let renderer = gsk_renderer_new_for_surface(surface)
+    else { return false }
+    defer {
+        gsk_renderer_unrealize(renderer)
+        g_object_unref(renderer)
+    }
+    guard let texture = gsk_renderer_render_texture(renderer, node, nil) else { return false }
+    defer { g_object_unref(texture) }
+    return path.withCString { gdk_texture_save_to_png(texture, $0) != 0 }
+}
+
 private func initialSnapshot() -> SessionSnapshot {
     return SessionSnapshot(selectedWorkspaceID: nil, groups: [])
 }
@@ -4094,11 +4119,22 @@ private func buildWindow(for application: Gtk.ApplicationRef) {
     state.filter("")
     if let selected = snapshot.selectedWorkspaceID { state.select(selected) }
     performOnGTKMain { [weak state] in state?.presentStartupRecoveryIfNeeded() }
+    if let capturePath = ProcessInfo.processInfo.environment["AWESOMUX_VISUAL_QA_CAPTURE_PATH"],
+       !capturePath.isEmpty {
+        timeout(add: 5_000) {
+            _ = captureVisualQAPNG(window: window, path: capturePath)
+            application.quit()
+            return false
+        }
+    }
 }
 
 let applicationID = ProcessInfo.processInfo.environment["AWESOMUX_SINGLE_WINDOW_PROBE"] == "1"
     ? "com.interactivebuffoonery.awesomux.activationprobe"
     : "com.interactivebuffoonery.awesomux"
+guard TerminalRuntime.prepareGTKEnvironment() else {
+    fatalError("Could not prepare GTK for Ghostty rendering")
+}
 let status = applicationID.withCString { identifier in
     Application.run(id: identifier, arguments: CommandLine.arguments, activationHandler: buildWindow)
 }

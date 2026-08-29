@@ -75,6 +75,9 @@ private func runStress(application: ApplicationRef) {
     }
 }
 
+guard TerminalRuntime.prepareGTKEnvironment() else {
+    fatalError("Could not prepare GTK for Ghostty rendering")
+}
 let status = Application.run(
     id: "com.interactivebuffoonery.awesomux.lifecycle-stress",
     arguments: CommandLine.arguments,

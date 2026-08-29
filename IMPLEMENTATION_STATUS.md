@@ -17,8 +17,8 @@ help, and agent context while preserving the compact reference geometry.
   dependency graph. The canonical Ghostty and zmx submodules remain clean.
 - The staged Ghostty build, minimal Linux embedder patch, generated OpenGL
   loader, language-neutral C shim, and Swift wrapper module build and link.
-- A native GTK4 window renders three independent real Ghostty surfaces on the
-  supported X11/GLX path. Sidebar rows switch whole workspaces; Development
+- A native GTK4 window renders independent real Ghostty surfaces on native
+  Wayland/EGL and X11/GLX. Sidebar rows switch whole workspaces; Development
   owns a two-pane split and Review owns a separate terminal page.
 - GTK IM context, keyboard, pointer, focus, resize, title, close, clipboard,
   accessibility-label, and main-thread wakeup bridges exist in the shim.
@@ -27,6 +27,14 @@ help, and agent context while preserving the compact reference geometry.
 - The standalone integration executable passed input, Unicode/emoji/combining
   and wide-character data, focus, resize, clipboard read/write, exit, and
   second-pane independence.
+- The native Wayland regression route passes that complete integration harness
+  plus 100 two-busy-surface lifecycle cycles. Real COSMIC runs also pass at
+  100%, 125%, 150%, and 200% scale; the inspected 1440×888 native screenshot
+  contains two complete Ghostty framebuffers with intact chrome.
+- Full local preflight passes all 130 Swift tests, the release/process probes,
+  X11 integration and lifecycle stress, and the new native Wayland integration
+  and lifecycle stress. Focused visual-QA commit `fd0dd22` is published to the
+  verified private origin.
 - Three standalone stress runs each passed 100 cycles with two concurrently
   busy, successfully realized surfaces. Peak RSS was 307,208 KiB on the first
   driver-cache warm-up and 245,056/244,844 KiB on the following runs.
@@ -575,10 +583,6 @@ help, and agent context while preserving the compact reference geometry.
 
 ## Active constraints
 
-- Native GTK Wayland cannot create the required desktop OpenGL context on the
-  current COSMIC/NVIDIA GTX 1080 Ti stack. X11/GLX under XWayland is the current
-  runtime path; the failed native path is recorded in
-  `PLATFORM_DIFFERENCES.md` and remains a high-priority investigation.
 - `libatk1.0-dev` is not installed system-wide while Sarah is away. The build
   uses only its downloaded development archive in `.build/sysroot`; the system
   can be normalized later without blocking work.
