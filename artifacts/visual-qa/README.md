@@ -1,5 +1,31 @@
 # Visual QA
 
+## 2026-08-29 — SwiftGtk4 live pane-scoped agent event
+
+- Linux image: [live Grok Needs Input transition](swift-gtk/progress/26-live-agent-events/live-grok-needs-input-x11.png).
+- Reference: pane-scoped agent-event delivery, provider identity, Needs Input
+  promotion, and footer roster behavior at macOS baseline
+  `fed33ff47c559344fc6db6fa53f16e75fcc4a116`.
+- Behavior: the release app created four owner-only pane event endpoints and
+  passed each endpoint, stable pane ID, and runtime session ID into its real
+  Ghostty child environment. Appending one bounded protocol-v1 Grok
+  `userInputRequired` event for the synthetic Pinned Review pane changed only
+  that pane from idle Pi to Grok Needs Attention, moved its workspace into the
+  Needs Input projection, refreshed the non-color-only status badge, changed
+  the footer to `3 agents` / two Needs Input, and persisted the new state.
+- Inspection: the 1440×852 X11/GLX application surface was captured after the
+  background reader and GTK-main publication completed, then inspected at
+  original resolution. XWayland exposes the GTK toplevel as an ARGB surface;
+  the capture preserves its pixels and composites transparent desktop pixels
+  over the owned dark application backdrop so text and controls remain
+  inspectable without capturing unrelated desktop content.
+- Verification: full preflight passes 83 Swift tests, release terminal
+  integration including exact child-environment delivery, and 100 two-surface
+  lifecycle cycles. The persisted fixture independently confirms the target
+  pane's Grok/Needs Attention identity.
+- Privacy: event and session fixtures are synthetic. The protocol contains no
+  prompt, terminal, command, clipboard, credential, or arbitrary output field.
+
 ## 2026-08-29 — SwiftGtk4 empty workspace and absent focused context
 
 - Linux image: [zero groups / no focused pane context](swift-gtk/progress/25-empty-neutral-footer/zero-groups-no-focused-context-x11.png).
