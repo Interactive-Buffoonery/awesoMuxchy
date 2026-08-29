@@ -40,6 +40,12 @@ private func applySearchMatch(_ range: Swift.Range<Int>?, to label: LabelRef) {
 }
 
 private final class ApplicationState: @unchecked Sendable {
+    private enum SidebarDragItem: Equatable {
+        case workspace(UUID)
+        case pinned(UUID)
+        case group(UUID)
+    }
+
     private final class WorkspaceRuntime {
         var groupID: UUID
         let pageName: String
@@ -253,6 +259,14 @@ private final class ApplicationState: @unchecked Sendable {
     private var sidebarNavigationKeyController: EventControllerKey?
     private var globalModifierKeyController: EventControllerKey?
     private var isWorkspaceJumpModifierHeld = false
+    private let sidebarDragNonce = UUID().uuidString
+    private var activeSidebarDrag: SidebarDragItem?
+    private var regularWorkspaceDragSources: [UUID: DragSource] = [:]
+    private var regularWorkspaceDropTargets: [UUID: DropTarget] = [:]
+    private var pinnedWorkspaceDragSources: [UUID: DragSource] = [:]
+    private var pinnedWorkspaceDropTargets: [UUID: DropTarget] = [:]
+    private var groupDragSources: [UUID: DragSource] = [:]
+    private var groupDropTargets: [UUID: DropTarget] = [:]
     private var lastWorkspaceCreateAt: ContinuousClock.Instant?
     private var context = FocusedPaneContextCoordinator()
     private var actions: [GIO.SimpleAction] = []
@@ -669,6 +683,7 @@ private final class ApplicationState: @unchecked Sendable {
         groupHeaderChrome[groupID]?.isCollapsed = group.isCollapsed
         refreshGroupAttention(groupID)
         if let disclosure = groupDisclosures[groupID] { setAccessibleExpanded(disclosure, !group.isCollapsed) }
+        announce("\(ChromeText.sanitized(group.name, limit: 120)) group \(group.isCollapsed ? "collapsed" : "expanded")")
         persist()
     }
 
@@ -909,6 +924,245 @@ private final class ApplicationState: @unchecked Sendable {
             pathBar: pathBar, focusedPaneID: workspace.focusedPaneID, focusedSurface: focusedSurface)
     }
 
+    private func sidebarDragPayload(for item: SidebarDragItem) -> String {
+        let kind: String
+        let id: UUID
+        switch item {
+        case let .workspace(value): kind = "workspace"; id = value
+        case let .pinned(value): kind = "pinned"; id = value
+        case let .group(value): kind = "group"; id = value
+        }
+        return "awesomux-sidebar:\(sidebarDragNonce):\(kind):\(id.uuidString)"
+    }
+
+    private func sidebarDragItem(from value: ValueRef) -> SidebarDragItem? {
+        guard let payload = value.getString() else { return nil }
+        let fields = payload.split(separator: ":", omittingEmptySubsequences: false)
+        guard fields.count == 4, fields[0] == "awesomux-sidebar",
+              fields[1] == Substring(sidebarDragNonce), let id = UUID(uuidString: String(fields[3]))
+        else { return nil }
+        switch fields[2] {
+        case "workspace": return .workspace(id)
+        case "pinned": return .pinned(id)
+        case "group": return .group(id)
+        default: return nil
+        }
+    }
+
+    private func makeSidebarDragSource(on host: WidgetRef, item: SidebarDragItem) -> DragSource {
+        let source = DragSource()
+        source.set(actions: isSidebarFiltering ? Gdk.DragAction(rawValue: 0) : .move)
+        source.set(content: Gdk.ContentProvider(value: Value(sidebarDragPayload(for: item))))
+        source.onDragBegin { [weak self] _, _ in self?.beginSidebarDrag(item) }
+        source.onDragEnd { [weak self] _, _, _ in self?.endSidebarDrag(item) }
+        source.onDragCancel { [weak self] _, _, _ in self?.endSidebarDrag(item); return false }
+        _ = source.ref()
+        gtk_widget_add_controller(host.widget_ptr, source.event_controller_ptr)
+        return source
+    }
+
+    private func beginSidebarDrag(_ item: SidebarDragItem) {
+        guard !isSidebarFiltering else { return }
+        activeSidebarDrag = item
+        for chrome in groupHeaderChrome.values { chrome.isDragActive = true }
+        for id in workspacePanePeekPopovers.keys { dismissWorkspacePanePeek(id) }
+    }
+
+    private func endSidebarDrag(_ item: SidebarDragItem) {
+        guard activeSidebarDrag == item else { return }
+        activeSidebarDrag = nil
+        clearSidebarDropIndicators()
+        for chrome in groupHeaderChrome.values { chrome.isDragActive = false }
+    }
+
+    private func clearSidebarDropIndicators() {
+        for chrome in regularRowChrome.values { clearDropIndicator(on: WidgetRef(chrome.root)) }
+        for chrome in liftedRowChrome.values { clearDropIndicator(on: WidgetRef(chrome.root)) }
+        for chrome in groupHeaderChrome.values { clearDropIndicator(on: WidgetRef(chrome.root)) }
+    }
+
+    private func clearDropIndicator(on widget: WidgetRef) {
+        widget.remove(cssClass: "aw-drop-before")
+        widget.remove(cssClass: "aw-drop-after")
+        widget.remove(cssClass: "aw-drop-into")
+    }
+
+    private func showDropIndicator(on widget: WidgetRef, edge: SidebarInsertionEdge) {
+        clearSidebarDropIndicators()
+        widget.add(cssClass: edge == .before ? "aw-drop-before" : "aw-drop-after")
+    }
+
+    private func insertionEdge(y: Double, in widget: WidgetRef) -> SidebarInsertionEdge {
+        y < Double(max(widget.getHeight(), 1)) / 2 ? .before : .after
+    }
+
+    private func installRegularWorkspaceDrag(on chrome: WorkspaceRowChrome, workspaceID: UUID) {
+        let source = makeSidebarDragSource(on: WidgetRef(chrome.row), item: .workspace(workspaceID))
+        regularWorkspaceDragSources[workspaceID] = source
+        let target = DropTarget(type: GType.string, actions: .move)
+        target.onEnter { [weak self, root = chrome.root] _, _, y in
+            self?.updateWorkspaceDropIndicator(targetID: workspaceID, root: root, y: y) ?? Gdk.DragAction(rawValue: 0)
+        }
+        target.onMotion { [weak self, root = chrome.root] _, _, y in
+            self?.updateWorkspaceDropIndicator(targetID: workspaceID, root: root, y: y) ?? Gdk.DragAction(rawValue: 0)
+        }
+        target.onLeave { [weak self, root = chrome.root] _ in self?.clearDropIndicator(on: WidgetRef(root)) }
+        target.onDrop { [weak self, root = chrome.root] _, value, _, y in
+            guard let self, self.sidebarDragItem(from: value) == self.activeSidebarDrag else { return false }
+            let accepted = self.dropWorkspace(on: workspaceID, edge: self.insertionEdge(y: y, in: WidgetRef(root)))
+            self.clearSidebarDropIndicators()
+            return accepted
+        }
+        _ = target.ref(); gtk_widget_add_controller(chrome.root.widget_ptr, target.event_controller_ptr)
+        regularWorkspaceDropTargets[workspaceID] = target
+    }
+
+    private func updateWorkspaceDropIndicator(
+        targetID: UUID, root: OverlayRef, y: Double
+    ) -> Gdk.DragAction {
+        guard !isSidebarFiltering, case let .workspace(sourceID) = activeSidebarDrag,
+              workspaceDropDestination(
+                sourceID: sourceID, targetID: targetID,
+                edge: insertionEdge(y: y, in: WidgetRef(root))
+              ) != nil else {
+            clearDropIndicator(on: WidgetRef(root)); return Gdk.DragAction(rawValue: 0)
+        }
+        showDropIndicator(on: WidgetRef(root), edge: insertionEdge(y: y, in: WidgetRef(root)))
+        return .move
+    }
+
+    private func installPinnedWorkspaceDrag(on chrome: WorkspaceRowChrome, workspaceID: UUID) {
+        let source = makeSidebarDragSource(on: WidgetRef(chrome.row), item: .pinned(workspaceID))
+        pinnedWorkspaceDragSources[workspaceID] = source
+        let target = DropTarget(type: GType.string, actions: .move)
+        target.onEnter { [weak self, root = chrome.root] _, _, y in
+            self?.updatePinnedDropIndicator(targetID: workspaceID, root: root, y: y) ?? Gdk.DragAction(rawValue: 0)
+        }
+        target.onMotion { [weak self, root = chrome.root] _, _, y in
+            self?.updatePinnedDropIndicator(targetID: workspaceID, root: root, y: y) ?? Gdk.DragAction(rawValue: 0)
+        }
+        target.onLeave { [weak self, root = chrome.root] _ in self?.clearDropIndicator(on: WidgetRef(root)) }
+        target.onDrop { [weak self, root = chrome.root] _, value, _, y in
+            guard let self, self.sidebarDragItem(from: value) == self.activeSidebarDrag else { return false }
+            let accepted = self.dropPinnedWorkspace(on: workspaceID, edge: self.insertionEdge(y: y, in: WidgetRef(root)))
+            self.clearSidebarDropIndicators()
+            return accepted
+        }
+        _ = target.ref(); gtk_widget_add_controller(chrome.root.widget_ptr, target.event_controller_ptr)
+        pinnedWorkspaceDropTargets[workspaceID] = target
+    }
+
+    private func updatePinnedDropIndicator(
+        targetID: UUID, root: OverlayRef, y: Double
+    ) -> Gdk.DragAction {
+        guard !isSidebarFiltering, case let .pinned(sourceID) = activeSidebarDrag,
+              pinnedDropDestination(
+                sourceID: sourceID, targetID: targetID,
+                edge: insertionEdge(y: y, in: WidgetRef(root))
+              ) != nil else {
+            clearDropIndicator(on: WidgetRef(root)); return Gdk.DragAction(rawValue: 0)
+        }
+        showDropIndicator(on: WidgetRef(root), edge: insertionEdge(y: y, in: WidgetRef(root)))
+        return .move
+    }
+
+    private func installGroupDrag(on chrome: GroupHeaderChrome, groupID: UUID) {
+        groupDragSources[groupID] = makeSidebarDragSource(on: WidgetRef(chrome.root), item: .group(groupID))
+        let target = DropTarget(type: GType.string, actions: .move)
+        target.onEnter { [weak self, root = chrome.root] _, _, y in
+            self?.updateGroupDropIndicator(targetID: groupID, root: root, y: y) ?? Gdk.DragAction(rawValue: 0)
+        }
+        target.onMotion { [weak self, root = chrome.root] _, _, y in
+            self?.updateGroupDropIndicator(targetID: groupID, root: root, y: y) ?? Gdk.DragAction(rawValue: 0)
+        }
+        target.onLeave { [weak self, root = chrome.root] _ in self?.clearDropIndicator(on: WidgetRef(root)) }
+        target.onDrop { [weak self, root = chrome.root] _, value, _, y in
+            guard let self, self.sidebarDragItem(from: value) == self.activeSidebarDrag else { return false }
+            let accepted = self.drop(onGroupHeader: groupID, edge: self.insertionEdge(y: y, in: WidgetRef(root)))
+            self.clearSidebarDropIndicators()
+            return accepted
+        }
+        _ = target.ref(); gtk_widget_add_controller(chrome.root.widget_ptr, target.event_controller_ptr)
+        groupDropTargets[groupID] = target
+    }
+
+    private func detachRegularWorkspaceDrag(_ workspaceID: UUID) {
+        if let source = regularWorkspaceDragSources.removeValue(forKey: workspaceID),
+           let row = rows[workspaceID] {
+            gtk_widget_remove_controller(row.widget_ptr, source.event_controller_ptr)
+        }
+        if let target = regularWorkspaceDropTargets.removeValue(forKey: workspaceID),
+           let chrome = regularRowChrome[workspaceID] {
+            gtk_widget_remove_controller(chrome.root.widget_ptr, target.event_controller_ptr)
+        }
+    }
+
+    private func detachPinnedWorkspaceDrag(_ workspaceID: UUID) {
+        if let source = pinnedWorkspaceDragSources.removeValue(forKey: workspaceID),
+           let row = pinnedRows[workspaceID] {
+            gtk_widget_remove_controller(row.widget_ptr, source.event_controller_ptr)
+        }
+        if let target = pinnedWorkspaceDropTargets.removeValue(forKey: workspaceID),
+           let chrome = liftedRowChrome[workspaceID] {
+            gtk_widget_remove_controller(chrome.root.widget_ptr, target.event_controller_ptr)
+        }
+    }
+
+    private func detachGroupDrag(_ groupID: UUID) {
+        guard let chrome = groupHeaderChrome[groupID] else {
+            groupDragSources.removeValue(forKey: groupID)
+            groupDropTargets.removeValue(forKey: groupID)
+            return
+        }
+        if let source = groupDragSources.removeValue(forKey: groupID) {
+            gtk_widget_remove_controller(chrome.root.widget_ptr, source.event_controller_ptr)
+        }
+        if let target = groupDropTargets.removeValue(forKey: groupID) {
+            gtk_widget_remove_controller(chrome.root.widget_ptr, target.event_controller_ptr)
+        }
+    }
+
+    private func refreshSidebarDragAvailability() {
+        let actions: Gdk.DragAction = isSidebarFiltering ? Gdk.DragAction(rawValue: 0) : .move
+        for source in regularWorkspaceDragSources.values { source.set(actions: actions) }
+        for source in pinnedWorkspaceDragSources.values { source.set(actions: actions) }
+        for source in groupDragSources.values { source.set(actions: actions) }
+        for target in regularWorkspaceDropTargets.values { target.set(actions: actions) }
+        for target in pinnedWorkspaceDropTargets.values { target.set(actions: actions) }
+        for target in groupDropTargets.values { target.set(actions: actions) }
+        if isSidebarFiltering {
+            activeSidebarDrag = nil
+            clearSidebarDropIndicators()
+            for chrome in groupHeaderChrome.values { chrome.isDragActive = false }
+        }
+    }
+
+    private func updateGroupDropIndicator(
+        targetID: UUID, root: OverlayRef, y: Double
+    ) -> Gdk.DragAction {
+        guard !isSidebarFiltering, let activeSidebarDrag else {
+            clearDropIndicator(on: WidgetRef(root)); return Gdk.DragAction(rawValue: 0)
+        }
+        switch activeSidebarDrag {
+        case let .group(sourceID):
+            guard groupDropDestination(
+                sourceID: sourceID, targetID: targetID,
+                edge: insertionEdge(y: y, in: WidgetRef(root))
+            ) != nil else {
+                clearDropIndicator(on: WidgetRef(root)); return Gdk.DragAction(rawValue: 0)
+            }
+            showDropIndicator(on: WidgetRef(root), edge: insertionEdge(y: y, in: WidgetRef(root)))
+        case let .workspace(sourceID):
+            guard groupHeaderWorkspaceDestination(sourceID: sourceID, groupID: targetID) != nil else {
+                clearDropIndicator(on: WidgetRef(root)); return Gdk.DragAction(rawValue: 0)
+            }
+            clearSidebarDropIndicators(); root.add(cssClass: "aw-drop-into")
+        case .pinned:
+            clearDropIndicator(on: WidgetRef(root)); return Gdk.DragAction(rawValue: 0)
+        }
+        return .move
+    }
+
     func makeRow(workspace: WorkspaceSnapshot, groupID: UUID) -> OverlayRef {
         let row = ToggleButtonRef(); row.add(cssClass: "aw-row"); row.setHalign(align: .fill)
         let groupIndex = snapshot.groups.firstIndex(where: { $0.id == groupID }) ?? 0
@@ -940,6 +1194,7 @@ private final class ApplicationState: @unchecked Sendable {
         if !(workspaceIDsByGroup[groupID] ?? []).contains(workspace.id) { workspaceIDsByGroup[groupID, default: []].append(workspace.id) }
         let chrome = WorkspaceRowChrome(row: row) { [weak self] in self?.softCloseWorkspace(workspace.id) }
         regularRowChrome[workspace.id] = chrome
+        installRegularWorkspaceDrag(on: chrome, workspaceID: workspace.id)
         return chrome.root
     }
 
@@ -1269,6 +1524,7 @@ private final class ApplicationState: @unchecked Sendable {
         if attention { attentionRows[workspace.id] = button } else { pinnedRows[workspace.id] = button }
         let chrome = WorkspaceRowChrome(row: button) { [weak self] in self?.softCloseWorkspace(workspace.id) }
         liftedRowChrome[workspace.id] = chrome
+        if !attention { installPinnedWorkspaceDrag(on: chrome, workspaceID: workspace.id) }
         return chrome.root
     }
 
@@ -1367,9 +1623,11 @@ private final class ApplicationState: @unchecked Sendable {
 
     private func acknowledgeWorkspace(_ workspaceID: UUID) {
         attentionAcknowledgementGeneration += 1
+        let wasAttention = snapshot.attentionWorkspaceIDs.contains(workspaceID)
         guard (try? snapshot.acknowledgeWorkspace(workspaceID)) != nil else { return }
         rebuildWorkspaceContextMenu(workspaceID)
         refreshLiftedRows(); updateSidebarVisibility(); persist()
+        announceAttentionReturnIfNeeded(workspaceID, wasAttention: wasAttention)
     }
 
     private func scheduleAttentionAcknowledgement(workspaceID: UUID, paneID: UUID) {
@@ -1388,6 +1646,7 @@ private final class ApplicationState: @unchecked Sendable {
                 else { return }
                 self.rebuildWorkspaceContextMenu(workspaceID)
                 self.refreshLiftedRows(); self.updateSidebarVisibility(); self.persist()
+                self.announceAttentionReturnIfNeeded(workspaceID, wasAttention: true)
             }
         }
     }
@@ -1407,6 +1666,7 @@ private final class ApplicationState: @unchecked Sendable {
     }
 
     private func togglePinned(_ workspaceID: UUID) {
+        let wasPinned = snapshot.pinnedWorkspaceIDs.contains(workspaceID)
         guard (try? snapshot.togglePinnedWorkspace(workspaceID)) != nil else { return }
         snapshot.reconcileAttentionWorkspaceIDs()
         let isPinned = snapshot.pinnedWorkspaceIDs.contains(workspaceID)
@@ -1414,12 +1674,111 @@ private final class ApplicationState: @unchecked Sendable {
         liftedPinActions[workspaceID]?.label = isPinned ? "Unpin" : "Pin"
         refreshLiftedRows()
         persist()
+        guard let workspace = snapshot.workspace(id: workspaceID) else { return }
+        let title = SidebarWorkspaceTitle.resolve(workspace: workspace)
+        if !wasPinned {
+            announce("Pinned \(title)")
+        } else if snapshot.attentionWorkspaceIDs.contains(workspaceID) {
+            announce("Unpinned \(title), moved to Needs Input")
+        } else if let group = snapshot.groups.first(where: { $0.workspaces.contains { $0.id == workspaceID } }) {
+            announce("Unpinned \(title), returned to \(ChromeText.sanitized(group.name, limit: 120))")
+        }
     }
 
     private func movePinned(_ workspaceID: UUID, offset: Int) {
         guard (try? snapshot.movePinnedWorkspace(workspaceID, offset: offset)) != nil else { return }
         refreshLiftedRows()
         persist()
+        announcePinnedReorder(workspaceID)
+    }
+
+    private func pinnedDropDestination(
+        sourceID: UUID, targetID: UUID, edge: SidebarInsertionEdge
+    ) -> (sourceIndex: Int, destinationIndex: Int)? {
+        guard let sourceIndex = snapshot.pinnedWorkspaceIDs.firstIndex(of: sourceID),
+              let targetIndex = snapshot.pinnedWorkspaceIDs.firstIndex(of: targetID),
+              let destination = SidebarInsertionResolver.reorderTarget(
+                sourceIndex: sourceIndex, targetIndex: targetIndex,
+                edge: edge, count: snapshot.pinnedWorkspaceIDs.count
+              ) else { return nil }
+        return (sourceIndex, destination)
+    }
+
+    private func workspaceDropDestination(
+        sourceID: UUID, targetID: UUID, edge: SidebarInsertionEdge
+    ) -> (groupID: UUID, destinationIndex: Int)? {
+        guard let sourceGroup = snapshot.groups.first(where: { $0.workspaces.contains { $0.id == sourceID } }),
+              let destinationGroup = snapshot.groups.first(where: { $0.workspaces.contains { $0.id == targetID } }),
+              let sourceIndex = sourceGroup.workspaces.firstIndex(where: { $0.id == sourceID }),
+              let targetIndex = destinationGroup.workspaces.firstIndex(where: { $0.id == targetID })
+        else { return nil }
+        if sourceGroup.id == destinationGroup.id {
+            guard let resolved = SidebarInsertionResolver.reorderTarget(
+                sourceIndex: sourceIndex, targetIndex: targetIndex,
+                edge: edge, count: sourceGroup.workspaces.count
+            ) else { return nil }
+            return (destinationGroup.id, resolved)
+        }
+        return (destinationGroup.id,
+            SidebarInsertionResolver.preRemovalIndex(targetIndex: targetIndex, edge: edge))
+    }
+
+    private func groupDropDestination(
+        sourceID: UUID, targetID: UUID, edge: SidebarInsertionEdge
+    ) -> (sourceIndex: Int, destinationIndex: Int)? {
+        guard let sourceIndex = snapshot.groups.firstIndex(where: { $0.id == sourceID }),
+              let targetIndex = snapshot.groups.firstIndex(where: { $0.id == targetID }),
+              let destination = SidebarInsertionResolver.reorderTarget(
+                sourceIndex: sourceIndex, targetIndex: targetIndex,
+                edge: edge, count: snapshot.groups.count
+              ) else { return nil }
+        return (sourceIndex, destination)
+    }
+
+    private func groupHeaderWorkspaceDestination(
+        sourceID: UUID, groupID: UUID
+    ) -> Int? {
+        guard let sourceGroup = snapshot.groups.first(where: { $0.workspaces.contains { $0.id == sourceID } }),
+              let sourceIndex = sourceGroup.workspaces.firstIndex(where: { $0.id == sourceID }),
+              let destination = snapshot.groups.first(where: { $0.id == groupID }) else { return nil }
+        let target = sourceGroup.id == groupID ? max(destination.workspaces.count - 1, 0) : destination.workspaces.count
+        return sourceGroup.id == groupID && sourceIndex == target ? nil : target
+    }
+
+    private func dropPinnedWorkspace(on targetID: UUID, edge: SidebarInsertionEdge) -> Bool {
+        guard !isSidebarFiltering, case let .pinned(sourceID) = activeSidebarDrag,
+              let destination = pinnedDropDestination(
+                sourceID: sourceID, targetID: targetID, edge: edge
+              )
+        else { return false }
+        movePinned(sourceID, offset: destination.destinationIndex - destination.sourceIndex)
+        return true
+    }
+
+    private func dropWorkspace(on targetID: UUID, edge: SidebarInsertionEdge) -> Bool {
+        guard !isSidebarFiltering, case let .workspace(sourceID) = activeSidebarDrag,
+              let destination = workspaceDropDestination(
+                sourceID: sourceID, targetID: targetID, edge: edge
+              )
+        else { return false }
+        return moveWorkspace(sourceID, to: destination.groupID, at: destination.destinationIndex)
+    }
+
+    private func drop(onGroupHeader groupID: UUID, edge: SidebarInsertionEdge) -> Bool {
+        guard !isSidebarFiltering, let activeSidebarDrag else { return false }
+        switch activeSidebarDrag {
+        case let .workspace(sourceID):
+            guard let target = groupHeaderWorkspaceDestination(sourceID: sourceID, groupID: groupID) else { return false }
+            return moveWorkspace(sourceID, to: groupID, at: target)
+        case let .group(sourceID):
+            guard let destination = groupDropDestination(
+                sourceID: sourceID, targetID: groupID, edge: edge
+            ) else { return false }
+            moveGroup(sourceID, offset: destination.destinationIndex - destination.sourceIndex)
+            return true
+        case .pinned:
+            return false
+        }
     }
 
     private func moveWorkspaceWithinGroup(_ workspaceID: UUID, offset: Int) {
@@ -1432,6 +1791,7 @@ private final class ApplicationState: @unchecked Sendable {
         refreshLiftedRows()
         performOnGTKMain { [weak self] in for id in affected { self?.rebuildWorkspaceContextMenu(id) } }
         persist()
+        announceWorkspaceReorder(workspaceID)
     }
 
     func presentWorkspaceNameDialog(_ workspaceID: UUID) {
@@ -1469,35 +1829,50 @@ private final class ApplicationState: @unchecked Sendable {
         return true
     }
 
-    private func moveWorkspace(_ workspaceID: UUID, to groupID: UUID) {
+    @discardableResult private func moveWorkspace(
+        _ workspaceID: UUID, to groupID: UUID, at requestedIndex: Int? = nil
+    ) -> Bool {
         guard let sourceID = snapshot.groups.first(where: { $0.workspaces.contains { $0.id == workspaceID } })?.id,
-              let destination = snapshot.groups.first(where: { $0.id == groupID }),
-              (try? snapshot.moveWorkspace(workspaceID, toGroup: groupID, at: destination.workspaces.count)) != nil
-        else { return }
-        workspaceIDsByGroup[sourceID]?.removeAll { $0 == workspaceID }
-        workspaceIDsByGroup[groupID, default: []].append(workspaceID)
-        let previousDestinationRow = destination.workspaces.last.flatMap { regularRowChrome[$0.id]?.root }
+              let destinationBefore = snapshot.groups.first(where: { $0.id == groupID })
+        else { return false }
+        let sourceBefore = snapshot.groups.first(where: { $0.id == sourceID })
+        let sourceIndexBefore = sourceBefore?.workspaces.firstIndex(where: { $0.id == workspaceID })
+        let targetIndex = requestedIndex ?? destinationBefore.workspaces.count
+        let clampedTarget = min(max(targetIndex, 0), sourceID == groupID
+            ? max(destinationBefore.workspaces.count - 1, 0) : destinationBefore.workspaces.count)
+        guard sourceID != groupID || sourceIndexBefore != clampedTarget,
+              (try? snapshot.moveWorkspace(workspaceID, toGroup: groupID, at: targetIndex)) != nil
+        else { return false }
+        workspaceIDsByGroup[sourceID] = snapshot.groups.first(where: { $0.id == sourceID })?.workspaces.map(\.id) ?? []
+        workspaceIDsByGroup[groupID] = snapshot.groups.first(where: { $0.id == groupID })?.workspaces.map(\.id) ?? []
         if let row = rows[workspaceID], let chrome = regularRowChrome[workspaceID], let body = groupBodies[groupID] {
-            if let controller = workspaceContextControllers.removeValue(forKey: workspaceID) {
-                gtk_widget_remove_controller(row.widget_ptr, controller.event_controller_ptr)
+            if sourceID != groupID {
+                if let controller = workspaceContextControllers.removeValue(forKey: workspaceID) {
+                    gtk_widget_remove_controller(row.widget_ptr, controller.event_controller_ptr)
+                }
+                workspaceContextPopovers.removeValue(forKey: workspaceID)?.unparent()
+                chrome.root.unparent()
+                for color in WorkspaceGroupColor.allCases { row.remove(cssClass: "aw-\(color.rawValue)") }
+                if let destination = snapshot.groups.first(where: { $0.id == groupID }) {
+                    let destinationGroupIndex = snapshot.groups.firstIndex(where: { $0.id == groupID }) ?? 0
+                    let color = SidebarTintProjection.resolvedColor(for: destination, unfilteredIndex: destinationGroupIndex)
+                    row.add(cssClass: "aw-\(color.rawValue)")
+                }
+                body.append(child: chrome.root)
+                installWorkspaceContextMenu(on: row, workspaceID: workspaceID, groupID: groupID)
             }
-            workspaceContextPopovers.removeValue(forKey: workspaceID)?.unparent()
-            chrome.root.unparent()
-            for color in WorkspaceGroupColor.allCases { row.remove(cssClass: "aw-\(color.rawValue)") }
-            let destinationIndex = snapshot.groups.firstIndex(where: { $0.id == groupID }) ?? 0
-            let color = SidebarTintProjection.resolvedColor(for: destination, unfilteredIndex: destinationIndex)
-            row.add(cssClass: "aw-\(color.rawValue)")
-            body.append(child: chrome.root)
-            body.reorderChildAfter(child: chrome.root, sibling: previousDestinationRow)
-            installWorkspaceContextMenu(on: row, workspaceID: workspaceID, groupID: groupID)
         }
         runtimes[workspaceID]?.groupID = groupID
+        reorderGroupRows(sourceID)
+        if groupID != sourceID { reorderGroupRows(groupID) }
         groupCounts[sourceID]?.label = "\(snapshot.groups.first(where: { $0.id == sourceID })?.workspaces.filter { !$0.isSoftClosed }.count ?? 0)"
         groupCounts[groupID]?.label = "\(snapshot.groups.first(where: { $0.id == groupID })?.workspaces.filter { !$0.isSoftClosed }.count ?? 0)"
         let affected = (workspaceIDsByGroup[sourceID] ?? []) + (workspaceIDsByGroup[groupID] ?? [])
         refreshLiftedRows(); refreshGroupActionEnablement()
         performOnGTKMain { [weak self] in for id in affected { self?.rebuildWorkspaceContextMenu(id) } }
         persist()
+        announceWorkspaceReorder(workspaceID)
+        return true
     }
 
     private func softCloseWorkspace(_ workspaceID: UUID) {
@@ -1591,6 +1966,8 @@ private final class ApplicationState: @unchecked Sendable {
     }
 
     private func removeWorkspaceUI(_ workspace: WorkspaceSnapshot) {
+        detachRegularWorkspaceDrag(workspace.id)
+        detachPinnedWorkspaceDrag(workspace.id)
         if let row = rows[workspace.id], let controller = workspaceContextControllers.removeValue(forKey: workspace.id) {
             gtk_widget_remove_controller(row.widget_ptr, controller.event_controller_ptr)
         }
@@ -1627,6 +2004,7 @@ private final class ApplicationState: @unchecked Sendable {
         for (id, row) in pinnedRows {
             if workspacePanePeekHosts[id]?.widget_ptr == row.widget_ptr { removeWorkspacePanePeek(id) }
             if let controller = liftedContextControllers[id] { gtk_widget_remove_controller(row.widget_ptr, controller.event_controller_ptr) }
+            detachPinnedWorkspaceDrag(id)
             liftedContextPopovers[id]?.unparent(); liftedRowChrome.removeValue(forKey: id)?.detach()
         }
         attentionRows.removeAll(); pinnedRows.removeAll()
@@ -1711,6 +2089,7 @@ private final class ApplicationState: @unchecked Sendable {
             isCollapsed: group.isCollapsed
         ) { [weak self] in self?.presentCloseGroupConfirmation(group.id) }
         groupHeaderChrome[group.id] = groupChrome
+        installGroupDrag(on: groupChrome, groupID: group.id)
         header.append(child: groupChrome.root)
 
         let options = MenuButtonRef(); options.add(cssClass: "aw-group-options")
@@ -1906,6 +2285,52 @@ private final class ApplicationState: @unchecked Sendable {
 
     private func persist() {
         do { try store.save(snapshot); isPersistencePaused = false } catch { isPersistencePaused = true }
+    }
+
+    private func announce(_ message: String) {
+        guard let window else { return }
+        announceAccessibilityStatus(from: window, ChromeText.sanitized(message, limit: 240))
+    }
+
+    private func announceWorkspaceReorder(_ workspaceID: UUID) {
+        guard let group = snapshot.groups.first(where: { $0.workspaces.contains { $0.id == workspaceID } }),
+              let index = group.workspaces.firstIndex(where: { $0.id == workspaceID }),
+              let workspace = snapshot.workspace(id: workspaceID)
+        else { return }
+        let count = group.workspaces.count
+        announce(SidebarAnnouncement.movedWorkspace(
+            title: SidebarWorkspaceTitle.resolve(workspace: workspace),
+            position: index + 1, count: count,
+            groupName: ChromeText.sanitized(group.name, limit: 120)
+        ))
+    }
+
+    private func announceGroupReorder(_ groupID: UUID) {
+        guard let index = snapshot.groups.firstIndex(where: { $0.id == groupID }) else { return }
+        let group = snapshot.groups[index]
+        announce(SidebarAnnouncement.movedGroup(
+            name: ChromeText.sanitized(group.name, limit: 120),
+            position: index + 1, count: snapshot.groups.count
+        ))
+    }
+
+    private func announcePinnedReorder(_ workspaceID: UUID) {
+        guard let index = snapshot.pinnedWorkspaceIDs.firstIndex(of: workspaceID),
+              let workspace = snapshot.workspace(id: workspaceID) else { return }
+        announce(SidebarAnnouncement.movedPinnedWorkspace(
+            title: SidebarWorkspaceTitle.resolve(workspace: workspace),
+            position: index + 1, count: snapshot.pinnedWorkspaceIDs.count
+        ))
+    }
+
+    private func announceAttentionReturnIfNeeded(_ workspaceID: UUID, wasAttention: Bool) {
+        guard wasAttention,
+              !snapshot.attentionWorkspaceIDs.contains(workspaceID),
+              !snapshot.pinnedWorkspaceIDs.contains(workspaceID),
+              let workspace = snapshot.workspace(id: workspaceID),
+              let group = snapshot.groups.first(where: { $0.workspaces.contains { $0.id == workspaceID } })
+        else { return }
+        announce("\(SidebarWorkspaceTitle.resolve(workspace: workspace)) left Needs Input, returned to \(ChromeText.sanitized(group.name, limit: 120))")
     }
 
     func installCommands(on application: Gtk.ApplicationRef) {
@@ -2135,6 +2560,8 @@ private final class ApplicationState: @unchecked Sendable {
         for value in WorkspaceGroupColor.allCases {
             groupColorActions[groupID]?[value]?.label = "●  \(value.rawValue.capitalized)\(color == value ? "  ✓" : "")"
         }
+        announce(color.map { "Workspace group color set to \($0.rawValue.capitalized)" }
+            ?? "Workspace group color cleared")
         persist()
     }
 
@@ -2147,6 +2574,7 @@ private final class ApplicationState: @unchecked Sendable {
             previous = root
         }
         refreshGroupActionEnablement()
+        announceGroupReorder(groupID)
         persist()
     }
 
@@ -2160,6 +2588,7 @@ private final class ApplicationState: @unchecked Sendable {
             groupHeaderChrome[group.id]?.isEmpty = group.workspaces.isEmpty
             groupHeaderChrome[group.id]?.isCollapsed = group.isCollapsed
         }
+        refreshSidebarDragAvailability()
     }
 
     private func refreshGroupTints() {
@@ -2204,6 +2633,8 @@ private final class ApplicationState: @unchecked Sendable {
         let workspaces = group.workspaces
         guard let removed = try? snapshot.closeGroup(groupID) else { return }
         for workspace in workspaces {
+            detachRegularWorkspaceDrag(workspace.id)
+            detachPinnedWorkspaceDrag(workspace.id)
             let paneSurfaces = workspace.layout.paneIDs.compactMap { surfacesByPane[$0] }
             if let row = rows[workspace.id], let controller = workspaceContextControllers.removeValue(forKey: workspace.id) {
                 gtk_widget_remove_controller(row.widget_ptr, controller.event_controller_ptr)
@@ -2227,6 +2658,7 @@ private final class ApplicationState: @unchecked Sendable {
             regularPinActions.removeValue(forKey: workspace.id)
             if let rail = railRows.removeValue(forKey: workspace.id) { sidebarRailRows?.remove(child: rail) }
         }
+        detachGroupDrag(groupID)
         groupHeaderChrome.removeValue(forKey: groupID)?.detach()
         if let root = groupRoots.removeValue(forKey: groupID) { groupsContainer?.remove(child: root) }
         if let railGroup = railGroupRows.removeValue(forKey: groupID) { sidebarRailRows?.remove(child: railGroup) }
@@ -2248,6 +2680,7 @@ private final class ApplicationState: @unchecked Sendable {
         refreshWorkspaceOptionsMenus()
         refreshLiftedRows()
         refreshEmptyState()
+        announce("Closed \(ChromeText.sanitized(group.name, limit: 120)) group")
         persist()
     }
 

@@ -138,6 +138,15 @@ help, and agent context while preserving the compact reference geometry.
   drives edge enablement. GTK reorders the existing row and collapsed rail
   projections while retaining terminal runtimes, then refreshes affected menus
   after each identity-based mutation.
+- Native GTK drag sources and drop targets now reorder ownership rows within
+  and across groups, append workspace drops on group headers, reorder group
+  headers, and reorder Pinned rows. A process-scoped payload nonce rejects
+  external data, filtering disables every structural source/target, midpoint
+  indicators reject no-op destinations, and each accepted drop performs one
+  authoritative snapshot mutation before existing GTK rows are reconciled.
+  Dark, Latte, and high-contrast insertion styles are present. The app launches
+  cleanly with all controllers attached; physical drag execution remains an
+  explicit QA gap because XTest pointer events do not reach this remote app.
 - Collapsed group headers now preserve hidden agent visibility with a tested
   Needs Input/Error/Thinking rollup (in that priority order, excluding passive
   Output). The 60-point rail includes group buttons whose native popovers list
@@ -201,7 +210,10 @@ help, and agent context while preserving the compact reference geometry.
   expanded state at the component seam; compact icon/footer targets are at
   least 24 points. Agent state chips are buttons that open the panel filtered
   to the chosen state. Orca enumerates the running app through AT-SPI; full
-  spoken navigation and announcement verification remains pending.
+  Group disclosure, color, close, workspace/pinned/group reorder, pin/unpin,
+  and Needs Input return transitions now publish GTK accessibility status
+  announcements with tested reference reorder wording. Full spoken navigation
+  and Orca announcement verification remains pending.
 - Workspace rows now expose real soft close and permanent clear actions. Soft
   close records a bounded, 24-hour recovery snapshot, removes the row from all
   projections, selects the next live workspace, and powers Ctrl-Shift-T
@@ -231,8 +243,8 @@ help, and agent context while preserving the compact reference geometry.
 1. Add the foreground-shell capability signal needed to gate inserted Git/gh
    commands as precisely as macOS does.
 2. Implement product-level split/close/recreate commands and teardown-race coverage.
-3. Capture hidden/revealed/right-side sidebar presentation, then complete group
-   creation, ordering controls, and dynamic menu enablement.
+3. Capture hidden/revealed/right-side sidebar presentation and physically
+   verify pointer reorder, insertion indicators, and dynamic menu enablement.
 4. Add bounded/coalesced persistence writes, recovery UI, and forced-termination tests.
 5. Continue through the root implementation order, capturing each required
    visual milestone.

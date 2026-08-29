@@ -911,3 +911,33 @@ private func snapshot(_ workspaces: [WorkspaceSnapshot]) -> SessionSnapshot {
     #expect(!shows(empty: true, collapsed: true))
     #expect(!shows(empty: true, dragging: true))
 }
+
+@Test func insertionResolverUsesPostRemovalIndicesAndRejectsNoOps() {
+    #expect(SidebarInsertionResolver.reorderTarget(
+        sourceIndex: 0, targetIndex: 2, edge: .after, count: 4
+    ) == 2)
+    #expect(SidebarInsertionResolver.reorderTarget(
+        sourceIndex: 3, targetIndex: 1, edge: .before, count: 4
+    ) == 1)
+    #expect(SidebarInsertionResolver.reorderTarget(
+        sourceIndex: 1, targetIndex: 1, edge: .before, count: 4
+    ) == nil)
+    #expect(SidebarInsertionResolver.reorderTarget(
+        sourceIndex: 1, targetIndex: 0, edge: .after, count: 4
+    ) == nil)
+    #expect(SidebarInsertionResolver.reorderTarget(
+        sourceIndex: -1, targetIndex: 0, edge: .before, count: 4
+    ) == nil)
+}
+
+@Test func sidebarReorderAnnouncementsMatchReferenceWording() {
+    #expect(SidebarAnnouncement.movedWorkspace(
+        title: "Review", position: 2, count: 4, groupName: "Local"
+    ) == "Moved Review to position 2 of 4 in Local")
+    #expect(SidebarAnnouncement.movedGroup(
+        name: "Local", position: 1, count: 3
+    ) == "Moved Local group to position 1 of 3")
+    #expect(SidebarAnnouncement.movedPinnedWorkspace(
+        title: "Review", position: 3, count: 5
+    ) == "Moved Review to position 3 of 5 in Pinned")
+}

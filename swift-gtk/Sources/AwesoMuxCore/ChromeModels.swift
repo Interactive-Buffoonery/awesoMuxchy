@@ -219,6 +219,50 @@ public enum SidebarGroupClosePolicy {
     }
 }
 
+public enum SidebarInsertionEdge: Equatable, Sendable {
+    case before
+    case after
+}
+
+public enum SidebarInsertionResolver {
+    public static func preRemovalIndex(targetIndex: Int, edge: SidebarInsertionEdge) -> Int {
+        max(0, targetIndex + (edge == .after ? 1 : 0))
+    }
+
+    public static func postRemovalTargetIndex(sourceIndex: Int, preRemovalIndex: Int) -> Int {
+        sourceIndex < preRemovalIndex ? preRemovalIndex - 1 : preRemovalIndex
+    }
+
+    public static func reorderTarget(
+        sourceIndex: Int, targetIndex: Int, edge: SidebarInsertionEdge, count: Int
+    ) -> Int? {
+        guard count > 0, (0..<count).contains(sourceIndex), (0..<count).contains(targetIndex) else {
+            return nil
+        }
+        let preRemoval = min(count, preRemovalIndex(targetIndex: targetIndex, edge: edge))
+        let destination = postRemovalTargetIndex(
+            sourceIndex: sourceIndex, preRemovalIndex: preRemoval
+        )
+        return destination == sourceIndex ? nil : destination
+    }
+}
+
+public enum SidebarAnnouncement {
+    public static func movedWorkspace(
+        title: String, position: Int, count: Int, groupName: String
+    ) -> String {
+        "Moved \(title) to position \(position) of \(count) in \(groupName)"
+    }
+
+    public static func movedGroup(name: String, position: Int, count: Int) -> String {
+        "Moved \(name) group to position \(position) of \(count)"
+    }
+
+    public static func movedPinnedWorkspace(title: String, position: Int, count: Int) -> String {
+        "Moved \(title) to position \(position) of \(count) in Pinned"
+    }
+}
+
 public struct SidebarGroupSection: Equatable, Sendable {
     public let id: UUID
     public let name: String

@@ -136,14 +136,17 @@ geometry and state styling have also passed a real-window visual correction.
   500 ms focused-pane dwell, immediate `Acknowledge Workspace` row action and
   Ctrl-Shift-K route reconcile the lifted section and hidden edge cue. Exact
   per-workspace `Mute Notifications`/`Unmute Notifications` overrides persist.
-  Unanswered-turn ingestion, reorder DnD, injected-clock UI coverage, and
-  AT-SPI announcements remain pending.
+  Unanswered-turn ingestion, injected-clock UI coverage, and physical AT-SPI
+  announcement inspection remain pending.
 - Non-pinned workspace menus now expose tested, bounded within-group Up/Down
   moves plus named previous/next-group and arbitrary-group alternatives.
   Mutations reuse the authoritative snapshot and existing terminal runtime,
   reorder regular/lifted/rail projections, and asynchronously rebuild affected
-  menus so boundary enablement remains truthful after every move. Pointer DnD,
-  insertion indicators, shortcuts, and announcements remain pending.
+  menus so boundary enablement remains truthful after every move. Native GTK
+  DnD now supports midpoint insertion within/across groups and group-header
+  append, with process-scoped payload validation, filter lockout, no-op
+  rejection, one mutation per accepted drop, and theme-aware indicators.
+  Exact reorder announcements are projected by tested core formatters.
 - `Close Workspace`, `Reopen Closed Workspace`, and `Clear Workspace` now have
   persistent model semantics and awesoMux-owned Ctrl-Shift-W, Ctrl-Shift-T,
   and Ctrl-Alt-Shift-W routing. Recovery is capped at 20 entries/24 hours,
@@ -184,19 +187,19 @@ geometry and state styling have also passed a real-window visual correction.
   Control-1…9 actions and transient digits from one lifted-first order. Real
   hover and close/reopen renders were inspected; physical held-Control input
   remains pending because synthetic X11 input does not reach this session.
-- The full local preflight passes 62 Swift tests after the row-chrome milestone,
-  followed by the release build, real two-terminal title/cwd integration, and
-  100 two-surface lifecycle cycles.
+- The full local preflight passes 64 Swift tests after the native DnD and
+  announcement milestone, followed by the release build, real two-terminal
+  title/cwd integration, and 100 two-surface lifecycle cycles.
 
 ## Remaining vertical-slice hardening
 
 - Native Wayland GL context creation on the current NVIDIA/COSMIC stack.
 - Real desktop IME preedit/commit and Orca inspection.
-- Automated pointer selection, hover, scroll, primary selection, and pending
-  clipboard teardown tests.
+- Automated pointer selection, hover, scroll, primary selection, physical DnD,
+  and pending clipboard teardown tests.
 - Automated destructive-dialog interaction and restored daemon continuity.
 - Collapsed/hidden/right-side presentation, pointer roster hover cards,
-  Orca state inspection, group move announcements,
+  Orca state/announcement inspection,
   foreground-shell detection, full settings panes, and agent runtime event
   ingestion remain after this footer milestone.
 

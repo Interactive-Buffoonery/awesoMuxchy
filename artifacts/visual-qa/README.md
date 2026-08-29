@@ -25,9 +25,10 @@
   real split terminals, and continuous footer without a GL-context error. Full
   preflight passed 59 Swift tests, release integration (including OSC title/cwd
   callbacks), and 100 two-surface lifecycle cycles.
-- Remaining row work: provider-specific owned glyphs/status shapes,
-  hover/focus close controls, jump-number overlays, pointer drag insertion,
-  and full physical-pointer/Orca action inspection.
+- Remaining row work: exact owned provider vector glyphs and full
+  physical-pointer/Orca action inspection. Hover/focus close controls,
+  jump-number overlays, and native pointer drag insertion are implemented;
+  the latter two still need trustworthy physical held-key/drag evidence.
 
 ## 2026-08-28 — SwiftGtk4 live sidebar chrome and rail
 
@@ -58,8 +59,9 @@
   Symbols; workspace tiles still need provider-specific glyphs/status shapes,
   hover/focus close controls, and jump-number overlays. Multi-pane peek cards
   are covered by the next milestone above.
-  Pointer drag insertion indicators, announcement coverage, roster-popover
-  capture, light/high-contrast/scale/right-side states, and the remaining
+  Pointer drag insertion and accessibility announcements are now implemented,
+  but physical drag/Orca proof, roster-popover capture,
+  light/high-contrast/scale/right-side states, and the remaining
   completion-contract screenshots are still pending.
 
 ## 2026-08-28 — SwiftGtk4 macOS footer visual correction

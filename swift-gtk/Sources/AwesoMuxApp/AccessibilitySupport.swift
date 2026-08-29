@@ -25,3 +25,10 @@ func setAccessibleExpanded<T: Gtk.AccessibleProtocol>(_ accessible: T, _ expande
     let value = GLibObject.Value(Int32(expanded ? GTK_ACCESSIBLE_TRISTATE_TRUE.rawValue : GTK_ACCESSIBLE_TRISTATE_FALSE.rawValue))
     accessible.updateStateValue(nStates: 1, states: &state, values: value.value_ptr)
 }
+
+func announceAccessibilityStatus<T: Gtk.AccessibleProtocol>(
+    from accessible: T, _ message: String,
+    priority: GtkAccessibleAnnouncementPriority = GTK_ACCESSIBLE_ANNOUNCEMENT_PRIORITY_MEDIUM
+) {
+    message.withCString { accessible.announce(message: $0, priority: priority) }
+}
