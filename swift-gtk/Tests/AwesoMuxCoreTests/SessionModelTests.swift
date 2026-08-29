@@ -935,6 +935,43 @@ private func snapshot(_ workspaces: [WorkspaceSnapshot]) -> SessionSnapshot {
     #expect(WorkspaceCreationTarget.workspaceHere(closedWorkspace.id, in: closedSnapshot) == nil)
 }
 
+@Test func groupAccessibilityPresentsLocalExecutionAndSelectedDescendant() {
+    let pane = PaneSnapshot(title: "Shell", workingDirectory: "/tmp")
+    let workspace = WorkspaceSnapshot(
+        name: "Local", focusedPaneID: pane.id, layout: .pane(pane)
+    )
+    let group = WorkspaceGroupSnapshot(name: "Local", workspaces: [workspace])
+
+    let presentation = SidebarGroupAccessibilityPresentation(
+        group: group, selectedWorkspaceID: workspace.id
+    )
+    #expect(presentation.workspaceCount == 1)
+    #expect(presentation.hasSelectedDescendant)
+    #expect(presentation.executionText == "Local panes")
+    #expect(SidebarGroupAccessibilityPresentation(
+        group: WorkspaceGroupSnapshot(name: "Empty", workspaces: []), selectedWorkspaceID: nil
+    ).executionText == "Local creation default")
+    var softClosedWorkspace = workspace
+    softClosedWorkspace.isSoftClosed = true
+    let softClosedPresentation = SidebarGroupAccessibilityPresentation(
+        group: WorkspaceGroupSnapshot(name: "Closed", workspaces: [softClosedWorkspace]),
+        selectedWorkspaceID: softClosedWorkspace.id
+    )
+    #expect(softClosedPresentation.workspaceCount == 0)
+    #expect(!softClosedPresentation.hasSelectedDescendant)
+
+    let remotePane = PaneSnapshot(
+        title: "Remote", workingDirectory: "/srv", ownership: .remoteZmx
+    )
+    let remoteWorkspace = WorkspaceSnapshot(
+        name: "Remote", focusedPaneID: remotePane.id, layout: .pane(remotePane)
+    )
+    #expect(SidebarGroupAccessibilityPresentation(
+        group: WorkspaceGroupSnapshot(name: "Remote", workspaces: [remoteWorkspace]),
+        selectedWorkspaceID: remoteWorkspace.id
+    ).executionText == nil)
+}
+
 @Test func workspaceCloseRiskUsesProcessPromptAndFreshAgentEvidence() {
     let now = Date(timeIntervalSince1970: 20_000)
     func input(

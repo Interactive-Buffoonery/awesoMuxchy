@@ -333,6 +333,13 @@ help, and agent context while preserving the compact reference geometry.
   Output). The 60-point rail includes group buttons whose native popovers list
   every live workspace as an explicit keyboard/screen-reader `Jump to` action;
   roster names and counts refresh after model mutations.
+- Group disclosures and collapsed-rail group controls now share a tested
+  accessibility presentation. Soft-closed workspaces do not contribute to the
+  count, the group publishes selected state when it contains the selected
+  workspace, and local groups expose the exact reference execution wording
+  `Local panes` or `Local creation default`. Remote execution wording remains
+  absent until the model carries the destination identity required by the
+  reference instead of exposing invented or incomplete copy.
 - Ghostty OSC title and working-directory actions now cross the language-neutral
   shim into Swift callbacks. Stable pane generations reject recycled/stale
   surfaces; sanitized updates land in the authoritative snapshot before rows,

@@ -2011,19 +2011,25 @@ private final class ApplicationState: @unchecked Sendable {
         groupAttentionLabels[groupID]?.set(visible: visible)
         railGroupAttentionLabels[groupID]?.label = visible ? symbol : ""
         railGroupAttentionLabels[groupID]?.set(visible: visible)
-        let count = group.workspaces.filter { !$0.isSoftClosed }.count
+        let presentation = SidebarGroupAccessibilityPresentation(
+            group: group, selectedWorkspaceID: snapshot.selectedWorkspaceID
+        )
+        let count = presentation.workspaceCount
         let suffix = visible ? "; \(summary.accessibilityPhrase)" : ""
+        let execution = presentation.executionText.map { "; \($0)" } ?? ""
         let groupIndex = snapshot.groups.firstIndex(where: { $0.id == groupID }) ?? 0
         let position = projectedPosition ?? (groupIndex + 1, snapshot.groups.count)
         let positionCopy = SidebarAccessibilityCopy.position(position.position, of: position.count)
             .map { "; \($0)" } ?? ""
         if let disclosure = groupDisclosures[groupID] {
             let color = SidebarTintProjection.resolvedColor(for: group, unfilteredIndex: groupIndex)
-            setAccessibleDescription(disclosure, "\(SidebarAccessibilityCopy.workspaceCount(count)); \(color.rawValue.capitalized) color; \(group.isCollapsed ? "Collapsed" : "Expanded")\(suffix)\(positionCopy)")
+            setAccessibleSelected(disclosure, presentation.hasSelectedDescendant)
+            setAccessibleDescription(disclosure, "\(SidebarAccessibilityCopy.workspaceCount(count))\(execution); \(color.rawValue.capitalized) color; \(group.isCollapsed ? "Collapsed" : "Expanded")\(suffix)\(positionCopy)")
         }
         if let rail = railGroupRows[groupID] {
             let color = SidebarTintProjection.resolvedColor(for: group, unfilteredIndex: groupIndex)
-            setAccessibleDescription(rail, "\(SidebarAccessibilityCopy.workspaceCount(count)); \(color.rawValue.capitalized) color\(suffix)\(positionCopy). Open roster to choose a workspace")
+            setAccessibleSelected(rail, presentation.hasSelectedDescendant)
+            setAccessibleDescription(rail, "\(SidebarAccessibilityCopy.workspaceCount(count))\(execution); \(color.rawValue.capitalized) color\(suffix)\(positionCopy). Open roster to choose a workspace")
         }
     }
 
@@ -2945,6 +2951,7 @@ private final class ApplicationState: @unchecked Sendable {
         for (id, row) in railRows { setAccessibleSelected(row, id == workspaceID) }
         for (id, row) in attentionRows { setAccessibleSelected(row, id == workspaceID) }
         for (id, row) in pinnedRows { setAccessibleSelected(row, id == workspaceID) }
+        for group in snapshot.groups { refreshGroupAttention(group.id) }
         title?.label = snapshot.workspace(id: workspaceID).map(SidebarWorkspaceTitle.resolve) ?? ""
         updateChrome(workspaceID); focus(runtime.focusedPaneID)
         refreshCommandEnablement()

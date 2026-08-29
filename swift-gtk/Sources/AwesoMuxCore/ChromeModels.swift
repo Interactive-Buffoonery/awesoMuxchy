@@ -537,6 +537,32 @@ public struct SidebarChromeProjection: Equatable, Sendable {
     }
 }
 
+public struct SidebarGroupAccessibilityPresentation: Equatable, Sendable {
+    public let workspaceCount: Int
+    public let hasSelectedDescendant: Bool
+    public let executionText: String?
+
+    public init(group: WorkspaceGroupSnapshot, selectedWorkspaceID: UUID?) {
+        let workspaces = group.workspaces.filter { !$0.isSoftClosed }
+        workspaceCount = workspaces.count
+        hasSelectedDescendant = selectedWorkspaceID.map { selected in
+            workspaces.contains { $0.id == selected }
+        } ?? false
+        let panes = workspaces.flatMap(\.layout.panes)
+        if panes.isEmpty {
+            executionText = "Local creation default"
+        } else if panes.allSatisfy({ $0.ownership == .local }) {
+            executionText = "Local panes"
+        } else {
+            // The current Linux snapshot declares remote ownership but does
+            // not yet carry the destination identity required by the pinned
+            // reference copy ("Remote panes on <destination>"). Do not invent
+            // a weaker visible or spoken substitute.
+            executionText = nil
+        }
+    }
+}
+
 public enum SidebarTintProjection {
     private static let automaticPalette: [WorkspaceGroupColor] = [.teal, .green, .blue, .pink, .yellow, .red, .gray]
 

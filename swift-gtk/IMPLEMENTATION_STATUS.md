@@ -464,6 +464,12 @@ geometry and state styling have also passed a real-window visual correction.
   over Thinking; Output is intentionally excluded. Each rail group control
   opens a native, keyboard-operable roster with named `Jump to` workspace
   actions and refreshed accessible state text.
+- Group disclosures and rail controls now share a tested accessibility
+  presentation: soft-closed workspaces are excluded from counts, selected
+  descendants set the group's selected state, and local-only groups expose the
+  exact reference `Local panes` or `Local creation default` execution text.
+  Remote execution text is withheld until destination identity exists in the
+  model rather than substituting weaker copy.
 - Workspace, lifted, collapsed-rail, and pane-peek surfaces now share a pure
   provider-tile projection. Claude, Codex, OpenCode, Pi, Grok, and shell use
   distinct owned scalable marks and reference tint families, while every non-idle
