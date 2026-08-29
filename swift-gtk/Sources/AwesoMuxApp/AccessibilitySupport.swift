@@ -22,6 +22,12 @@ func makeAccessibleToggleButton(role: GtkAccessibleRole) -> ToggleButtonRef {
     ToggleButtonRef(raw: makeAccessibleObject(type: gtk_toggle_button_get_type(), role: role).ptr)
 }
 
+func makeAccessibleLabel(_ text: String, role: GtkAccessibleRole) -> LabelRef {
+    let label = LabelRef(raw: makeAccessibleObject(type: gtk_label_get_type(), role: role).ptr)
+    label.label = text
+    return label
+}
+
 func setAccessibleLabel<T: Gtk.AccessibleProtocol>(_ accessible: T, _ label: String) {
     var property = GTK_ACCESSIBLE_PROPERTY_LABEL
     let value = GLibObject.Value(label)

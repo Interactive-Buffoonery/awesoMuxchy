@@ -180,6 +180,13 @@ geometry and state styling have also passed a real-window visual correction.
   current-directory creation resolve different directory/group contexts at
   activation and share a 400 ms duplicate guard. Quick Settings now applies
   persisted Standard/Compact sidebar density live.
+- Workspace rename now presents one transient modal sheet instead of a loose
+  GTK window. It matches `WorkspaceEditSheet` copy and validation, exposes a
+  real heading plus named text box and actions, disables repeat command
+  activation while open, and routes entry activation/Escape through guarded
+  Save/Cancel paths. Live AT-SPI Save and Cancel passes verified persistence,
+  command recovery, and crash-free controller teardown; the corrected owned
+  Latte sheet was inspected at 420×196.
 - `SidebarLiftedProjection` now composes search, sticky Needs Input arrival
   order, and explicit Pinned order without duplicating origin rows. The schema
   additions decode absent legacy fields safely and validate every ordered ID.

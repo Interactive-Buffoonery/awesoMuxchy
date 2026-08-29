@@ -286,6 +286,23 @@ public enum SidebarAccessibilityCopy {
     }
 }
 
+public enum WorkspaceRenameDraft {
+    public static let emptyHint = "Enter a workspace name to enable Save"
+
+    public static func sanitized(_ value: String) -> String {
+        ChromeText.sanitized(value, limit: 120)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    public static func canSubmit(_ value: String) -> Bool {
+        !sanitized(value).isEmpty
+    }
+
+    public static func heading(for currentTitle: String) -> String {
+        "Rename '\(ChromeText.sanitized(currentTitle, limit: 120))'"
+    }
+}
+
 public struct SidebarGroupSection: Equatable, Sendable {
     public let id: UUID
     public let name: String

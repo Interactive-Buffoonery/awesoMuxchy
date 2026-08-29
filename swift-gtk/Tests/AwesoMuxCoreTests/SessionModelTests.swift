@@ -573,6 +573,15 @@ private func snapshot(_ workspaces: [WorkspaceSnapshot]) -> SessionSnapshot {
     }
 }
 
+@Test func workspaceRenameDraftMatchesReferenceCopyAndValidation() {
+    #expect(WorkspaceRenameDraft.heading(for: "Review") == "Rename 'Review'")
+    #expect(WorkspaceRenameDraft.heading(for: "Build\nready") == "Rename 'Buildready'")
+    #expect(WorkspaceRenameDraft.emptyHint == "Enter a workspace name to enable Save")
+    #expect(!WorkspaceRenameDraft.canSubmit(" \n "))
+    #expect(WorkspaceRenameDraft.canSubmit("  Review  "))
+    #expect(WorkspaceRenameDraft.sanitized("  Review\nReady  ") == "ReviewReady")
+}
+
 @Test func workspaceAcknowledgementAndNotificationOverridesPersistIndependently() throws {
     let waitingPane = PaneSnapshot(title: "Approval", workingDirectory: "/tmp", agentState: .needsAttention)
     let quietPane = PaneSnapshot(title: "Shell", workingDirectory: "/tmp")

@@ -192,8 +192,7 @@ public extension SessionSnapshot {
     }
 
     mutating func renameWorkspace(_ workspaceID: UUID, to rawName: String) throws {
-        let name = ChromeText.sanitized(rawName, limit: 120)
-            .trimmingCharacters(in: .whitespacesAndNewlines)
+        let name = WorkspaceRenameDraft.sanitized(rawName)
         guard !name.isEmpty else { throw SessionMutationError.invalidWorkspaceName }
         try updateWorkspace(id: workspaceID) {
             $0.name = name

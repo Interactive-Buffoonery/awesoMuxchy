@@ -268,6 +268,8 @@ private final class ApplicationState: @unchecked Sendable {
     private var searchKeyController: EventControllerKey?
     private var sidebarNavigationKeyController: EventControllerKey?
     private var globalModifierKeyController: EventControllerKey?
+    private var workspaceRenameWindow: WindowRef?
+    private var workspaceRenameKeyController: EventControllerKey?
     private var isWorkspaceJumpModifierHeld = false
     private let sidebarDragNonce = UUID().uuidString
     private var activeSidebarDrag: SidebarDragItem?
@@ -2049,23 +2051,78 @@ private final class ApplicationState: @unchecked Sendable {
         announceWorkspaceReorder(workspaceID)
     }
 
+    private func dismissWorkspaceRenameWindow() {
+        let presented = workspaceRenameWindow
+        if let presented, let controller = workspaceRenameKeyController {
+            gtk_widget_remove_controller(presented.widget_ptr, controller.event_controller_ptr)
+        }
+        workspaceRenameKeyController = nil
+        presented?.close()
+        workspaceRenameWindow = nil
+        refreshCommandEnablement()
+    }
+
     func presentWorkspaceNameDialog(_ workspaceID: UUID) {
-        guard let workspace = snapshot.workspace(id: workspaceID) else { return }
-        let window = WindowRef(); window.title = "Rename Workspace"; window.setDefaultSize(width: 420, height: 170)
-        let box = BoxRef(orientation: .vertical, spacing: 12)
+        if let workspaceRenameWindow { workspaceRenameWindow.present(); return }
+        guard let workspace = snapshot.workspace(id: workspaceID), let parent = window else { return }
+        let currentTitle = SidebarWorkspaceTitle.resolve(workspace: workspace)
+        let window = WindowRef(); workspaceRenameWindow = window
+        window.title = "Rename Workspace"; window.setDefaultSize(width: 420, height: 190)
+        window.setTransientFor(parent: parent); window.set(modal: true)
+        window.setDestroyWithParent(setting: true); window.set(resizable: false)
+        window.add(cssClass: "aw-sheet"); applyThemeClasses(to: window)
+        let box = BoxRef(orientation: .vertical, spacing: 16)
+        box.add(cssClass: "aw-sheet"); applyThemeClasses(to: box)
         box.setMarginStart(margin: 20); box.setMarginEnd(margin: 20)
         box.setMarginTop(margin: 20); box.setMarginBottom(margin: 20)
-        let heading = LabelRef(str: "Rename Workspace"); heading.add(cssClass: "aw-menu-title"); heading.xalign = 0
-        let entry = EntryRef(); entry.text = workspace.name; entry.setPlaceholder(text: "Workspace name")
+        setAccessibleLabel(box, "Rename Workspace")
+        let heading = makeAccessibleLabel(
+            WorkspaceRenameDraft.heading(for: currentTitle), role: GTK_ACCESSIBLE_ROLE_HEADING
+        )
+        heading.add(cssClass: "aw-menu-title"); heading.xalign = 0
+        let nameLabel = LabelRef(str: "Name"); nameLabel.add(cssClass: "aw-sheet-label"); nameLabel.xalign = 0
+        let entry = EntryRef(); entry.text = currentTitle; entry.setPlaceholder(text: "Workspace name")
+        entry.add(cssClass: "aw-sheet-entry")
+        setAccessibleLabel(entry, "Workspace name")
         let actions = BoxRef(orientation: .horizontal, spacing: 8); actions.setHalign(align: .end)
-        let cancel = ButtonRef(label: "Cancel"); let confirm = ButtonRef(label: "Rename")
-        cancel.onClicked { [window] _ in window.close() }
-        confirm.onClicked { [weak self, window, entry] _ in
-            guard self?.renameWorkspace(workspaceID, to: entry.text ?? "") == true else { return }
-            window.close()
+        let cancel = ButtonRef(label: "Cancel"); let confirm = ButtonRef(label: "Save")
+        cancel.add(cssClass: "aw-sheet-secondary"); confirm.add(cssClass: "aw-sheet-primary")
+        func updateSaveState() {
+            let enabled = WorkspaceRenameDraft.canSubmit(entry.text ?? "")
+            confirm.set(sensitive: enabled)
+            setAccessibleDescription(confirm, enabled ? "" : WorkspaceRenameDraft.emptyHint)
+        }
+        let submit = { [weak self, entry] in
+            guard let self else { return }
+            let proposed = WorkspaceRenameDraft.sanitized(entry.text ?? "")
+            guard !proposed.isEmpty else { return }
+            if proposed == WorkspaceRenameDraft.sanitized(currentTitle)
+                || self.renameWorkspace(workspaceID, to: proposed) {
+                self.dismissWorkspaceRenameWindow()
+            }
+        }
+        cancel.onClicked { [weak self] _ in self?.dismissWorkspaceRenameWindow() }
+        confirm.onClicked { _ in submit() }
+        entry.onChanged { _ in updateSaveState() }
+        entry.onActivate { _ in submit() }
+        window.set(defaultWidget: confirm)
+        let keys = EventControllerKey()
+        keys.onKeyPressed { [weak self] _, keyval, _, _ in
+            guard keyval == UInt(GDK_KEY_Escape) else { return false }
+            self?.dismissWorkspaceRenameWindow(); return true
+        }
+        _ = keys.ref()
+        workspaceRenameKeyController = keys
+        gtk_widget_add_controller(window.widget_ptr, keys.event_controller_ptr)
+        window.onCloseRequest { [weak self] _ in
+            self?.workspaceRenameWindow = nil
+            self?.workspaceRenameKeyController = nil
+            self?.refreshCommandEnablement()
+            return false
         }
         actions.append(child: cancel); actions.append(child: confirm)
-        box.append(child: heading); box.append(child: entry); box.append(child: actions)
+        box.append(child: heading); box.append(child: nameLabel); box.append(child: entry); box.append(child: actions)
+        updateSaveState(); refreshCommandEnablement()
         window.set(child: box); window.present(); _ = entry.grabFocus()
     }
 
@@ -2507,14 +2564,18 @@ private final class ApplicationState: @unchecked Sendable {
 
     private func applyTheme() {
         guard let rootWidget else { return }
-        for theme in AppTheme.allCases { rootWidget.remove(cssClass: "theme-\(theme.rawValue.lowercased())") }
-        rootWidget.remove(cssClass: "high-contrast"); rootWidget.remove(cssClass: "reduced-motion")
+        applyThemeClasses(to: rootWidget)
+    }
+
+    private func applyThemeClasses<T: Gtk.WidgetProtocol>(to widget: T) {
+        for theme in AppTheme.allCases { widget.remove(cssClass: "theme-\(theme.rawValue.lowercased())") }
+        widget.remove(cssClass: "high-contrast"); widget.remove(cssClass: "reduced-motion")
         let appearance = GTKChromeAppearance.resolve(preference: preferences.theme)
-        rootWidget.add(cssClass: "theme-\(appearance.theme.rawValue.lowercased())")
-        if appearance.isHighContrast { rootWidget.add(cssClass: "high-contrast") }
-        if appearance.reducesMotion { rootWidget.add(cssClass: "reduced-motion") }
-        for density in SidebarDensity.allCases { rootWidget.remove(cssClass: "density-\(density.rawValue)") }
-        rootWidget.add(cssClass: "density-\(preferences.sidebarDensity.rawValue)")
+        widget.add(cssClass: "theme-\(appearance.theme.rawValue.lowercased())")
+        if appearance.isHighContrast { widget.add(cssClass: "high-contrast") }
+        if appearance.reducesMotion { widget.add(cssClass: "reduced-motion") }
+        for density in SidebarDensity.allCases { widget.remove(cssClass: "density-\(density.rawValue)") }
+        widget.add(cssClass: "density-\(preferences.sidebarDensity.rawValue)")
     }
 
     private func openFeedback() {
@@ -2641,6 +2702,7 @@ private final class ApplicationState: @unchecked Sendable {
                 let action = GIO.SimpleAction(name: definition.id.rawValue, parameterType: nil as VariantTypeRef?)
                 action.set(enabled: implemented.contains(definition.id)
                     && (definition.id != .reopenClosedWorkspace || !snapshot.recentlyClosedWorkspaces.isEmpty)
+                    && (definition.id != .renameWorkspace || snapshot.selectedWorkspaceID != nil)
                     && (definition.id.workspaceJumpIndex.map { workspaceJumpOrder().indices.contains($0) } ?? true))
                 action.onActivate { [weak self] _, _ in self?.perform(definition.id) }
                 application.add(action: action)
@@ -2656,6 +2718,9 @@ private final class ApplicationState: @unchecked Sendable {
 
     private func refreshCommandEnablement() {
         pruneExpiredClosedWorkspaces()
+        commandActions[.renameWorkspace]?.set(
+            enabled: snapshot.selectedWorkspaceID != nil && workspaceRenameWindow == nil
+        )
         commandActions[.reopenClosedWorkspace]?.set(enabled: !snapshot.recentlyClosedWorkspaces.isEmpty)
         for command in CommandID.allCases {
             if let index = command.workspaceJumpIndex {

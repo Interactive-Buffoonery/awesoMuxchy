@@ -187,6 +187,12 @@ help, and agent context while preserving the compact reference geometry.
   bounded Pinned ordering. Rename refreshes regular, lifted, rail, search, and
   persisted representations; moving preserves terminal/pane identity and
   rebinds the row menu to its destination group.
+- Workspace rename now uses one main-window-owned modal sheet with the exact
+  reference heading, field, Cancel/Save copy, empty-input hint, default submit,
+  and Escape dismissal. Its draft policy is pure-tested; live AT-SPI inspection
+  verified heading/label/text-box/button semantics, disabled empty Save,
+  successful persisted Save, non-mutating Cancel, and command disable/re-enable
+  around the sheet. The final owned Latte surface was captured and inspected.
 - Regular and Needs Input row menus now provide non-pointer workspace ordering:
   bounded `Move Workspace Up`/`Move Workspace Down`, named previous/next-group
   alternatives, and arbitrary destination groups. A tested availability model
