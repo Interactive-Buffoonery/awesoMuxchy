@@ -1,5 +1,34 @@
 # Visual QA
 
+## 2026-08-29 — SwiftGtk4 workspace rename sheet
+
+- Linux image: [workspace rename sheet](swift-gtk/progress/30-workspace-rename/workspace-rename-sheet-x11.png).
+- Reference: `WorkspaceEditSheet.swift` and exact localized rename copy at
+  macOS baseline `fed33ff47c559344fc6db6fa53f16e75fcc4a116`.
+- Behavior: `Rename Workspace…`, Ctrl-Shift-R, and the named row action now
+  present one transient modal sheet owned by the main window. The sheet uses
+  the current coarse visible title, exact `Rename '<title>'`, `Name`,
+  `Workspace name`, `Cancel`, and `Save` copy. Whitespace-only input disables
+  Save with `Enter a workspace name to enable Save`; valid Save updates and
+  persists the authoritative workspace, while Cancel leaves it unchanged.
+  The command is disabled until the sheet closes so repeated activation cannot
+  stack windows.
+- Accessibility and interaction: live AT-SPI inspection verified the heading,
+  label, text-box, and button roles/names. Empty Save exposed the exact hint and
+  rejected its Click action. Valid Save and Cancel were invoked through AT-SPI;
+  both closed cleanly, command enablement recovered, persistence was correct,
+  and the real app remained alive. Entry activation and Escape share the same
+  guarded submit/dismiss paths.
+- Inspection: the 420×196 X11/GLX window was inspected at original resolution.
+  The final Latte surface uses owned Geist typography, field focus treatment,
+  primary/secondary buttons, spacing, and background across the full window;
+  an initial native-white GTK pass was rejected and replaced.
+- Verification: the reference-copy/draft policy is covered by pure tests. Full
+  preflight passes 87 Swift tests, release terminal integration, and 100
+  two-surface lifecycle cycles.
+- Privacy: the profile and titles are synthetic; no terminal content, commands,
+  clipboard data, credentials, paths, or arbitrary agent output are shown.
+
 ## 2026-08-29 — SwiftGtk4 background agent outcome
 
 - Linux image: [Codex Error in its origin group](swift-gtk/progress/29-background-agent-outcomes/codex-error-origin-group-x11.png).
