@@ -1,5 +1,27 @@
 # Visual QA
 
+## 2026-08-29 — SwiftGtk4 sidebar footer menus
+
+- Linux images: [Quick settings](swift-gtk/progress/23-sidebar-footer-menus/quick-settings-x11.png)
+  and [Help & Feedback](swift-gtk/progress/23-sidebar-footer-menus/help-feedback-x11.png).
+- Reference: `SidebarStatusFooter.swift`, Quick Settings wording, and feedback
+  menu routes at macOS baseline
+  `fed33ff47c559344fc6db6fa53f16e75fcc4a116`.
+- Behavior: AT-SPI activated both real expanded-footer menu buttons. Quick
+  settings exposes persisted System/Light/Dark, Standard/Compact, and Mute
+  notifications controls. Help & Feedback exposes only `Report a bug…` and
+  `Suggest a feature…`, both routed to the verified issue intake; placeholder
+  informational surfaces remain absent.
+- Correction and inspection: the first pass exposed a low-contrast native mute
+  label. Owned Mocha/Latte colors, a visible focus outline, and a 24 px minimum
+  row were added. Both final popover PNGs were inspected at original resolution;
+  choices, selection fills, labels, padding, and pointer geometry are clear.
+- Accessibility: direct AT-SPI inspection reports every visible theme, density,
+  notification, and feedback control by name and as sensitive.
+- Verification: full preflight passes 74 Swift tests, release terminal
+  integration, and 100 two-surface lifecycle cycles.
+- Privacy: both surfaces contain product-owned static wording only.
+
 ## 2026-08-29 — SwiftGtk4 group action menu
 
 - Linux image: [first-group action menu](swift-gtk/progress/22-group-menu/first-group-actions-x11.png).

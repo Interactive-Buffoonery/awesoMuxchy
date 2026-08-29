@@ -70,7 +70,10 @@ geometry and state styling have also passed a real-window visual correction.
   in owner-only profile-scoped JSON.
 - Quick Settings and feedback menus now expose only implemented behavior.
   Placeholder Welcome Tour and More settings windows were removed rather than
-  presenting informational stand-ins as functioning product routes.
+  presenting informational stand-ins as functioning product routes. Their real
+  GTK popovers were opened through AT-SPI and captured; every visible choice is
+  named and sensitive. The mute check row now owns theme contrast, keyboard
+  focus treatment, and a 24-point minimum target.
 - Expanded agent activity is now one priority-grouped pane-grained projection
   shared with the footer counts. Rows preserve sidebar traversal order, expose
   live pane/session titles plus sanitized local/remote locations, publish
