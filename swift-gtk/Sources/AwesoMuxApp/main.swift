@@ -316,6 +316,13 @@ private final class ApplicationState: @unchecked Sendable {
             return false
         }
     }
+    private let footerTitleSettle = FooterTitleSettleCoordinator {
+        delayMilliseconds, action in
+        timeout(add: delayMilliseconds) {
+            action()
+            return false
+        }
+    }
     private var sidebarMotionController: EventControllerMotion?
     private var searchKeyController: EventControllerKey?
     private var sidebarNavigationKeyController: EventControllerKey?
@@ -735,7 +742,39 @@ private final class ApplicationState: @unchecked Sendable {
         else { return }
         refreshWorkspaceRowPresentation(workspaceID)
         sidebarFooter?.update(AgentFooterSummary(snapshot: snapshot))
+        let request = FooterTitleSettleRequest(
+            workspaceID: workspaceID, paneID: paneID, surfaceGeneration: generation
+        )
+        if currentFooterTitleSettleRequest() == request {
+            footerTitleSettle.schedule(
+                request: request,
+                currentRequest: { [weak self] in self?.currentFooterTitleSettleRequest() },
+                refresh: { [weak self] request in self?.refreshFooterAfterSettledTitle(request) }
+            )
+        }
         persist()
+    }
+
+    private func currentFooterTitleSettleRequest() -> FooterTitleSettleRequest? {
+        guard let workspaceID = snapshot.selectedWorkspaceID,
+              let workspace = snapshot.workspace(id: workspaceID),
+              let runtime = runtimes[workspaceID],
+              workspace.focusedPaneID == runtime.focusedPaneID,
+              let generation = surfaceGenerationByPane[runtime.focusedPaneID],
+              acceptsPanePublication(
+                  runtime.focusedPaneID, workspaceID: workspaceID, generation: generation
+              )
+        else { return nil }
+        return FooterTitleSettleRequest(
+            workspaceID: workspaceID,
+            paneID: runtime.focusedPaneID,
+            surfaceGeneration: generation
+        )
+    }
+
+    private func refreshFooterAfterSettledTitle(_ request: FooterTitleSettleRequest) {
+        guard currentFooterTitleSettleRequest() == request else { return }
+        updateChrome(request.workspaceID)
     }
 
     private func publishPaneWorkingDirectory(
@@ -2962,6 +3001,7 @@ private final class ApplicationState: @unchecked Sendable {
     }
 
     private func updateChrome(_ workspaceID: UUID) {
+        footerTitleSettle.cancel()
         guard let runtime = runtimes[workspaceID], let workspace = snapshot.workspace(id: workspaceID),
               let pane = workspace.layout.pane(id: runtime.focusedPaneID) else { return }
         let identity = context.begin(workspaceID: workspaceID, paneID: pane.id)

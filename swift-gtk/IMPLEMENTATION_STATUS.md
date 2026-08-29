@@ -125,6 +125,11 @@ geometry and state styling have also passed a real-window visual correction.
 - Footer resolution runs concurrently off the GTK thread and publishes through
   GLib's main context. Git/`gh` execution is non-shell, bounded, prompt-free,
   output-capped, HTTPS-validated, and guarded against stale pane identity.
+- Title-only publications for the selected focused pane now coalesce behind a
+  tested 500 ms settle before refreshing footer repository context. This keeps
+  in-place branch changes discoverable without launching a filesystem/Git walk
+  for every high-frequency terminal-title frame; cwd/pane/surface-generation
+  changes and background-pane titles cancel or fail closed.
 - The path control and status chips now use the reference's intrinsic sizing,
   spacing, radii, opacity, tone-specific borders, and 10/11-point monospaced
   hierarchy. Repository roots render as `repo root`; nested directories render

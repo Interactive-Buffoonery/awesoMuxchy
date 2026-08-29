@@ -344,7 +344,12 @@ help, and agent context while preserving the compact reference geometry.
   shim into Swift callbacks. Stable pane generations reject recycled/stale
   surfaces; sanitized updates land in the authoritative snapshot before rows,
   search, lifted projections, accessibility labels, window title, and the
-  focused-pane footer refresh. User-renamed workspace titles remain fixed.
+  focused-pane footer refresh. Title-only publications now schedule one tested
+  500 ms settle refresh for the selected focused pane, so an in-place branch
+  change updates Git/PR/CI context without re-walking the repository for every
+  agent-title spinner frame. Pane switches, cwd changes, recycled surface
+  generations, and background-pane titles invalidate that work. User-renamed
+  workspace titles remain fixed.
   The real terminal integration emits OSC 2 and OSC 7 and requires both
   callbacks to arrive.
 - Expanded multi-pane workspace rows now publish a tested pane-tree-order peek
