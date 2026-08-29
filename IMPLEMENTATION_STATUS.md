@@ -197,6 +197,16 @@ help, and agent context while preserving the compact reference geometry.
   current-directory commands now have distinct group/directory semantics and
   all pointer creation routes share a 400 ms duplicate guard. Standard and
   compact sidebar density is selectable, persisted, and applied live.
+- Workspace creation targeting now matches the reference routes instead of
+  silently using the first stored group. The expanded primary segment resolves
+  the selected workspace's owning group at activation, with the canonical
+  `awesoMux` group as its cold fallback. App/menu `New Workspace` targets that
+  canonical default directly, while `New Workspace in Current Directory`
+  combines the selected owner with the focused pane's current directory. A
+  real isolated profile selected a workspace in the second of three groups;
+  activating the primary control left both sibling counts unchanged, appended
+  and selected exactly one workspace in that second group, and persisted the
+  launch directory.
 - The sidebar now chains one tested lifted-row projection after search: Needs
   Input renders first in sticky arrival order, Pinned follows in explicit user
   order, pinned wins deduplication, and ownership groups retain identity while

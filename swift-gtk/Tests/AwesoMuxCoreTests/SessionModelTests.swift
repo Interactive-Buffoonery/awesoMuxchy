@@ -657,6 +657,31 @@ private func snapshot(_ workspaces: [WorkspaceSnapshot]) -> SessionSnapshot {
     ).unicodeScalars.count == WorkspaceGroupNameDraft.inputScalarLimit)
 }
 
+@Test func workspaceCreationTargetsSelectedOwnerAndConfiguredDefaultWithoutFirstGroupFallback() {
+    let first = workspace(panes: 1)
+    let selected = workspace(panes: 1)
+    let firstGroup = WorkspaceGroupSnapshot(name: "Research", workspaces: [first])
+    let selectedGroup = WorkspaceGroupSnapshot(name: "Product", workspaces: [selected])
+    let defaultGroup = WorkspaceGroupSnapshot(name: "AWESÓMUX", workspaces: [])
+    let selectedSnapshot = SessionSnapshot(
+        selectedWorkspaceID: selected.id,
+        groups: [firstGroup, selectedGroup, defaultGroup]
+    )
+
+    #expect(WorkspaceCreationTarget.selectedOwningGroupID(in: selectedSnapshot) == selectedGroup.id)
+    #expect(WorkspaceCreationTarget.currentContextGroupID(in: selectedSnapshot) == selectedGroup.id)
+    #expect(WorkspaceCreationTarget.defaultGroupID(in: selectedSnapshot) == defaultGroup.id)
+
+    let groupless = SessionSnapshot(groups: [firstGroup, defaultGroup])
+    #expect(WorkspaceCreationTarget.currentContextGroupID(in: groupless) == defaultGroup.id)
+    #expect(WorkspaceCreationTarget.defaultGroupID(
+        in: groupless, defaultGroupName: "Product"
+    ) == nil)
+    #expect(WorkspaceCreationTarget.currentContextGroupID(
+        in: SessionSnapshot(groups: [firstGroup])
+    ) == nil)
+}
+
 @Test func workspaceCloseRiskUsesProcessPromptAndFreshAgentEvidence() {
     let now = Date(timeIntervalSince1970: 20_000)
     func input(

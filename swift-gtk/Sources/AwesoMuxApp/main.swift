@@ -2935,14 +2935,15 @@ private final class ApplicationState: @unchecked Sendable {
         select(order[index])
     }
 
-    private var selectedOwningGroup: WorkspaceGroupSnapshot? {
-        snapshot.groups.first(where: { group in
-            group.workspaces.contains(where: { $0.id == snapshot.selectedWorkspaceID })
-        })
+    func createDefaultWorkspace() {
+        let groupID = WorkspaceCreationTarget.defaultGroupID(in: snapshot)
+            ?? createGroup(named: WorkspaceCreationTarget.defaultGroupName)
+        createWorkspace(in: groupID, directory: FileManager.default.currentDirectoryPath)
     }
 
-    func createDefaultWorkspace() {
-        let groupID = snapshot.groups.first?.id ?? createGroup(named: "awesoMux")
+    func createWorkspaceInCurrentContext() {
+        let groupID = WorkspaceCreationTarget.currentContextGroupID(in: snapshot)
+            ?? createGroup(named: WorkspaceCreationTarget.defaultGroupName)
         createWorkspace(in: groupID, directory: FileManager.default.currentDirectoryPath)
     }
 
@@ -2950,7 +2951,9 @@ private final class ApplicationState: @unchecked Sendable {
         let directory = snapshot.selectedWorkspace
             .flatMap { $0.layout.pane(id: $0.focusedPaneID)?.workingDirectory }
             ?? FileManager.default.currentDirectoryPath
-        createWorkspace(in: selectedOwningGroup?.id ?? snapshot.groups.first?.id, directory: directory)
+        let groupID = WorkspaceCreationTarget.currentContextGroupID(in: snapshot)
+            ?? createGroup(named: WorkspaceCreationTarget.defaultGroupName)
+        createWorkspace(in: groupID, directory: directory)
     }
 
     func createWorkspace(in groupID: UUID) {
@@ -3360,7 +3363,7 @@ private func buildWindow(for application: Gtk.ApplicationRef) {
     setAccessibleLabel(createPrimary, "New Workspace")
     setAccessibleDescription(createPrimary, SidebarAccessibilityCopy.newWorkspaceHint)
     createPrimary.setTooltip(text: "New Workspace")
-    createPrimary.onClicked { [weak state] _ in state?.createDefaultWorkspace() }
+    createPrimary.onClicked { [weak state] _ in state?.createWorkspaceInCurrentContext() }
     let createOptions = state.makeWorkspaceOptionsButton(includePrimaryAction: false)
     createOptions.add(cssClass: "aw-create-options")
     createSplit.append(child: createPrimary); createSplit.append(child: createOptions)

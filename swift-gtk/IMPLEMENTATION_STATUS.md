@@ -196,6 +196,14 @@ geometry and state styling have also passed a real-window visual correction.
   current-directory creation resolve different directory/group contexts at
   activation and share a 400 ms duplicate guard. Quick Settings now applies
   persisted Standard/Compact sidebar density live.
+- Creation no longer treats storage order as the default-group contract. The
+  expanded primary action resolves the selected workspace's owning group at
+  activation, falling back to the canonical `awesoMux` group; app/menu New
+  Workspace targets that canonical default, and New Workspace in Current
+  Directory preserves the focused pane cwd while using selected-owner/default
+  routing. Pure coverage rejects silent first-group fallback. In a real
+  three-group profile, AT-SPI activation selected and persisted one new
+  workspace in the selected second group without changing either sibling.
 - Workspace rename now presents one transient modal sheet instead of a loose
   GTK window. It matches `WorkspaceEditSheet` copy and validation, exposes a
   real heading plus named text box and actions, disables repeat command

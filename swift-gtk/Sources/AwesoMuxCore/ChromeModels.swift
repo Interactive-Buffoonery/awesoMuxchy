@@ -432,6 +432,37 @@ public struct CollapsedGroupAttention: Equatable, Sendable {
     }
 }
 
+public enum WorkspaceCreationTarget {
+    public static let defaultGroupName = "awesoMux"
+
+    public static func selectedOwningGroupID(in snapshot: SessionSnapshot) -> UUID? {
+        guard let selected = snapshot.selectedWorkspaceID else { return nil }
+        return snapshot.groups.first { group in
+            group.workspaces.contains { $0.id == selected }
+        }?.id
+    }
+
+    public static func defaultGroupID(
+        in snapshot: SessionSnapshot,
+        defaultGroupName: String = WorkspaceCreationTarget.defaultGroupName
+    ) -> UUID? {
+        snapshot.groups.first { group in
+            ChromeText.sanitized(group.name, limit: 120).compare(
+                ChromeText.sanitized(defaultGroupName, limit: 120),
+                options: [.caseInsensitive, .diacriticInsensitive]
+            ) == .orderedSame
+        }?.id
+    }
+
+    public static func currentContextGroupID(
+        in snapshot: SessionSnapshot,
+        defaultGroupName: String = WorkspaceCreationTarget.defaultGroupName
+    ) -> UUID? {
+        selectedOwningGroupID(in: snapshot)
+            ?? defaultGroupID(in: snapshot, defaultGroupName: defaultGroupName)
+    }
+}
+
 public struct SidebarChromeProjection: Equatable, Sendable {
     public static let width = SidebarWidthPolicy.defaultWidth
     public static let headerMinimumHeight = 48
