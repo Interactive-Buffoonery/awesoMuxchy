@@ -1,5 +1,31 @@
 # Visual QA
 
+## 2026-08-28 — SwiftGtk4 focused-footer long text
+
+- Linux image: [long repository path, branch, and dirty state](swift-gtk/progress/15-focused-footer-long-text/long-path-branch-dirty-x11.png).
+- Reference: `TerminalPathBarView.swift`, `TerminalPathBarChips.swift`, and
+  `TerminalPathBarModel.swift` at macOS baseline
+  `fed33ff47c559344fc6db6fa53f16e75fcc4a116`.
+- Captured content size: 1440 × 852 on the verified X11/GLX path, with two
+  independently rendered real Ghostty panes and a synthetic local Git working
+  copy carrying a deliberately long repository name, nested directory, long
+  branch, and one uncommitted entry.
+- Corrected behavior: the project and path retain their existing end/middle
+  truncation priorities; the branch label now follows the reference 240 px
+  maximum with middle truncation while keeping its short ahead/behind hint
+  whole. GTK status menu buttons are shrinkable, and long branch-list entries
+  are bounded so no status surface can push or clip adjacent footer controls.
+- PR parity: draft and review chips now render the reference suffixes
+  (`PR #N · draft` and `PR #N · review`) while preserving the full accessible
+  state description.
+- Verification: the PNG was opened and inspected at original resolution. Both
+  terminals, the path control, middle-truncated branch chip, and dirty chip are
+  visible without overlap or clipping. Full local preflight passes 70 Swift
+  tests, the release terminal integration, and 100 two-surface lifecycle cycles.
+- Privacy: the repository, branch, directory, and dirty marker are generated
+  synthetic fixture data. No terminal history, typed command, clipboard data,
+  credential, arbitrary agent output, or private path is shown.
+
 ## 2026-08-28 — SwiftGtk4 Needs Input transition
 
 - Linux images: [selected workspace in Needs Input](swift-gtk/progress/14-needs-input-transition/selected-needs-input-x11.png)
