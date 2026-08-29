@@ -64,7 +64,9 @@ help, and agent context while preserving the compact reference geometry.
   Quick Settings and Help & Feedback popovers were captured and inspected. The
   notification check row now has owned Mocha/Latte contrast, a visible focus
   outline, and a 24-point minimum target; AT-SPI reports all visible choices as
-  sensitive.
+  sensitive. HighContrast passes repeat the real Quick Settings and group-menu
+  surfaces with stronger borders and preserved labels, selections, and
+  enablement; provider/status grayscale traversal remains pending.
 - The collapsed 60-point footer now mirrors the reference vertical contract:
   Quick Settings, Help & Feedback, then only nonzero Thinking, Output, and
   Needs Attention controls. Each 32-point state control cycles through exact

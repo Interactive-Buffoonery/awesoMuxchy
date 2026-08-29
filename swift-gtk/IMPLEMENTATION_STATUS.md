@@ -73,7 +73,9 @@ geometry and state styling have also passed a real-window visual correction.
   presenting informational stand-ins as functioning product routes. Their real
   GTK popovers were opened through AT-SPI and captured; every visible choice is
   named and sensitive. The mute check row now owns theme contrast, keyboard
-  focus treatment, and a 24-point minimum target.
+  focus treatment, and a 24-point minimum target. Real HighContrast captures
+  cover Quick Settings and the full group action/color menu; all labels,
+  selections, checks, and boundary enablement remain distinct.
 - Expanded agent activity is now one priority-grouped pane-grained projection
   shared with the footer counts. Rows preserve sidebar traversal order, expose
   live pane/session titles plus sanitized local/remote locations, publish

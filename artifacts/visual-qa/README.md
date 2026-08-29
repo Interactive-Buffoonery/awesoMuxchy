@@ -1,5 +1,21 @@
 # Visual QA
 
+## 2026-08-29 — SwiftGtk4 high-contrast interactions
+
+- Linux images: [high-contrast Quick settings](swift-gtk/progress/24-high-contrast-interactions/quick-settings-x11.png)
+  and [high-contrast group menu](swift-gtk/progress/24-high-contrast-interactions/group-menu-x11.png).
+- Reference: high-contrast focus/border/foreground behavior, Quick Settings,
+  and group actions at macOS baseline
+  `fed33ff47c559344fc6db6fa53f16e75fcc4a116`.
+- Behavior: the release app ran with GTK HighContrast on X11/GLX. AT-SPI opened
+  both native popovers, preserving the same truthful choices, selected Dark /
+  Standard / Blue states, and first-group Move Up boundary.
+- Inspection: both dedicated surfaces were inspected at original resolution.
+  High-contrast popover borders are thicker and brighter; labels, selected
+  fills, radio/check marks, and the notification control remain distinct. The
+  broader provider/state grayscale matrix and focus-ring traversal remain open.
+- Privacy: both captures contain product-owned static wording only.
+
 ## 2026-08-29 — SwiftGtk4 sidebar footer menus
 
 - Linux images: [Quick settings](swift-gtk/progress/23-sidebar-footer-menus/quick-settings-x11.png)
