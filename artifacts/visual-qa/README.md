@@ -1,5 +1,33 @@
 # Visual QA
 
+## 2026-08-29 — SwiftGtk4 focused-footer interactive targets
+
+- Linux image: [interactive focused-footer chips](swift-gtk/progress/47-focused-footer-targets/interactive-chip-targets-x11.png).
+- Reference: `TerminalPathBarView.swift` at macOS baseline
+  `fed33ff47c559344fc6db6fa53f16e75fcc4a116`, where the actionable branch chip
+  has a 24-point minimum height.
+- Captured content: a 1144 × 38 footer-only crop from the real 1440 × 852
+  release app on X11/GLX under XWayland. The app used a clean isolated profile
+  and created one real local Ghostty workspace in the repository.
+- Behavior and correction: interactive branch, pull-request, and CI menu chips
+  now consume the shared tested 24-point target minimum. The visible `main`
+  branch control occupies that full height; the noninteractive `+6` dirty
+  indicator intentionally retains its compact 20-point status geometry.
+- Inspection: the PNG was opened at original resolution. The path control,
+  branch chip, dirty indicator, dividers, baseline, and 38-point footer remain
+  vertically aligned with no clipping or movement into the terminal surface.
+- Verification: full preflight passes the text baseline, all 129 Swift tests,
+  warnings/release builds, single-window and dynamic-command probes,
+  forced-termination persistence, real terminal integration, and 100
+  two-surface lifecycle cycles.
+- Privacy: the strict footer crop contains only the repository's public name,
+  generic branch/status data, and product chrome. It contains no terminal
+  contents, typed commands, clipboard data, credentials, or private paths.
+- Upload status: retained locally. Pushing this focused screenshot commit from
+  the current branch would also publish unapproved implementation ancestors,
+  so the standing screenshot-only authorization does not safely cover that
+  push.
+
 ## 2026-08-29 — SwiftGtk4 command availability boundaries
 
 - Linux image: [zero-workspace command palette](swift-gtk/progress/46-command-availability/empty-palette-latte-x11.png).
