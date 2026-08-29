@@ -964,12 +964,16 @@ private final class ApplicationState: @unchecked Sendable {
             }
             return true
         case UInt(GDK_KEY_Down):
-            guard !searchResultIDs.isEmpty else { return true }
+            guard SidebarKeyboardNavigationPolicy.searchConsumesArrow(
+                resultCount: searchResultIDs.count
+            ) else { return handleSidebarNavigationKey(keyval) }
             searchResultIndex = min(searchResultIndex + 1, searchResultIDs.count - 1)
             updateSearchResultHighlight()
             return true
         case UInt(GDK_KEY_Up):
-            guard !searchResultIDs.isEmpty else { return true }
+            guard SidebarKeyboardNavigationPolicy.searchConsumesArrow(
+                resultCount: searchResultIDs.count
+            ) else { return handleSidebarNavigationKey(keyval) }
             searchResultIndex = max(searchResultIndex - 1, 0)
             updateSearchResultHighlight()
             return true
@@ -1726,6 +1730,7 @@ private final class ApplicationState: @unchecked Sendable {
         if isLifted { liftedContextControllers[workspaceID] = click } else { workspaceContextControllers[workspaceID] = click }
         gtk_widget_add_controller(row.widget_ptr, click.event_controller_ptr)
         let key = EventControllerKey()
+        key.propagationPhase = .capture
         key.onKeyPressed { _, keyval, _, modifiers in
             let opensMenu = keyval == UInt(GDK_KEY_Menu)
                 || (keyval == UInt(GDK_KEY_F10) && modifiers.contains(.shiftMask))

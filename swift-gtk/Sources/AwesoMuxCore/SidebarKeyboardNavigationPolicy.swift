@@ -6,6 +6,10 @@ public enum SidebarNavigationKey: Sendable {
 }
 
 public enum SidebarKeyboardNavigationPolicy {
+    public static func searchConsumesArrow(resultCount: Int) -> Bool {
+        resultCount > 0
+    }
+
     public static func destination(current: Int?, count: Int, key: SidebarNavigationKey) -> Int? {
         guard count > 0 else { return nil }
         switch key {

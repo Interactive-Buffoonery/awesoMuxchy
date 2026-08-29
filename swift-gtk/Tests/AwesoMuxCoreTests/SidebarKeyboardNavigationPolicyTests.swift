@@ -9,3 +9,8 @@ import Testing
     #expect(SidebarKeyboardNavigationPolicy.destination(current: 2, count: 4, key: .first) == 0)
     #expect(SidebarKeyboardNavigationPolicy.destination(current: 1, count: 4, key: .last) == 3)
 }
+
+@Test func emptySearchYieldsArrowNavigationToSidebarHierarchy() {
+    #expect(!SidebarKeyboardNavigationPolicy.searchConsumesArrow(resultCount: 0))
+    #expect(SidebarKeyboardNavigationPolicy.searchConsumesArrow(resultCount: 1))
+}
