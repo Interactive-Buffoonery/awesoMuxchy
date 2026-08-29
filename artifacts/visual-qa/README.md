@@ -1,5 +1,29 @@
 # Visual QA
 
+## 2026-08-29 — SwiftGtk4 unanswered-turn promotion
+
+- Linux image: [Claude waiting in Needs Input](swift-gtk/progress/28-unanswered-turn/claude-waiting-needs-input-x11.png).
+- Reference: runtime-only unanswered-turn lifting and exact accessibility
+  transition wording at macOS baseline `fed33ff47c559344fc6db6fa53f16e75fcc4a116`.
+- Behavior: the release app received a pane-scoped protocol-v1 Claude Code
+  `notification` that explicitly reported `waiting`, matching the reference
+  one-shot idle-prompt shape. Review moved into Needs Input while its pane
+  remained Waiting with no manufactured attention reason; its blue information
+  badge and neutral `1 agent` footer distinguish this from a blocking prompt.
+  The transition announces `Review is still waiting for a reply, moved to Needs
+  Input` through GTK without moving terminal focus.
+- Inspection: the 1440×852 X11/GLX surface was inspected at original resolution.
+  Review appears once above Local, retains its origin description and Claude
+  burst, Development remains selected with both real terminal panes intact, and
+  the focused-pane footer is unchanged.
+- Verification: core tests cover exact phase classification, permission-prompt
+  exclusion, Pinned precedence, acknowledgement, prompt/session retraction, and
+  omission of both the runtime pane mark and derived lift from persisted JSON.
+  Full preflight passes 86 Swift tests, the release terminal integration, and
+  100 two-surface lifecycle cycles.
+- Privacy: the event and profile are synthetic and contain no prompt, terminal,
+  command, clipboard, credential, or arbitrary output field.
+
 ## 2026-08-29 — SwiftGtk4 owned provider vector glyphs
 
 - Linux images: [Latte provider matrix](swift-gtk/progress/27-provider-vector-glyphs/provider-vectors-light-x11.png),
