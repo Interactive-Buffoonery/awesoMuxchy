@@ -246,7 +246,10 @@ geometry and state styling have also passed a real-window visual correction.
 - The expanded header now uses separate 30-point primary and 24-point options
   segments; the collapsed rail uses a 40-point creation menu. Default versus
   current-directory creation resolve different directory/group contexts at
-  activation and share a 400 ms duplicate guard. Quick Settings now applies
+  activation and share a 400 ms duplicate guard. Current-directory creation is
+  disabled when no focused cwd exists, refreshes with selection, and carries a
+  declared remote pane's cwd through the same local-workspace route as the
+  reference. Quick Settings now applies
   persisted Standard/Compact sidebar density live. The preference also updates
   native GTK geometry: Standard uses 14/3/5-point group/header/session spacing
   and Compact uses 8/1/3 points, with GTK-specific row sizing and exact

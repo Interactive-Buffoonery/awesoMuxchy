@@ -461,6 +461,14 @@ public enum WorkspaceCreationTarget {
         selectedOwningGroupID(in: snapshot)
             ?? defaultGroupID(in: snapshot, defaultGroupName: defaultGroupName)
     }
+
+    public static func currentDirectory(in snapshot: SessionSnapshot) -> String? {
+        guard let workspace = snapshot.selectedWorkspace,
+              let pane = workspace.layout.pane(id: workspace.focusedPaneID)
+        else { return nil }
+        let directory = pane.workingDirectory.trimmingCharacters(in: .newlines)
+        return directory.isEmpty ? nil : directory
+    }
 }
 
 public struct SidebarChromeProjection: Equatable, Sendable {

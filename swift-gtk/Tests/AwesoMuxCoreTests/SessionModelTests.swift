@@ -887,6 +887,7 @@ private func snapshot(_ workspaces: [WorkspaceSnapshot]) -> SessionSnapshot {
     #expect(WorkspaceCreationTarget.selectedOwningGroupID(in: selectedSnapshot) == selectedGroup.id)
     #expect(WorkspaceCreationTarget.currentContextGroupID(in: selectedSnapshot) == selectedGroup.id)
     #expect(WorkspaceCreationTarget.defaultGroupID(in: selectedSnapshot) == defaultGroup.id)
+    #expect(WorkspaceCreationTarget.currentDirectory(in: selectedSnapshot) == "/tmp")
 
     let groupless = SessionSnapshot(groups: [firstGroup, defaultGroup])
     #expect(WorkspaceCreationTarget.currentContextGroupID(in: groupless) == defaultGroup.id)
@@ -896,6 +897,29 @@ private func snapshot(_ workspaces: [WorkspaceSnapshot]) -> SessionSnapshot {
     #expect(WorkspaceCreationTarget.currentContextGroupID(
         in: SessionSnapshot(groups: [firstGroup])
     ) == nil)
+    #expect(WorkspaceCreationTarget.currentDirectory(in: groupless) == nil)
+
+    let remotePane = PaneSnapshot(
+        title: "Remote", workingDirectory: "/srv/project", ownership: .remoteZmx
+    )
+    let remoteWorkspace = WorkspaceSnapshot(
+        name: "Remote", focusedPaneID: remotePane.id, layout: .pane(remotePane)
+    )
+    let remoteSnapshot = SessionSnapshot(
+        selectedWorkspaceID: remoteWorkspace.id,
+        groups: [WorkspaceGroupSnapshot(name: "Remote", workspaces: [remoteWorkspace])]
+    )
+    #expect(WorkspaceCreationTarget.currentDirectory(in: remoteSnapshot) == "/srv/project")
+
+    let missingPane = PaneSnapshot(title: "Missing", workingDirectory: "\n")
+    let missingWorkspace = WorkspaceSnapshot(
+        name: "Missing", focusedPaneID: missingPane.id, layout: .pane(missingPane)
+    )
+    let missingSnapshot = SessionSnapshot(
+        selectedWorkspaceID: missingWorkspace.id,
+        groups: [WorkspaceGroupSnapshot(name: "Local", workspaces: [missingWorkspace])]
+    )
+    #expect(WorkspaceCreationTarget.currentDirectory(in: missingSnapshot) == nil)
 }
 
 @Test func workspaceCloseRiskUsesProcessPromptAndFreshAgentEvidence() {

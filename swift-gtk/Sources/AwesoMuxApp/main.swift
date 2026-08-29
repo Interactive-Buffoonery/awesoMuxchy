@@ -3230,6 +3230,7 @@ private final class ApplicationState: @unchecked Sendable {
             .jumpWorkspace9,
             .commandPalette, .focusSidebar, .toggleSidebarWidth, .toggleSidebarVisibility]
         let selectedWorkspaceCommands: Set<CommandID> = [
+            .newWorkspaceInCurrentDirectory,
             .renameWorkspace, .closeWorkspace, .clearWorkspace,
             .splitRight, .splitDown, .closePane,
             .growActivePane, .shrinkActivePane,
@@ -3276,6 +3277,9 @@ private final class ApplicationState: @unchecked Sendable {
 
     private func refreshCommandEnablement() {
         pruneExpiredClosedWorkspaces()
+        commandActions[.newWorkspaceInCurrentDirectory]?.set(
+            enabled: WorkspaceCreationTarget.currentDirectory(in: snapshot) != nil
+        )
         commandActions[.renameWorkspace]?.set(
             enabled: snapshot.selectedWorkspaceID != nil && activeSheetWindow == nil
         )
@@ -3387,9 +3391,9 @@ private final class ApplicationState: @unchecked Sendable {
     }
 
     func createWorkspaceInCurrentDirectory() {
-        let directory = snapshot.selectedWorkspace
-            .flatMap { $0.layout.pane(id: $0.focusedPaneID)?.workingDirectory }
-            ?? FileManager.default.currentDirectoryPath
+        guard let directory = WorkspaceCreationTarget.currentDirectory(in: snapshot) else {
+            return
+        }
         let groupID = WorkspaceCreationTarget.currentContextGroupID(in: snapshot)
             ?? createGroup(named: WorkspaceCreationTarget.defaultGroupName)
         createWorkspace(in: groupID, directory: directory)

@@ -95,8 +95,12 @@ for _ in {1..100}; do
   sleep 0.05
 done
 
+action_enabled newWorkspaceInCurrentDirectory &&
+  fail "New Workspace in Current Directory was enabled without a selected workspace"
 activate newWorkspace
 wait_for_state "1 1 0"
+action_enabled newWorkspaceInCurrentDirectory ||
+  fail "New Workspace in Current Directory did not enable with a selected workspace"
 action_enabled focusPane2 && fail "Focus Pane 2 was enabled for one pane"
 
 activate splitRight
