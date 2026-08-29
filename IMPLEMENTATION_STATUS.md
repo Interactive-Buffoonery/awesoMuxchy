@@ -303,6 +303,14 @@ help, and agent context while preserving the compact reference geometry.
   avoiding synchronous GL teardown races. A clean real-app sequence exercised
   Split Right → confirmed Close → Split Down → confirmed Close, preserved the
   original pane identity/cwd, and emitted no GTK or runtime diagnostics.
+- `Grow Active Pane` and `Shrink Active Pane` now join that same owned command
+  route with Linux Control-Alt-Equals/Minus mappings. A tested tree reducer
+  adjusts the nearest split containing the focused pane, grows the correct
+  first/second side, clamps at 10–90%, and treats a repeated boundary command
+  as a no-op rather than escaping to an ancestor split. GTK remounts only the
+  split containers, preserves/focuses both live Ghostty surfaces, and persists
+  the fraction. Real app actions drove 0.50 → 0.45 → 0.50 → 0.10 with an extra
+  clamped activation and no GTK/runtime diagnostics.
 - Workspace rows, lifted Needs Input/Pinned rows, collapsed-rail controls, and
   multi-pane peek cards now share one provider-aware tile projection. Claude,
   Codex, OpenCode, Pi, Grok, and shell retain distinct owned scalable marks and

@@ -276,6 +276,13 @@ geometry and state styling have also passed a real-window visual correction.
   exact pane-risk sheet when required, and defers detached Ghostty destruction
   until process exit. A real two-cycle right/down split-and-confirmed-close pass
   preserved the original pane ID and cwd and finished with a clean runtime log.
+- Grow/Shrink Active Pane now map to Control-Alt-Equals/Minus and are enabled
+  only for a selected multi-pane workspace. The pure nearest-split reducer
+  handles nested first/second growth, 10–90% clamps, and boundary no-ops;
+  command activation persists the new fraction while remounting containers
+  around the same live surfaces. Real GTK actions verified
+  0.50 → 0.45 → 0.50 → 0.10 and a non-mutating extra boundary activation with
+  a clean runtime log.
 - `Close Workspace`, `Reopen Closed Workspace`, and `Clear Workspace` now have
   persistent model semantics and awesoMux-owned Ctrl-Shift-W, Ctrl-Shift-T,
   and Ctrl-Alt-Shift-W routing. Recovery is capped at 20 entries/24 hours,

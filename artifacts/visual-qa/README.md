@@ -15,15 +15,19 @@
   live risk gate, was confirmed through the named AT-SPI action, returned focus
   to the original pane, and retired the detached Ghostty surface only after
   process exit. The final repeated sequence produced no GTK or runtime
-  diagnostics.
+  diagnostics. Follow-up real GTK actions drove Grow/Shrink Active Pane through
+  persisted 0.50 → 0.45 → 0.50 → 0.10 fractions and a non-mutating extra clamp
+  activation while retaining the same live pane identities; proportions are
+  behavioral evidence only because the strict crop intentionally excludes
+  terminal content.
 - Inspection: the 296×852 sidebar-only Latte capture was opened at original
   resolution and shows the selected `Pane Commands` row with the two-pane
   indicator/count while fixed header/footer geometry remains stable. The
   480×230 owned sheet was recaptured after rejecting an X11 partial-damage
   frame, then inspected at original resolution for exact heading, body, hint,
   safe-default Cancel, and destructive action treatment.
-- Verification: full preflight passes the text baseline, all 96 Swift tests,
-  the production build, real terminal integration, and 100 two-surface
+- Verification: full local preflight passes the text baseline, all 97 Swift
+  tests, the production build, real terminal integration, and 100 two-surface
   lifecycle cycles.
 - Privacy: the profile, workspace, pane title, cwd, counts, and status are
   synthetic. The strict sidebar and sheet crops contain no terminal content,

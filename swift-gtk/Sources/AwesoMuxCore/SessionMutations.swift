@@ -66,6 +66,37 @@ public extension PaneLayout {
             return self
         }
     }
+
+    func resizingNearestSplit(containing paneID: UUID, by delta: Double) -> PaneLayout? {
+        guard delta.isFinite, delta != 0 else { return nil }
+        switch self {
+        case .pane:
+            return nil
+        case let .split(axis, fraction, first, second):
+            if let updatedFirst = first.resizingNearestSplit(containing: paneID, by: delta) {
+                return .split(
+                    axis: axis, fraction: fraction,
+                    first: updatedFirst, second: second
+                )
+            }
+            if let updatedSecond = second.resizingNearestSplit(containing: paneID, by: delta) {
+                return .split(
+                    axis: axis, fraction: fraction,
+                    first: first, second: updatedSecond
+                )
+            }
+            let adjusted: Double
+            if first.paneIDs.contains(paneID) {
+                adjusted = fraction + delta
+            } else if second.paneIDs.contains(paneID) {
+                adjusted = fraction - delta
+            } else {
+                return nil
+            }
+            let bounded = min(max(adjusted, 0.1), 0.9)
+            return .split(axis: axis, fraction: bounded, first: first, second: second)
+        }
+    }
 }
 
 public extension SessionSnapshot {
@@ -536,6 +567,19 @@ public extension SessionSnapshot {
         if let closedPaneID { unansweredTurnPaneIDs.remove(closedPaneID) }
         reconcileAttentionWorkspaceIDs()
         return decision ?? .closeWindow
+    }
+
+    @discardableResult
+    mutating func resizeFocusedSplit(in workspaceID: UUID, by delta: Double) throws -> Bool {
+        var changed = false
+        try updateWorkspace(id: workspaceID) { workspace in
+            guard let updated = workspace.layout.resizingNearestSplit(
+                containing: workspace.focusedPaneID, by: delta
+            ), updated != workspace.layout else { return }
+            workspace.layout = updated
+            changed = true
+        }
+        return changed
     }
 
     private mutating func updateWorkspace(

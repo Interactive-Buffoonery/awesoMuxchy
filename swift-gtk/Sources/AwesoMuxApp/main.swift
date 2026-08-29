@@ -2843,6 +2843,7 @@ private final class ApplicationState: @unchecked Sendable {
             .renameWorkspace, .acknowledgeWorkspace, .togglePinWorkspace,
             .closeWorkspace, .clearWorkspace, .reopenClosedWorkspace,
             .splitRight, .splitDown, .closePane,
+            .growActivePane, .shrinkActivePane,
             .previousWorkspace, .nextWorkspace, .previousPane, .nextPane,
             .jumpWorkspace1, .jumpWorkspace2, .jumpWorkspace3, .jumpWorkspace4,
             .jumpWorkspace5, .jumpWorkspace6, .jumpWorkspace7, .jumpWorkspace8,
@@ -2854,6 +2855,8 @@ private final class ApplicationState: @unchecked Sendable {
             button.add(cssClass: "aw-menu-row"); button.setHalign(align: .fill)
             if let index = definition.id.workspaceJumpIndex {
                 button.set(sensitive: workspaceJumpOrder().indices.contains(index))
+            } else if [.growActivePane, .shrinkActivePane].contains(definition.id) {
+                button.set(sensitive: snapshot.selectedWorkspace?.layout.paneCount ?? 0 > 1)
             }
             button.onClicked { [weak self, window] _ in
                 window.close(); self?.perform(definition.id)
@@ -2925,6 +2928,7 @@ private final class ApplicationState: @unchecked Sendable {
             .renameWorkspace, .acknowledgeWorkspace, .togglePinWorkspace,
             .closeWorkspace, .clearWorkspace, .reopenClosedWorkspace,
             .splitRight, .splitDown, .closePane,
+            .growActivePane, .shrinkActivePane,
             .previousWorkspace, .nextWorkspace, .previousPane, .nextPane,
             .jumpWorkspace1, .jumpWorkspace2, .jumpWorkspace3, .jumpWorkspace4,
             .jumpWorkspace5, .jumpWorkspace6, .jumpWorkspace7, .jumpWorkspace8,
@@ -2933,10 +2937,12 @@ private final class ApplicationState: @unchecked Sendable {
         let selectedWorkspaceCommands: Set<CommandID> = [
             .renameWorkspace, .closeWorkspace, .clearWorkspace,
             .splitRight, .splitDown, .closePane,
+            .growActivePane, .shrinkActivePane,
         ]
         let sheetCommands: Set<CommandID> = [
             .newWorkspaceGroup, .renameWorkspace, .closeWorkspace, .clearWorkspace,
             .splitRight, .splitDown, .closePane,
+            .growActivePane, .shrinkActivePane,
         ]
         let menu = GIO.Menu()
         for section in [CommandSection.file, .view, .workspace, .pane] {
@@ -2946,6 +2952,8 @@ private final class ApplicationState: @unchecked Sendable {
                 action.set(enabled: implemented.contains(definition.id)
                     && (definition.id != .reopenClosedWorkspace || !snapshot.recentlyClosedWorkspaces.isEmpty)
                     && (!selectedWorkspaceCommands.contains(definition.id) || snapshot.selectedWorkspaceID != nil)
+                    && (![CommandID.growActivePane, .shrinkActivePane].contains(definition.id)
+                        || snapshot.selectedWorkspace?.layout.paneCount ?? 0 > 1)
                     && (!sheetCommands.contains(definition.id) || activeSheetWindow == nil)
                     && (definition.id.workspaceJumpIndex.map { workspaceJumpOrder().indices.contains($0) } ?? true))
                 action.onActivate { [weak self] _, _ in self?.perform(definition.id) }
@@ -2977,6 +2985,13 @@ private final class ApplicationState: @unchecked Sendable {
                 enabled: snapshot.selectedWorkspaceID != nil && activeSheetWindow == nil
             )
         }
+        let canResizePane = snapshot.selectedWorkspace?.layout.paneCount ?? 0 > 1
+        commandActions[.growActivePane]?.set(
+            enabled: canResizePane && activeSheetWindow == nil
+        )
+        commandActions[.shrinkActivePane]?.set(
+            enabled: canResizePane && activeSheetWindow == nil
+        )
         commandActions[.reopenClosedWorkspace]?.set(enabled: !snapshot.recentlyClosedWorkspaces.isEmpty)
         for command in CommandID.allCases {
             if let index = command.workspaceJumpIndex {
@@ -3027,6 +3042,8 @@ private final class ApplicationState: @unchecked Sendable {
         case .splitRight: splitFocusedPane(.horizontal)
         case .splitDown: splitFocusedPane(.vertical)
         case .closePane: requestPrimaryClosePane()
+        case .growActivePane: resizeFocusedSplit(by: 0.05)
+        case .shrinkActivePane: resizeFocusedSplit(by: -0.05)
         default: break
         }
     }
@@ -3408,6 +3425,7 @@ private final class ApplicationState: @unchecked Sendable {
         refreshLiftedRows()
         sidebarFooter?.update(AgentFooterSummary(snapshot: snapshot))
         rebuildWorkspaceContextMenu(workspaceID)
+        refreshCommandEnablement()
         persist()
         focus(pane.id)
         announce(axis == .horizontal ? "Split pane right" : "Split pane down")
@@ -3458,9 +3476,21 @@ private final class ApplicationState: @unchecked Sendable {
         refreshLiftedRows()
         sidebarFooter?.update(AgentFooterSummary(snapshot: snapshot))
         rebuildWorkspaceContextMenu(workspaceID)
+        refreshCommandEnablement()
         persist()
         focus(updated.focusedPaneID)
         announce("Pane closed")
+    }
+
+    private func resizeFocusedSplit(by delta: Double) {
+        guard activeSheetWindow == nil,
+              let workspaceID = snapshot.selectedWorkspaceID,
+              (try? snapshot.resizeFocusedSplit(in: workspaceID, by: delta)) == true,
+              remountWorkspaceLayout(workspaceID),
+              let focusedPaneID = snapshot.workspace(id: workspaceID)?.focusedPaneID
+        else { return }
+        persist()
+        focus(focusedPaneID)
     }
 
     private func selectRelative(_ offset: Int) {

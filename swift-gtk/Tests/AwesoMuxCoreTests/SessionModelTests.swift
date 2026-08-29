@@ -117,6 +117,43 @@ private func snapshot(_ workspaces: [WorkspaceSnapshot]) -> SessionSnapshot {
     #expect(value.workspaces[0].focusedPaneID == paneIDs[2])
 }
 
+@Test func resizingFocusedPaneChangesNearestSplitAndClampsItsFraction() throws {
+    let first = PaneSnapshot(title: "first", workingDirectory: "/tmp")
+    let second = PaneSnapshot(title: "second", workingDirectory: "/tmp")
+    let third = PaneSnapshot(title: "third", workingDirectory: "/tmp")
+    let nested = PaneLayout.split(
+        axis: .vertical, fraction: 0.5,
+        first: .pane(second), second: .pane(third)
+    )
+    let workspace = WorkspaceSnapshot(
+        name: "Nested", focusedPaneID: second.id,
+        layout: .split(
+            axis: .horizontal, fraction: 0.4,
+            first: .pane(first), second: nested
+        )
+    )
+    var value = snapshot([workspace])
+
+    #expect(try value.resizeFocusedSplit(in: workspace.id, by: 0.05))
+    guard case let .split(_, rootFraction, _, right) = value.workspaces[0].layout,
+          case let .split(_, nestedFraction, _, _) = right else {
+        Issue.record("Expected the nested split layout")
+        return
+    }
+    #expect(rootFraction == 0.4)
+    #expect(nestedFraction == 0.55)
+
+    try value.focusPane(third.id, in: workspace.id)
+    #expect(try value.resizeFocusedSplit(in: workspace.id, by: 1))
+    guard case let .split(_, _, _, clampedRight) = value.workspaces[0].layout,
+          case let .split(_, clampedFraction, _, _) = clampedRight else {
+        Issue.record("Expected the clamped nested split layout")
+        return
+    }
+    #expect(clampedFraction == 0.1)
+    #expect(!(try value.resizeFocusedSplit(in: workspace.id, by: 1)))
+}
+
 @Test func selectingWorkspaceRejectsSoftClosedTarget() {
     var closed = workspace(panes: 1)
     closed.isSoftClosed = true
@@ -132,6 +169,8 @@ private func snapshot(_ workspaces: [WorkspaceSnapshot]) -> SessionSnapshot {
     let chords = definitions.compactMap(\.defaultChord)
     #expect(Set(chords).count == chords.count)
     #expect(CommandCatalog.definition(for: .splitRight).action == "Split Right")
+    #expect(CommandCatalog.definition(for: .growActivePane).action == "Grow Active Pane")
+    #expect(CommandCatalog.definition(for: .shrinkActivePane).action == "Shrink Active Pane")
     #expect(CommandCatalog.definition(for: .newWorkspaceGroup).action == "New Workspace Group…")
     #expect(CommandCatalog.definition(for: .focusSidebar) == CommandDefinition(
         id: .focusSidebar,

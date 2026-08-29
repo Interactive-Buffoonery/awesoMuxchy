@@ -11,6 +11,8 @@ public enum CommandID: String, CaseIterable, Codable, Sendable {
     case reopenClosedWorkspace
     case splitRight
     case splitDown
+    case growActivePane
+    case shrinkActivePane
     case previousWorkspace
     case nextWorkspace
     case jumpWorkspace1
@@ -126,6 +128,10 @@ public enum CommandCatalog {
               defaultChord: chord("d", .control)),
         .init(id: .splitDown, action: "Split Down", section: .pane,
               defaultChord: chord("d", .control, .shift)),
+        .init(id: .growActivePane, action: "Grow Active Pane", section: .pane,
+              defaultChord: chord("=", .control, .alt)),
+        .init(id: .shrinkActivePane, action: "Shrink Active Pane", section: .pane,
+              defaultChord: chord("-", .control, .alt)),
         .init(id: .previousWorkspace, action: "Previous Workspace", section: .workspace,
               defaultChord: chord("[", .control, .shift)),
         .init(id: .nextWorkspace, action: "Next Workspace", section: .workspace,
