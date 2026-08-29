@@ -1,5 +1,33 @@
 # Visual QA
 
+## 2026-08-29 — SwiftGtk4 workspace-group naming sheets
+
+- Linux images: [new workspace group](swift-gtk/progress/31-group-naming/new-workspace-group-sheet-x11.png)
+  and [rename workspace group](swift-gtk/progress/31-group-naming/rename-workspace-group-sheet-x11.png).
+- Reference: `WorkspaceGroupCreateSheet.swift`, `WorkspaceGroupRenameSheet.swift`,
+  and `WorkspaceGroupNameDraft.swift` at macOS baseline
+  `fed33ff47c559344fc6db6fa53f16e75fcc4a116`.
+- Behavior: every group create/rename route now presents one transient modal
+  sheet owned by the main window. The sheets use exact headings, `Name`,
+  `Group name`, `Workspace group name`, `Cancel`, and Create/Save copy. A shared
+  bounded draft rejects empty, invisible, duplicate, and mixed-script names,
+  displays sanitization adjustments before saving, and keeps invalid forms
+  open. Return submits valid input and Escape cancels; repeat group creation is
+  disabled until the active sheet closes.
+- Accessibility and interaction: live AT-SPI verified heading, label, text-box,
+  and button semantics. Duplicate `Local` exposed the exact validation message
+  and rejected Click. Valid `Research` was created and persisted, then opened
+  from its real group-action popover, renamed to `Product`, and persisted. Both
+  sheets closed cleanly, command enablement recovered, and the app stayed alive.
+- Inspection: both 420-point X11/GLX Latte surfaces were inspected at original
+  resolution. Owned Geist typography, focus treatment, spacing, and
+  primary/secondary buttons match the accepted workspace-rename sheet.
+- Verification: full preflight passes the text baseline, 88 Swift tests,
+  production build, terminal integration, and 100 two-surface lifecycle cycles.
+- Privacy: all group names and profile state are synthetic; no terminal
+  content, commands, clipboard data, credentials, paths, or arbitrary agent
+  output are shown.
+
 ## 2026-08-29 — SwiftGtk4 workspace rename sheet
 
 - Linux image: [workspace rename sheet](swift-gtk/progress/30-workspace-rename/workspace-rename-sheet-x11.png).
