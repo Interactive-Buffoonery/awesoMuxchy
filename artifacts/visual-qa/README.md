@@ -4,7 +4,9 @@
 
 - Linux images: [hidden attention edge](swift-gtk/progress/19-hidden-sidebar-reveal/hidden-attention-edge-x11.png),
   [pointer-hover reveal](swift-gtk/progress/19-hidden-sidebar-reveal/edge-hover-revealed-x11.png),
-  and [retracted after pointer leave](swift-gtk/progress/19-hidden-sidebar-reveal/retracted-after-leave-x11.png).
+  [retracted after pointer leave](swift-gtk/progress/19-hidden-sidebar-reveal/retracted-after-leave-x11.png),
+  [right-side hidden attention edge](swift-gtk/progress/19-hidden-sidebar-reveal/right-hidden-attention-edge-x11.png),
+  and [right-edge pointer reveal](swift-gtk/progress/19-hidden-sidebar-reveal/right-edge-hover-revealed-x11.png).
 - Reference: `SidebarPresentationCommand.swift`, `SidebarView.swift`, and
   hidden-discovery behavior at macOS baseline
   `fed33ff47c559344fc6db6fa53f16e75fcc4a116`.
@@ -12,7 +14,8 @@
   hidden image retains the full terminal allocation and exposes the pink
   attention edge tab. Hovering that tab reveals the 296 px sidebar as an
   overlay; moving back into the terminal retracts it after the leave grace
-  without changing the terminal footer width.
+  without changing the terminal footer width. The mirrored right-side fixture
+  places and reveals the attention tab and sidebar from the opposite edge.
 - Inspection: all PNGs were inspected at original resolution with real Ghostty
   rendering. The reveal preserves selection, fixed footer alignment, and the
   selected pane's focused-footer state.
