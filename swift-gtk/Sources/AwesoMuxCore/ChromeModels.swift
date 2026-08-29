@@ -537,6 +537,13 @@ public struct SidebarChromeProjection: Equatable, Sendable {
     }
 }
 
+public enum ChromeControlMetrics {
+    /// Completion-contract minimum for every interactive sidebar/footer target.
+    public static let minimumInteractiveTarget = 24
+    /// Compact height retained by noninteractive dirty/remote status indicators.
+    public static let focusedFooterStatusHeight = 20
+}
+
 public struct SidebarGroupAccessibilityPresentation: Equatable, Sendable {
     public let workspaceCount: Int
     public let hasSelectedDescendant: Bool

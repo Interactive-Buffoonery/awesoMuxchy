@@ -352,6 +352,11 @@ help, and agent context while preserving the compact reference geometry.
   workspace titles remain fixed.
   The real terminal integration emits OSC 2 and OSC 7 and requires both
   callbacks to arrive.
+- Focused-footer branch, pull-request, and CI menu chips now consume the shared
+  tested 24-point interactive-target minimum, matching the pinned reference and
+  the completion contract. Noninteractive dirty and remote indicators retain
+  their compact 20-point status geometry rather than being misrepresented as
+  controls.
 - Expanded multi-pane workspace rows now publish a tested pane-tree-order peek
   projection and reveal the reference-width card after 180 ms. The card shows
   workspace rollup state, authoritative focused cwd, pane numbers, pane-local

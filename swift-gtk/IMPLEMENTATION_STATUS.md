@@ -134,6 +134,9 @@ geometry and state styling have also passed a real-window visual correction.
   spacing, radii, opacity, tone-specific borders, and 10/11-point monospaced
   hierarchy. Repository roots render as `repo root`; nested directories render
   repo-relative, and disappearing Git/PR/CI state clears stale chips.
+- Interactive branch/PR/CI menu chips now use the shared tested 24-point target
+  minimum; the noninteractive dirty/remote indicators intentionally remain at
+  the reference's compact 20-point status height.
 - The path/project priority and branch chip now handle pathological footer text
   without displacing adjacent controls. The branch label follows the reference
   240-point cap and middle truncation while the short ahead/behind hint remains

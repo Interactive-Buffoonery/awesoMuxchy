@@ -7,6 +7,15 @@ import Testing
     #expect(FooterOpenTargetAction.resolve(controlHeld: true) == .revealInFiles)
 }
 
+@Test func focusedFooterInteractiveTargetsMeetTheCompletionContract() {
+    #expect(ChromeControlMetrics.minimumInteractiveTarget == 24)
+    #expect(ChromeControlMetrics.focusedFooterStatusHeight == 20)
+    #expect(
+        ChromeControlMetrics.minimumInteractiveTarget
+            > ChromeControlMetrics.focusedFooterStatusHeight
+    )
+}
+
 @Test func agentFooterSummarizesOnlyDeclaredAgentsAndPrioritizesAttention() {
     let thinking = PaneSnapshot(title: "Plan", workingDirectory: "/tmp", agent: "Codex", agentState: .thinking)
     let attention = PaneSnapshot(title: "Fix", workingDirectory: "/tmp", agent: "Claude", agentState: .needsAttention)
