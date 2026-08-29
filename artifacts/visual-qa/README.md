@@ -2,7 +2,8 @@
 
 ## 2026-08-29 — SwiftGtk4 sidebar keyboard-focus handoff
 
-- Linux images: [expanded search focus](swift-gtk/progress/17-sidebar-keyboard-focus/expanded-search-focus-x11.png)
+- Linux images: [expanded search focus](swift-gtk/progress/17-sidebar-keyboard-focus/expanded-search-focus-x11.png),
+  [expanded first-row focus](swift-gtk/progress/17-sidebar-keyboard-focus/expanded-row-focus-x11.png),
   and [collapsed selected-row focus](swift-gtk/progress/17-sidebar-keyboard-focus/collapsed-row-focus-x11.png).
 - Reference: `KeyboardShortcutCatalog.focusSidebar`,
   `SidebarFocusRequest.swift`, `SidebarPresentationCommand.swift`, and
@@ -12,18 +13,19 @@
   Command-Control-S chord to Linux Control-Super-S. Expanded mode moves focus
   from the active terminal to `Search sessions`; collapsed mode focuses the
   selected rail row (or its stable fallback). A hidden sidebar is persistently
-  shown before the focus handoff.
+  shown before the focus handoff. From an empty expanded search field, Down
+  hands focus directly to the first logical sidebar row.
 - Verification: the action was invoked through `org.gtk.Actions` in the real
-  app. The expanded image shows the search field's keyboard-only blue focus
-  ring; the collapsed image shows the selected Needs Input rail row's distinct
-  focus outline. A hide/focus round trip changed the profile-scoped synthetic
+  app. The expanded images show the search field and the first Needs Input row
+  with their keyboard-only blue focus outlines; AT-SPI reported the row as the
+  focused list item. The collapsed image shows the selected Needs Input rail
+  row's distinct focus outline. A hide/focus round trip changed the synthetic
   fixture from hidden `true` to `false`. Both images contain two live Ghostty
-  panes and were inspected at original resolution. Full preflight passes 71
+  panes and were inspected at original resolution. Full preflight passes 72
   Swift tests, release terminal integration, and 100 two-surface lifecycle
   cycles.
-- Accessibility note: GTK 4.14's AT-SPI bridge still omits its focused state
-  bit for these widgets, so the visible native focus ring and direct action
-  route are the authoritative evidence; full Orca spoken inspection remains.
+- Accessibility note: direct AT-SPI inspection confirms focus on the search
+  entry and expanded workspace list item; full Orca spoken inspection remains.
 - Privacy: the profile and terminal prompts are synthetic. No terminal history,
   typed commands, clipboard data, credentials, arbitrary agent output, or
   private path is present.

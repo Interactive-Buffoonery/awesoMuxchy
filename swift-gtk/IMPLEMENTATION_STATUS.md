@@ -214,7 +214,11 @@ geometry and state styling have also passed a real-window visual correction.
   the Linux Control-Super-S mapping. It persistently unhides the sidebar, then
   focuses `Search sessions` in expanded mode or the selected/fallback rail row
   in collapsed mode. Direct GTK-action QA and inspected real-app captures cover
-  both focus rings plus the hidden-to-visible preference transition.
+  both focus rings plus the hidden-to-visible preference transition. Empty
+  search Up/Down now routes directly into the hierarchy instead of relying on
+  GTK event bubbling; a policy regression test and AT-SPI focus inspection
+  cover the first-row handoff. Row context keys run in capture phase so GTK's
+  built-in key handling cannot intercept Menu or Shift+F10 first.
   Footer state chips are real buttons that open a state-filtered activity
   panel, and Orca discovers the live app through AT-SPI.
 - Collapsed group attention is projected once from pane agent states and shared

@@ -270,7 +270,9 @@ help, and agent context while preserving the compact reference geometry.
   Control-Super-S, unhides the sidebar, and hands terminal focus to the
   expanded search field or the selected collapsed-rail row. Both visible focus
   states were exercised through the exported GTK action and inspected at
-  original resolution. Agent state chips are
+  original resolution. Empty-search arrows route directly into the logical
+  hierarchy, with the first expanded row's AT-SPI focused state and native
+  outline inspected in the real app. Agent state chips are
   buttons that open the panel filtered to the chosen state. Orca enumerates
   the running app through AT-SPI. Group disclosure, color, close,
   workspace/pinned/group reorder, pin/unpin, and Needs Input return transitions
