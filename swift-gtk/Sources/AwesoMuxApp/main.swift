@@ -2110,10 +2110,7 @@ private final class ApplicationState: @unchecked Sendable {
         }
         _ = action("New Workspace Here") { [weak self] in self?.createWorkspace(here: workspaceID, fallbackGroupID: groupID) }
         _ = action("Rename Workspace…") { [weak self] in self?.presentWorkspaceNameDialog(workspaceID) }
-        if let workspace = snapshot.workspace(id: workspaceID),
-           workspace.layout.panes.contains(where: {
-               $0.agentState == .needsAttention && !workspace.acknowledgedAttentionPaneIDs.contains($0.id)
-           }) {
+        if CommandAvailabilityProjection.canAcknowledgeWorkspace(workspaceID, in: snapshot) {
             _ = action("Acknowledge Workspace") { [weak self] in self?.acknowledgeWorkspace(workspaceID) }
         }
         let muteTitle = snapshot.workspace(id: workspaceID)?.notificationsMuted == true
@@ -3100,20 +3097,7 @@ private final class ApplicationState: @unchecked Sendable {
             return
         }
         guard let rootWidget else { return }
-        let implemented: Set<CommandID> = [
-            .newWorkspace, .newWorkspaceInCurrentDirectory, .newWorkspaceGroup,
-            .renameWorkspace, .acknowledgeWorkspace, .togglePinWorkspace,
-            .closeWorkspace, .clearWorkspace, .reopenClosedWorkspace,
-            .splitRight, .splitDown, .closePane,
-            .growActivePane, .shrinkActivePane,
-            .previousWorkspace, .nextWorkspace, .previousPane, .nextPane,
-            .focusPane1, .focusPane2, .focusPane3,
-            .focusPane4, .focusPane5, .focusPane6,
-            .jumpWorkspace1, .jumpWorkspace2, .jumpWorkspace3, .jumpWorkspace4,
-            .jumpWorkspace5, .jumpWorkspace6, .jumpWorkspace7, .jumpWorkspace8,
-            .jumpWorkspace9,
-            .focusSidebar, .toggleSidebarWidth, .toggleSidebarVisibility,
-        ]
+        let implemented = CommandAvailabilityProjection.implementedCommandIDs
         let definitions = CommandCatalog.definitions.filter { implemented.contains($0.id) }
         let controller = CommandPaletteController(
             anchor: WidgetRef(rootWidget),
@@ -3217,52 +3201,17 @@ private final class ApplicationState: @unchecked Sendable {
     }
 
     func installCommands(on application: Gtk.ApplicationRef) {
-        let implemented: Set<CommandID> = [.newWorkspace, .newWorkspaceInCurrentDirectory, .newWorkspaceGroup,
-            .renameWorkspace, .acknowledgeWorkspace, .togglePinWorkspace,
-            .closeWorkspace, .clearWorkspace, .reopenClosedWorkspace,
-            .splitRight, .splitDown, .closePane,
-            .growActivePane, .shrinkActivePane,
-            .previousWorkspace, .nextWorkspace, .previousPane, .nextPane,
-            .focusPane1, .focusPane2, .focusPane3,
-            .focusPane4, .focusPane5, .focusPane6,
-            .jumpWorkspace1, .jumpWorkspace2, .jumpWorkspace3, .jumpWorkspace4,
-            .jumpWorkspace5, .jumpWorkspace6, .jumpWorkspace7, .jumpWorkspace8,
-            .jumpWorkspace9,
-            .commandPalette, .focusSidebar, .toggleSidebarWidth, .toggleSidebarVisibility]
-        let selectedWorkspaceCommands: Set<CommandID> = [
-            .newWorkspaceInCurrentDirectory,
-            .renameWorkspace, .closeWorkspace, .clearWorkspace,
-            .splitRight, .splitDown, .closePane,
-            .growActivePane, .shrinkActivePane,
-            .previousPane, .nextPane,
-            .focusPane1, .focusPane2, .focusPane3,
-            .focusPane4, .focusPane5, .focusPane6,
-        ]
-        let sheetCommands: Set<CommandID> = [
-            .newWorkspaceGroup, .renameWorkspace, .closeWorkspace, .clearWorkspace,
-            .splitRight, .splitDown, .closePane,
-            .growActivePane, .shrinkActivePane,
-            .previousPane, .nextPane,
-            .focusPane1, .focusPane2, .focusPane3,
-            .focusPane4, .focusPane5, .focusPane6,
-        ]
+        let implemented = CommandAvailabilityProjection.implementedCommandIDs
+        let enabled = CommandAvailabilityProjection.enabledCommandIDs(
+            snapshot: snapshot, isSheetPresented: activeSheetWindow != nil
+        )
         let menu = GIO.Menu()
         for section in [CommandSection.file, .view, .workspace, .pane] {
             let submenu = GIO.Menu()
-            for definition in CommandCatalog.definitions where definition.section == section {
+            for definition in CommandCatalog.definitions
+                where definition.section == section && implemented.contains(definition.id) {
                 let action = GIO.SimpleAction(name: definition.id.rawValue, parameterType: nil as VariantTypeRef?)
-                action.set(enabled: implemented.contains(definition.id)
-                    && (definition.id != .reopenClosedWorkspace || !snapshot.recentlyClosedWorkspaces.isEmpty)
-                    && (!selectedWorkspaceCommands.contains(definition.id) || snapshot.selectedWorkspaceID != nil)
-                    && (![CommandID.growActivePane, .shrinkActivePane].contains(definition.id)
-                        || snapshot.selectedWorkspace?.layout.paneCount ?? 0 > 1)
-                    && (![CommandID.previousPane, .nextPane].contains(definition.id)
-                        || snapshot.selectedWorkspace?.layout.paneCount ?? 0 > 1)
-                    && (definition.id.paneFocusIndex.map {
-                        $0 <= (snapshot.selectedWorkspace?.layout.paneCount ?? 0)
-                    } ?? true)
-                    && (!sheetCommands.contains(definition.id) || activeSheetWindow == nil)
-                    && (definition.id.workspaceJumpIndex.map { workspaceJumpOrder().indices.contains($0) } ?? true))
+                action.set(enabled: enabled.contains(definition.id))
                 action.onActivate { [weak self] _, _ in self?.perform(definition.id) }
                 application.add(action: action)
                 commandActions[definition.id] = action
@@ -3277,44 +3226,11 @@ private final class ApplicationState: @unchecked Sendable {
 
     private func refreshCommandEnablement() {
         pruneExpiredClosedWorkspaces()
-        commandActions[.newWorkspaceInCurrentDirectory]?.set(
-            enabled: WorkspaceCreationTarget.currentDirectory(in: snapshot) != nil
+        let enabled = CommandAvailabilityProjection.enabledCommandIDs(
+            snapshot: snapshot, isSheetPresented: activeSheetWindow != nil
         )
-        commandActions[.renameWorkspace]?.set(
-            enabled: snapshot.selectedWorkspaceID != nil && activeSheetWindow == nil
-        )
-        commandActions[.newWorkspaceGroup]?.set(enabled: activeSheetWindow == nil)
-        commandActions[.closeWorkspace]?.set(
-            enabled: snapshot.selectedWorkspaceID != nil && activeSheetWindow == nil
-        )
-        commandActions[.clearWorkspace]?.set(
-            enabled: snapshot.selectedWorkspaceID != nil && activeSheetWindow == nil
-        )
-        for command in [CommandID.splitRight, .splitDown, .closePane] {
-            commandActions[command]?.set(
-                enabled: snapshot.selectedWorkspaceID != nil && activeSheetWindow == nil
-            )
-        }
-        let canResizePane = snapshot.selectedWorkspace?.layout.paneCount ?? 0 > 1
-        commandActions[.growActivePane]?.set(
-            enabled: canResizePane && activeSheetWindow == nil
-        )
-        commandActions[.shrinkActivePane]?.set(
-            enabled: canResizePane && activeSheetWindow == nil
-        )
-        commandActions[.previousPane]?.set(enabled: canResizePane && activeSheetWindow == nil)
-        commandActions[.nextPane]?.set(enabled: canResizePane && activeSheetWindow == nil)
-        commandActions[.reopenClosedWorkspace]?.set(enabled: !snapshot.recentlyClosedWorkspaces.isEmpty)
-        for command in CommandID.allCases {
-            if let index = command.workspaceJumpIndex {
-                commandActions[command]?.set(enabled: workspaceJumpOrder().indices.contains(index))
-            }
-            if let index = command.paneFocusIndex {
-                commandActions[command]?.set(
-                    enabled: index <= (snapshot.selectedWorkspace?.layout.paneCount ?? 0)
-                        && activeSheetWindow == nil
-                )
-            }
+        for (command, action) in commandActions {
+            action.set(enabled: enabled.contains(command))
         }
     }
 

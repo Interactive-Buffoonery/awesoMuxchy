@@ -525,11 +525,15 @@ help, and agent context while preserving the compact reference geometry.
   Visible `+`/`×` children on primary-create, row-close, group-close, and
   activity-close buttons are explicitly decorative so GTK cannot replace the
   parent action name with the glyph.
-- Pane command enablement now refreshes on every workspace selection rather
-  than retaining the previous workspace's pane count. A release-process
-  preflight probe moves through one-pane → two-pane → one-pane → two-pane
-  states, verifies `Focus Pane 2` enablement at each boundary, invokes it, and
-  requires the authoritative focused identity to equal pane-tree item two.
+- One tested `CommandAvailabilityProjection` now owns initial and refreshed
+  GAction/palette availability for the implemented catalog. It covers empty,
+  one/two-workspace, one/two-pane, attention/unanswered, recovery, sheet,
+  sidebar-target, and jump boundaries. The release-process preflight probe
+  crosses those real states, routes exact pane identity two, and proves modal
+  sheet gating while retaining the reference's deliberate split availability.
+  Unimplemented catalog entries are omitted rather than exported as disabled
+  placeholders. The inspected zero-workspace Latte palette contains only the
+  truthful `New Workspace` suggestion.
 - Background live-agent outcome crossings now publish the reference accessibility
   status copy without changing sidebar ownership. Real Codex `done` and `error`
   events on Review emitted `Codex in Review completed.` and `Codex in Review

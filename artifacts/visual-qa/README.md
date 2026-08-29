@@ -1,5 +1,39 @@
 # Visual QA
 
+## 2026-08-29 — SwiftGtk4 command availability boundaries
+
+- Linux image: [zero-workspace command palette](swift-gtk/progress/46-command-availability/empty-palette-latte-x11.png).
+- Reference: `PaletteCommand.swift`, `AwesoMuxApp.swift`, and the command
+  availability tests at macOS baseline
+  `fed33ff47c559344fc6db6fa53f16e75fcc4a116`.
+- Architecture and behavior: one pure `CommandAvailabilityProjection` now
+  drives initial GAction state, every live refresh, and the command palette's
+  immutable summon snapshot. It covers selected workspace/cwd, pane and
+  workspace counts, attention and unanswered turns, recently closed state,
+  active sheets, jump bounds, and sidebar-target availability. The workspace
+  context menu uses the same acknowledgement predicate, including unanswered
+  turns that do not carry a blocking agent state. Unimplemented catalog items
+  are omitted from GTK actions and menus instead of appearing as disabled
+  placeholders.
+- Real-app QA: the release-process probe starts from a genuinely empty profile,
+  crosses one workspace, two panes, a second workspace, pane routing, and an
+  active naming sheet. It verifies disabled no-op actions at every boundary,
+  exact enabling after each model change, and the reference's deliberate split
+  availability while a sheet is presented.
+- Inspection: the 606×506 Latte popup was inspected at original resolution.
+  Its bare query contains only `New Workspace` under `SUGGESTED`; `New
+  Workspace in Current Directory` and `Reopen Closed Workspace` are absent,
+  no row is implicitly selected, the focused search ring is visible, and the
+  complete native shadow is intact.
+- Verification: full preflight passes the text baseline, all 125 Swift tests,
+  warnings-as-errors and release builds, single-window and expanded
+  dynamic-command probes, both forced-termination cases, terminal integration,
+  and 100 two-surface lifecycle cycles.
+- Privacy: the profile contains zero workspaces and therefore creates no
+  terminal. The popup-only capture contains no shell identity, terminal
+  content, commands, credentials, clipboard data, private paths, or arbitrary
+  agent output.
+
 ## 2026-08-29 — SwiftGtk4 unified command palette
 
 - Linux image: [collapsed-search unified palette](swift-gtk/progress/45-command-palette/unified-command-palette-latte-x11.png).

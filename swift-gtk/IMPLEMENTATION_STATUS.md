@@ -59,9 +59,12 @@ geometry and state styling have also passed a real-window visual correction.
   Input, or Pinned rows as projections change; pointer cards remain outside the
   keyboard focus chain while row context actions expose every pane through the
   same exact focus route. Workspace selection now refreshes pane-command
-  enablement immediately: a release-process probe proves `Focus Pane 2`
-  disables on one pane, enables on two, tracks one/two-pane workspace switches,
-  and routes to the second pane's exact tree-order identity. A fresh release
+  enablement immediately. A pure catalog-wide projection also gates workspace,
+  attention, recovery, jump, palette, and sidebar commands across empty,
+  one/two-workspace, pane-count, and modal-sheet states. A release-process probe
+  proves each boundary, including exact second-pane routing and the reference's
+  split availability during a sheet, and rejects export of the unimplemented
+  Keyboard Shortcuts placeholder. A fresh release
   app used app-owned collapsed/expanded focus recovery to expose the peek card;
   AT-SPI invoked pane 1's explicit Click action and the owner-only snapshot
   persisted the exact first pane identity. A real Pinned-row X11/GLX capture

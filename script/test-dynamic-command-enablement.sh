@@ -47,6 +47,11 @@ action_enabled() {
     --method org.gtk.Actions.Describe "$1" | grep -q '((true,'
 }
 
+action_exists() {
+  gdbus call --session --dest "$application" --object-path "$object_path" \
+    --method org.gtk.Actions.Describe "$1" >/dev/null 2>&1
+}
+
 snapshot_state() {
   python3 - "$snapshot" <<'PY'
 import json
@@ -95,12 +100,21 @@ for _ in {1..100}; do
   sleep 0.05
 done
 
-action_enabled newWorkspaceInCurrentDirectory &&
-  fail "New Workspace in Current Directory was enabled without a selected workspace"
+action_exists keyboardShortcuts && fail "unimplemented Keyboard Shortcuts action was exported"
+for action in newWorkspaceInCurrentDirectory renameWorkspace acknowledgeWorkspace \
+  togglePinWorkspace splitRight closePane previousWorkspace nextWorkspace \
+  focusPane1 jumpWorkspace1; do
+  action_enabled "$action" && fail "$action was enabled without a selected workspace"
+done
 activate newWorkspace
 wait_for_state "1 1 0"
-action_enabled newWorkspaceInCurrentDirectory ||
-  fail "New Workspace in Current Directory did not enable with a selected workspace"
+for action in newWorkspaceInCurrentDirectory renameWorkspace togglePinWorkspace \
+  splitRight closePane focusPane1 jumpWorkspace1; do
+  action_enabled "$action" || fail "$action did not enable with one selected workspace"
+done
+for action in acknowledgeWorkspace previousWorkspace nextWorkspace focusPane2 jumpWorkspace2; do
+  action_enabled "$action" && fail "$action was enabled outside its availability boundary"
+done
 action_enabled focusPane2 && fail "Focus Pane 2 was enabled for one pane"
 
 activate splitRight
@@ -110,6 +124,9 @@ action_enabled focusPane2 || fail "Focus Pane 2 did not enable after split"
 activate newWorkspace
 wait_for_state "2 1 0"
 action_enabled focusPane2 && fail "Focus Pane 2 stayed enabled on one-pane workspace"
+for action in previousWorkspace nextWorkspace jumpWorkspace2; do
+  action_enabled "$action" || fail "$action did not enable with two workspaces"
+done
 
 activate jumpWorkspace1
 wait_for_state "2 2 1"
@@ -117,4 +134,16 @@ action_enabled focusPane2 || fail "Focus Pane 2 did not refresh after workspace 
 activate focusPane2
 wait_for_state "2 2 1"
 
-echo "dynamic command enablement: passed one/two-pane workspace transitions and pane-2 routing"
+activate newWorkspaceGroup
+for _ in {1..100}; do
+  action_enabled commandPalette || break
+  sleep 0.05
+done
+for action in newWorkspaceGroup renameWorkspace togglePinWorkspace closePane \
+  commandPalette focusSidebar toggleSidebarWidth toggleSidebarVisibility \
+  jumpWorkspace1; do
+  action_enabled "$action" && fail "$action stayed enabled while a sheet was presented"
+done
+action_enabled splitRight || fail "Split Right did not match reference sheet availability"
+
+echo "dynamic command enablement: passed empty/one/two-workspace, pane, and sheet boundaries"
