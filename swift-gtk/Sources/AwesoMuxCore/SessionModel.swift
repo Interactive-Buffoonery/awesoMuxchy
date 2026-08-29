@@ -199,6 +199,10 @@ public struct SessionSnapshot: Codable, Equatable, Sendable {
     public var groups: [WorkspaceGroupSnapshot]
     public var pinnedWorkspaceIDs: [UUID]
     public var attentionWorkspaceIDs: [UUID]
+    /// Runtime-only panes whose completed turn was reported unanswered. Like
+    /// the attention sticky, this is omitted from CodingKeys so relaunch never
+    /// restores a stale live-agent signal.
+    public var unansweredTurnPaneIDs: Set<UUID>
     /// Runtime-only hold that keeps the selected row in Needs Input after the
     /// passive read dwell. It is deliberately omitted from CodingKeys so a
     /// relaunch rebuilds lift state from live attention instead of restoring a
@@ -216,6 +220,7 @@ public struct SessionSnapshot: Codable, Equatable, Sendable {
         groups: [WorkspaceGroupSnapshot] = [],
         pinnedWorkspaceIDs: [UUID] = [],
         attentionWorkspaceIDs: [UUID] = [],
+        unansweredTurnPaneIDs: Set<UUID> = [],
         attentionStickyWorkspaceID: UUID? = nil,
         recentlyClosedWorkspaces: [RecentlyClosedWorkspaceRecord] = []
     ) {
@@ -224,6 +229,7 @@ public struct SessionSnapshot: Codable, Equatable, Sendable {
         self.groups = groups
         self.pinnedWorkspaceIDs = pinnedWorkspaceIDs
         self.attentionWorkspaceIDs = attentionWorkspaceIDs
+        self.unansweredTurnPaneIDs = unansweredTurnPaneIDs
         self.attentionStickyWorkspaceID = attentionStickyWorkspaceID
         self.recentlyClosedWorkspaces = recentlyClosedWorkspaces
     }
@@ -240,9 +246,31 @@ public struct SessionSnapshot: Codable, Equatable, Sendable {
             groups: try values.decodeIfPresent([WorkspaceGroupSnapshot].self, forKey: .groups) ?? [],
             pinnedWorkspaceIDs: try values.decodeIfPresent([UUID].self, forKey: .pinnedWorkspaceIDs) ?? [],
             attentionWorkspaceIDs: try values.decodeIfPresent([UUID].self, forKey: .attentionWorkspaceIDs) ?? [],
+            unansweredTurnPaneIDs: [],
             attentionStickyWorkspaceID: nil,
             recentlyClosedWorkspaces: try values.decodeIfPresent([RecentlyClosedWorkspaceRecord].self, forKey: .recentlyClosedWorkspaces) ?? []
         )
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var values = encoder.container(keyedBy: CodingKeys.self)
+        try values.encode(schemaVersion, forKey: .schemaVersion)
+        try values.encodeIfPresent(selectedWorkspaceID, forKey: .selectedWorkspaceID)
+        try values.encode(groups, forKey: .groups)
+        try values.encode(pinnedWorkspaceIDs, forKey: .pinnedWorkspaceIDs)
+        // Arrival order persists only for real pane attention. An unanswered
+        // turn is a live-agent signal whose pane IDs are intentionally omitted;
+        // retaining its derived workspace ID would resurrect a stale lifted row
+        // after relaunch with no producer capable of retracting it.
+        let persistentAttentionIDs = attentionWorkspaceIDs.filter { workspaceID in
+            guard let workspace = workspace(id: workspaceID) else { return false }
+            let acknowledged = Set(workspace.acknowledgedAttentionPaneIDs)
+            return workspace.layout.panes.contains {
+                $0.agentState == .needsAttention && !acknowledged.contains($0.id)
+            }
+        }
+        try values.encode(persistentAttentionIDs, forKey: .attentionWorkspaceIDs)
+        try values.encode(recentlyClosedWorkspaces, forKey: .recentlyClosedWorkspaces)
     }
 
     public func validated() throws -> SessionSnapshot {

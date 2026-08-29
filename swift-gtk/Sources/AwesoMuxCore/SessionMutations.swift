@@ -257,10 +257,14 @@ public extension SessionSnapshot {
     }
 
     mutating func acknowledgeWorkspace(_ workspaceID: UUID) throws {
+        guard let paneIDs = workspace(id: workspaceID)?.layout.paneIDs else {
+            throw SessionMutationError.workspaceNotFound(workspaceID)
+        }
         try updateWorkspace(id: workspaceID) { workspace in
             workspace.acknowledgedAttentionPaneIDs = workspace.layout.panes
                 .filter { $0.agentState == .needsAttention }.map(\.id)
         }
+        unansweredTurnPaneIDs.subtract(paneIDs)
         if attentionStickyWorkspaceID == workspaceID {
             attentionStickyWorkspaceID = nil
         }
@@ -273,6 +277,13 @@ public extension SessionSnapshot {
         in workspaceID: UUID,
         passively: Bool = false
     ) throws -> Bool {
+        guard workspace(id: workspaceID)?.layout.pane(id: paneID) != nil else {
+            throw SessionMutationError.paneNotFound(paneID)
+        }
+        if unansweredTurnPaneIDs.remove(paneID) != nil {
+            reconcileAttentionWorkspaceIDs()
+            return true
+        }
         var didAcknowledge = false
         try updateWorkspace(id: workspaceID) { workspace in
             guard let pane = workspace.layout.pane(id: paneID), pane.agentState == .needsAttention else {
@@ -319,6 +330,23 @@ public extension SessionSnapshot {
         if selectedWorkspaceID == workspaceID {
             refreshAttentionStickyForSelection()
         }
+    }
+
+    mutating func updatePaneAgentRuntime(
+        paneID: UUID,
+        workspaceID: UUID,
+        update: AgentRuntimeUpdate
+    ) throws {
+        try updatePaneAgentState(
+            paneID: paneID, workspaceID: workspaceID, agent: update.agent,
+            state: update.state, attentionReason: update.attentionReason
+        )
+        if update.reportsUnansweredTurn {
+            unansweredTurnPaneIDs.insert(paneID)
+        } else if update.phase == .promptSubmit || update.phase == .sessionEnd {
+            unansweredTurnPaneIDs.remove(paneID)
+        }
+        reconcileAttentionWorkspaceIDs()
     }
 
     mutating func refreshAttentionStickyForSelection() {
@@ -387,6 +415,7 @@ public extension SessionSnapshot {
     }
 
     mutating func reconcileAttentionWorkspaceIDs() {
+        unansweredTurnPaneIDs.formIntersection(Set(workspaces.flatMap { $0.layout.paneIDs }))
         for groupIndex in groups.indices {
             for workspaceIndex in groups[groupIndex].workspaces.indices {
                 let activeAttention = Set(groups[groupIndex].workspaces[workspaceIndex].layout.panes
@@ -401,7 +430,7 @@ public extension SessionSnapshot {
             let acknowledged = Set(workspace.acknowledgedAttentionPaneIDs)
             return !workspace.isSoftClosed && (workspace.id == sticky || workspace.layout.panes.contains {
                 $0.agentState == .needsAttention && !acknowledged.contains($0.id)
-            })
+            } || !unansweredTurnPaneIDs.isDisjoint(with: workspace.layout.paneIDs))
         }.map(\.id)
         let eligibleSet = Set(eligible)
         attentionWorkspaceIDs.removeAll {

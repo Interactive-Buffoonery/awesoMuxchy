@@ -610,17 +610,41 @@ private final class ApplicationState: @unchecked Sendable {
     private func publishPaneAgentUpdate(
         _ update: AgentRuntimeUpdate, paneID: UUID, workspaceID: UUID, generation: Int
     ) {
+        let wasUnanswered = snapshot.unansweredTurnPaneIDs.contains(paneID)
+        let wasLifted = snapshot.attentionWorkspaceIDs.contains(workspaceID)
         guard acceptsPanePublication(paneID, workspaceID: workspaceID, generation: generation),
-              (try? snapshot.updatePaneAgentState(
-                  paneID: paneID, workspaceID: workspaceID, agent: update.agent,
-                  state: update.state, attentionReason: update.attentionReason
+              (try? snapshot.updatePaneAgentRuntime(
+                  paneID: paneID, workspaceID: workspaceID, update: update
               )) != nil
         else { return }
+        let promotedUnansweredTurn = update.reportsUnansweredTurn
+            && !snapshot.pinnedWorkspaceIDs.contains(workspaceID)
+            && !wasUnanswered
+            && !wasLifted
+            && snapshot.attentionWorkspaceIDs.contains(workspaceID)
         refreshWorkspaceAgentTile(workspaceID)
         refreshWorkspaceRowPresentation(workspaceID)
         refreshLiftedRows()
         sidebarFooter?.update(AgentFooterSummary(snapshot: snapshot))
         persist()
+        if promotedUnansweredTurn, let workspace = snapshot.workspace(id: workspaceID) {
+            announce(SidebarAnnouncement.unansweredTurnPromoted(
+                title: SidebarWorkspaceTitle.resolve(workspace: workspace)
+            ))
+        } else if update.state == .needsAttention,
+                  !wasLifted,
+                  !snapshot.pinnedWorkspaceIDs.contains(workspaceID),
+                  snapshot.attentionWorkspaceIDs.contains(workspaceID),
+                  snapshot.selectedWorkspaceID != workspaceID,
+                  let workspace = snapshot.workspace(id: workspaceID)
+        {
+            announce(SidebarAnnouncement.attentionPromoted(
+                agent: ChromeText.sanitized(update.agent, limit: 80),
+                title: SidebarWorkspaceTitle.resolve(workspace: workspace)
+            ))
+        } else {
+            announceAttentionReturnIfNeeded(workspaceID, wasAttention: wasLifted)
+        }
     }
 
     private func refreshWorkspaceAgentTile(_ workspaceID: UUID) {
@@ -1836,20 +1860,25 @@ private final class ApplicationState: @unchecked Sendable {
         attentionAcknowledgementGeneration += 1
         let generation = attentionAcknowledgementGeneration
         guard let workspace = snapshot.workspace(id: workspaceID),
-              workspace.layout.pane(id: paneID)?.agentState == .needsAttention,
-              !workspace.acknowledgedAttentionPaneIDs.contains(paneID)
+              let pane = workspace.layout.pane(id: paneID),
+              (snapshot.unansweredTurnPaneIDs.contains(paneID)
+                  || (pane.agentState == .needsAttention
+                      && !workspace.acknowledgedAttentionPaneIDs.contains(paneID)))
         else { return }
         DispatchQueue.main.asyncAfter(deadline: .now() + .milliseconds(500)) { [weak self] in
             performOnGTKMain {
                 guard let self, self.attentionAcknowledgementGeneration == generation,
                       self.snapshot.selectedWorkspaceID == workspaceID,
-                      self.runtimes[workspaceID]?.focusedPaneID == paneID,
-                      (try? self.snapshot.acknowledgePane(
+                      self.runtimes[workspaceID]?.focusedPaneID == paneID
+                else { return }
+                let wasAttention = self.snapshot.attentionWorkspaceIDs.contains(workspaceID)
+                guard (try? self.snapshot.acknowledgePane(
                           paneID, in: workspaceID, passively: true
                       )) == true
                 else { return }
                 self.rebuildWorkspaceContextMenu(workspaceID)
                 self.refreshLiftedRows(); self.updateSidebarVisibility(); self.persist()
+                self.announceAttentionReturnIfNeeded(workspaceID, wasAttention: wasAttention)
             }
         }
     }

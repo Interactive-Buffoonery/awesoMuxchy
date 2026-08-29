@@ -68,7 +68,13 @@ help, and agent context while preserving the compact reference geometry.
   publishes through the existing generation-guarded pane reducer on GTK's
   main thread. A real Grok `userInputRequired` event moved the exact workspace
   into Needs Input, refreshed its provider/status tile and three-agent footer,
-  and persisted the pane state. Full preflight passes 83 Swift tests; the
+  and persisted the pane state. Waiting `notification` events are separately
+  tracked as runtime-only unanswered turns: they promote without manufacturing
+  an attention reason, retract on prompt submission/session end or explicit
+  acknowledgement, honor Pinned precedence, and announce the exact reference
+  move wording without stealing focus. Ordinary background input promotions
+  and live return-to-group transitions also use the reference announcement
+  channel. Full preflight passes 86 Swift tests; the
   terminal harness also proves the environment reaches the child process.
 - Footer menus expose only real routes: Quick Settings directly changes the
   implemented theme, density, and notification preferences, while Report a
@@ -303,9 +309,9 @@ help, and agent context while preserving the compact reference geometry.
   outline inspected in the real app. Agent state chips are
   buttons that open the panel filtered to the chosen state. Orca enumerates
   the running app through AT-SPI. Group disclosure, color, close,
-  workspace/pinned/group reorder, pin/unpin, and Needs Input return transitions
-  now publish GTK accessibility status
-  announcements with tested reference reorder wording. Full spoken navigation
+  workspace/pinned/group reorder, pin/unpin, Needs Input promotion (including
+  unanswered turns), and return transitions now publish GTK accessibility
+  status announcements with tested reference wording. Full spoken navigation
   and Orca announcement verification remains pending.
 - Workspace rows now expose real soft close and permanent clear actions. Soft
   close records a bounded, 24-hour recovery snapshot, removes the row from all

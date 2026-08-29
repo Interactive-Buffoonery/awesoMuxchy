@@ -249,6 +249,14 @@ public enum SidebarAnnouncement {
     public static func movedPinnedWorkspace(title: String, position: Int, count: Int) -> String {
         "Moved \(title) to position \(position) of \(count) in Pinned"
     }
+
+    public static func unansweredTurnPromoted(title: String) -> String {
+        "\(title) is still waiting for a reply, moved to Needs Input"
+    }
+
+    public static func attentionPromoted(agent: String, title: String) -> String {
+        "\(agent) in \(title) needs input."
+    }
 }
 
 public enum SidebarAccessibilityCopy {

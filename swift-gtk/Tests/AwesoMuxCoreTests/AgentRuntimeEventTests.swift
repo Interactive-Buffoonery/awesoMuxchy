@@ -41,6 +41,84 @@ import Testing
     ))
 }
 
+@Test func agentRuntimeEventClassifiesOnlyWaitingNotificationAsUnansweredTurn() throws {
+    let idlePrompt = try #require(
+        #"{"v":1,"source":"claude-code","phase":"notification","execution":"waiting"}"#.data(using: .utf8)
+    )
+    let permission = try #require(
+        #"{"v":1,"source":"claude-code","phase":"notification","execution":"waiting","attentionReason":"permissionPrompt"}"#.data(using: .utf8)
+    )
+    let ordinaryWaiting = try #require(
+        #"{"v":1,"source":"claude-code","phase":"stop","execution":"waiting"}"#.data(using: .utf8)
+    )
+    #expect(AgentRuntimeEventProtocol.decode(line: idlePrompt)?.reportsUnansweredTurn == true)
+    #expect(AgentRuntimeEventProtocol.decode(line: permission)?.reportsUnansweredTurn == false)
+    #expect(AgentRuntimeEventProtocol.decode(line: ordinaryWaiting)?.reportsUnansweredTurn == false)
+}
+
+@Test func unansweredTurnPromotionIsRuntimeOnlyAndRetractsOnPromptSubmit() throws {
+    let pane = PaneSnapshot(title: "Claude", workingDirectory: "/tmp", agent: "Claude Code")
+    let workspace = WorkspaceSnapshot(name: "Review", focusedPaneID: pane.id, layout: .pane(pane))
+    var value = SessionSnapshot(
+        selectedWorkspaceID: workspace.id,
+        groups: [WorkspaceGroupSnapshot(name: "Local", workspaces: [workspace])]
+    )
+    try value.updatePaneAgentRuntime(
+        paneID: pane.id, workspaceID: workspace.id,
+        update: AgentRuntimeUpdate(
+            agent: "Claude Code", state: .waiting, attentionReason: nil,
+            phase: .notification
+        )
+    )
+    #expect(value.unansweredTurnPaneIDs == [pane.id])
+    #expect(value.attentionWorkspaceIDs == [workspace.id])
+    #expect(value.workspace(id: workspace.id)?.layout.pane(id: pane.id)?.attentionReason == nil)
+
+    var passivelyRead = value
+    #expect(try passivelyRead.acknowledgePane(pane.id, in: workspace.id, passively: true))
+    #expect(passivelyRead.unansweredTurnPaneIDs.isEmpty)
+    #expect(passivelyRead.attentionWorkspaceIDs.isEmpty)
+
+    let restored = try JSONDecoder().decode(SessionSnapshot.self, from: JSONEncoder().encode(value))
+    #expect(restored.unansweredTurnPaneIDs.isEmpty)
+    #expect(restored.attentionWorkspaceIDs.isEmpty)
+
+    try value.updatePaneAgentRuntime(
+        paneID: pane.id, workspaceID: workspace.id,
+        update: AgentRuntimeUpdate(
+            agent: "Claude Code", state: .running, attentionReason: nil,
+            phase: .promptSubmit
+        )
+    )
+    #expect(value.unansweredTurnPaneIDs.isEmpty)
+    #expect(value.attentionWorkspaceIDs.isEmpty)
+}
+
+@Test func unansweredTurnAcknowledgementAndPinnedPrecedenceMatchLiftedSections() throws {
+    let pane = PaneSnapshot(title: "Claude", workingDirectory: "/tmp")
+    let workspace = WorkspaceSnapshot(name: "Review", focusedPaneID: pane.id, layout: .pane(pane))
+    var value = SessionSnapshot(
+        selectedWorkspaceID: workspace.id,
+        groups: [WorkspaceGroupSnapshot(name: "Local", workspaces: [workspace])],
+        pinnedWorkspaceIDs: [workspace.id]
+    )
+    let idlePrompt = AgentRuntimeUpdate(
+        agent: "Claude Code", state: .waiting, attentionReason: nil,
+        phase: .notification
+    )
+    try value.updatePaneAgentRuntime(
+        paneID: pane.id, workspaceID: workspace.id, update: idlePrompt
+    )
+    #expect(value.unansweredTurnPaneIDs == [pane.id])
+    #expect(value.attentionWorkspaceIDs.isEmpty)
+
+    try value.togglePinnedWorkspace(workspace.id)
+    #expect(value.attentionWorkspaceIDs == [workspace.id])
+    try value.acknowledgeWorkspace(workspace.id)
+    #expect(value.unansweredTurnPaneIDs.isEmpty)
+    #expect(value.attentionWorkspaceIDs.isEmpty)
+}
+
 @Test func paneAgentUpdatePublishesProviderAndClearsAttentionReason() throws {
     let pane = PaneSnapshot(title: "Shell", workingDirectory: "/tmp")
     let workspace = WorkspaceSnapshot(name: "Runtime", focusedPaneID: pane.id, layout: .pane(pane))

@@ -198,9 +198,14 @@ geometry and state styling have also passed a real-window visual correction.
   immediate `Acknowledge Workspace` row action and Ctrl-Shift-K route release
   the sticky and reconcile the lifted section and hidden edge cue. Exact
   per-workspace `Mute Notifications`/`Unmute Notifications` overrides persist.
-  Full preflight passes 71 Swift tests after the accessibility correction.
-  Unanswered-turn ingestion, injected-clock GTK coverage, and physical AT-SPI
-  announcement inspection remain pending.
+  Pane-scoped `notification` + `waiting` runtime events now add a separate,
+  non-persistent unanswered-turn mark, lift without an attention reason, honor
+  Pinned precedence, retract only on prompt submission/session end or explicit
+  acknowledgement, and publish the exact `is still waiting for a reply, moved
+  to Needs Input` GTK status announcement. Blocking prompts keep their distinct
+  background-agent announcement. Full preflight passes 86 Swift tests.
+  Injected-clock GTK coverage and physical AT-SPI announcement inspection remain
+  pending.
 - Non-pinned workspace menus now expose tested, bounded within-group Up/Down
   moves plus named previous/next-group and arbitrary-group alternatives.
   Mutations reuse the authoritative snapshot and existing terminal runtime,
@@ -275,7 +280,7 @@ geometry and state styling have also passed a real-window visual correction.
   Control-1…9 actions and transient digits from one lifted-first order. Real
   hover and close/reopen renders were inspected; physical held-Control input
   remains pending because synthetic X11 input does not reach this session.
-- The full local preflight passes 64 Swift tests after the native DnD and
+- The full local preflight passes 86 Swift tests after the live unanswered-turn
   announcement milestone, followed by the release build, real two-terminal
   title/cwd integration, and 100 two-surface lifecycle cycles.
 - Long group text is now width-bounded and ellipsized, titlebar brand/title

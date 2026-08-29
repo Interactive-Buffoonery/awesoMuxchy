@@ -1028,6 +1028,10 @@ private func snapshot(_ workspaces: [WorkspaceSnapshot]) -> SessionSnapshot {
     #expect(SidebarAnnouncement.movedPinnedWorkspace(
         title: "Review", position: 3, count: 5
     ) == "Moved Review to position 3 of 5 in Pinned")
+    #expect(SidebarAnnouncement.unansweredTurnPromoted(title: "Review")
+        == "Review is still waiting for a reply, moved to Needs Input")
+    #expect(SidebarAnnouncement.attentionPromoted(agent: "Claude Code", title: "Review")
+        == "Claude Code in Review needs input.")
 }
 
 @Test func sidebarAccessibilityCopyRejectsInvalidPositionsAndUsesSingularCounts() {
