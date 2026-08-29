@@ -52,6 +52,12 @@ help, and agent context while preserving the compact reference geometry.
   installed editors, Files, and copy actions off the GTK thread. Git and `gh`
   use argv-only bounded processes with prompts disabled, capped output, hard
   timeout fallback, HTTPS-only remote actions, and stale-identity rejection.
+  Ordinary path clicks retain the workspace menu; Linux Control-click maps the
+  reference Command-click gesture to reveal the same current, identity-checked
+  local repository root or working directory in Files. Remote panes fail
+  closed, and the modifier policy is covered independently of GTK delivery.
+  Real release-app AT-SPI QA confirms an ordinary click still opens the menu
+  with both Show in Files and Copy Path.
   A real zero-group/no-selection profile verifies the neutral absent state:
   the focused footer and all path/Git/PR/CI/remote chips disappear instead of
   presenting disabled placeholders, while the empty-workspace recovery action

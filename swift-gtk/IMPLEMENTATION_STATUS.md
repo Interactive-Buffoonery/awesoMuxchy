@@ -80,7 +80,11 @@ geometry and state styling have also passed a real-window visual correction.
   generation checks reject stale publication. Validated local repositories add
   branch, dirty/ahead/behind, PR, and failing/running CI chips plus branch,
   browser, copy, Files, and discovered-editor actions. Remote panes suppress
-  local actions and show a remote indicator.
+  local actions and show a remote indicator. Ordinary path clicks retain that
+  action menu, while Linux Control-click maps the reference Command-click to
+  reveal the same current, identity-checked local repo root or working
+  directory in Files; remote panes fail closed. Real release-app AT-SPI QA
+  confirms an ordinary click still exposes both Show in Files and Copy Path.
   A separate valid zero-group profile verifies the no-focused-pane boundary:
   no path bar or context chips are fabricated, the centered recovery action is
   exposed, fixed sidebar chrome remains, and the footer reports `0 agents`.

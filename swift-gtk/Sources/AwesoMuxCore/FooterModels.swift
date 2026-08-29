@@ -301,6 +301,16 @@ public enum FocusedPaneFooterWording {
     public static let insertFailureLogCommand = "Insert Failure-Log Command"
 }
 
+public enum FooterOpenTargetAction: Equatable, Sendable {
+    case showMenu
+    case revealInFiles
+
+    /// Linux maps the reference Command-click gesture to Control-click.
+    public static func resolve(controlHeld: Bool) -> Self {
+        controlHeld ? .revealInFiles : .showMenu
+    }
+}
+
 public struct TerminalFooterDetails: Equatable, Sendable {
     public let context: FocusedPaneContext
     public let repoRoot: String?

@@ -45,6 +45,7 @@ final class FocusedPanePathBar: @unchecked Sendable {
 
     let root = BoxRef(orientation: .horizontal, spacing: 8)
     private let pathMenu = MenuButtonRef()
+    private let pathModifierClick = GestureClick()
     private let project = LabelRef(str: "")
     private let path = LabelRef(str: "")
     private let branchMenu = MenuButtonRef()
@@ -58,6 +59,7 @@ final class FocusedPanePathBar: @unchecked Sendable {
     private let remote = LabelRef(str: "Remote")
     private let actions: Actions
     private var context: FocusedPaneContext?
+    private var openTargetPath: String?
 
     init(actions: Actions) {
         self.actions = actions
@@ -94,6 +96,18 @@ final class FocusedPanePathBar: @unchecked Sendable {
         chevron.add(cssClass: "aw-path-chevron")
         pathContent.append(child: chevron)
         pathMenu.set(child: pathContent)
+        pathModifierClick.set(button: 1)
+        pathModifierClick.propagationPhase = .capture
+        pathModifierClick.onPressed { [weak self] gesture, _, _, _ in
+            let action = FooterOpenTargetAction.resolve(
+                controlHeld: gesture.getCurrentEventState().contains(.controlMask)
+            )
+            guard action == .revealInFiles, let self, let openTargetPath else { return }
+            _ = gesture.set(state: .claimed)
+            pathMenu.popdown()
+            actions.reveal(openTargetPath)
+        }
+        gtk_widget_add_controller(pathMenu.widget_ptr, pathModifierClick.event_controller_ptr)
         root.append(child: pathMenu)
 
         let spacer = BoxRef(orientation: .horizontal, spacing: 0)
@@ -155,11 +169,12 @@ final class FocusedPanePathBar: @unchecked Sendable {
 
     func updatePreview(_ value: FocusedPaneContext, isRemote: Bool) {
         context = value
+        openTargetPath = isRemote ? nil : value.copyPath
         project.label = value.project
         path.label = value.path
-        pathMenu.setTooltip(text: isRemote ? "Workspace options are unavailable for remote panes." : "Open workspace options.")
+        pathMenu.setTooltip(text: isRemote ? "Workspace options are unavailable for remote panes." : "Open workspace options. Control-click to show in Files.")
         setAccessibleLabel(pathMenu, "\(value.project), \(value.path)")
-        setAccessibleDescription(pathMenu, isRemote ? "Workspace options are unavailable for remote panes" : "Open workspace options")
+        setAccessibleDescription(pathMenu, isRemote ? "Workspace options are unavailable for remote panes" : "Opens workspace options. Control-click to show in Files")
         remote.set(visible: isRemote)
         branchMenu.set(visible: false)
         dirty.set(visible: false)
@@ -176,6 +191,7 @@ final class FocusedPanePathBar: @unchecked Sendable {
     func updateDetails(_ details: TerminalFooterDetails) {
         guard context?.identity == details.context.identity else { return }
         let presentation = details.pathPresentation
+        openTargetPath = details.repoRoot ?? details.context.copyPath
         project.label = presentation.project
         path.label = presentation.path
         pathMenu.set(popover: pathPopover(path: details.repoRoot ?? details.context.copyPath, editors: details.editors))

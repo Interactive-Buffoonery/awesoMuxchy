@@ -994,6 +994,17 @@
 - Corrected semantics: repository roots use the exact `repo root` wording,
   nested working directories use repo-relative paths, and Git/PR/CI chips are
   explicitly cleared when their resolved state disappears.
+- Later interaction correction: ordinary primary clicks still open the path
+  action menu. Linux Control-click maps the reference Command-click gesture to
+  reveal that same current, identity-checked local repo root or working
+  directory in Files; remote panes fail closed. This changes behavior but not
+  pixels, so the inspected footer image remains the applicable visual record.
+- Interaction verification: a fresh release app launched from `/tmp`; AT-SPI
+  found the one actionable current path control by its exact modifier hint,
+  accepted an ordinary click, and then exposed both `Show in Files` and
+  `Copy Path`. The full local preflight passes all 114 Swift tests, both builds,
+  the single-window and dynamic-command probes, both forced-termination cases,
+  terminal integration, and 100 two-surface lifecycle cycles.
 - Verification: the image was captured from the real GTK application after
   background repository resolution and opened at original resolution for
   inspection. The focused repository supplied real branch, ahead, and dirty

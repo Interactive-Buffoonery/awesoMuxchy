@@ -2,6 +2,11 @@ import Foundation
 import Testing
 @testable import AwesoMuxCore
 
+@Test func pathBarOpenTargetMapsReferenceModifierToLinuxControlClick() {
+    #expect(FooterOpenTargetAction.resolve(controlHeld: false) == .showMenu)
+    #expect(FooterOpenTargetAction.resolve(controlHeld: true) == .revealInFiles)
+}
+
 @Test func agentFooterSummarizesOnlyDeclaredAgentsAndPrioritizesAttention() {
     let thinking = PaneSnapshot(title: "Plan", workingDirectory: "/tmp", agent: "Codex", agentState: .thinking)
     let attention = PaneSnapshot(title: "Fix", workingDirectory: "/tmp", agent: "Claude", agentState: .needsAttention)
