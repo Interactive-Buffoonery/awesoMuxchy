@@ -1,5 +1,37 @@
 # Visual QA
 
+## 2026-08-28 — SwiftGtk4 live sidebar chrome and rail
+
+- Linux images: [expanded populated sidebar](swift-gtk/progress/10-sidebar-live-chrome/expanded-populated-x11.png)
+  and [collapsed 60-point rail](swift-gtk/progress/10-sidebar-live-chrome/collapsed-rail-x11.png).
+- Reference: awesoMux macOS at
+  `fed33ff47c559344fc6db6fa53f16e75fcc4a116`.
+- Captured content size: 1440 × 852 on the verified X11/GLX path under
+  XWayland. Both images contain two real, independently rendered Ghostty panes;
+  neither contains a GL-context error, fake terminal, or blank integration
+  surface.
+- Expanded state: the sidebar is settled at the 296-point reference default
+  with fixed search/create chrome, Needs Input and Pinned projections, group
+  ownership, selected workspace, agent footer, and the continuous 38-point
+  focused-pane footer.
+- Collapsed state: the same live window is settled at 60 points with 40-point
+  search/create/workspace controls, distinct attention and pinned glyphs, the
+  group tint marker, and the compact agent footer. Terminal layout and focus
+  survive the mode transition.
+- Live-data verification: the language-neutral Ghostty bridge now forwards OSC
+  title and cwd changes through generation-guarded pane identity. The full
+  preflight passed 58 Swift tests, a release integration that emits OSC 2 and
+  OSC 7, and 100 two-surface lifecycle cycles before capture.
+- Privacy: the fixture shows only the intentional local development-style
+  prompt and repository basename. It contains no terminal history, entered
+  commands, clipboard contents, credentials, or arbitrary agent output.
+- Visible remaining differences: GTK/portable glyph outlines differ from SF
+  Symbols; workspace tiles still need provider-specific glyphs/status shapes,
+  hover/focus close controls, jump-number overlays, and multi-pane peek cards.
+  Pointer drag insertion indicators, announcement coverage, roster-popover
+  capture, light/high-contrast/scale/right-side states, and the remaining
+  completion-contract screenshots are still pending.
+
 ## 2026-08-28 — SwiftGtk4 macOS footer visual correction
 
 - Linux image: [focused footer](swift-gtk/progress/09-footer-macos-parity/focused-footer-x11.png).
