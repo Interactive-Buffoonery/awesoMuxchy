@@ -1,5 +1,36 @@
 # Visual QA
 
+## 2026-08-29 — SwiftGtk4 focused-footer command gate
+
+- Linux image: [agent-pane branch footer](swift-gtk/progress/34-footer-command-gate/agent-footer-branch-gate-x11.png).
+- Reference: `TerminalPathBarView.swift`, `TerminalPathBarChips.swift`, and
+  `TerminalPathBarMenus.swift` at macOS baseline
+  `fed33ff47c559344fc6db6fa53f16e75fcc4a116`.
+- Behavior: the selected local pane declared Codex while its focused footer
+  resolved a synthetic two-branch repository. The real branch popover exposed
+  `feature/preview` with the AT-SPI description `Copies the branch name`; it did
+  not claim that an agent pane could receive checkout text. The shared gate now
+  requires a local non-agent pane, observed prompt, prompt-present state, and
+  idle-shell liveness. PR/CI insertion rows are omitted when that gate is shut
+  and re-check it at activation; safe open/copy actions remain available.
+- Copy/accessibility: the current branch is noninteractive. PR and CI menus use
+  exact `Open in Browser`, `Copy URL`, `Insert Checkout Command`, `Insert Watch
+  Command`, and `Insert Failure-Log Command` wording. Branch rows describe
+  whether activation inserts at the prompt or copies the branch name.
+- Inspection: the 1144×38 X11/GLX footer crop was opened at original
+  resolution. The synthetic `repository › repo root` composition, divider,
+  spacing, and `main` chip remain aligned without exposing terminal content.
+  GTK's transient popover uses a separate surface that this raw window capture
+  path does not composite; its live contents and description were checked over
+  AT-SPI instead of being misrepresented as screenshot evidence.
+- Verification: full preflight passes the text baseline, all 94 tests (including
+  every gate rejection and exact footer action wording), the production build,
+  real terminal integration, and 100 two-surface lifecycle cycles. The live
+  AT-SPI pass confirms the closed-gate branch behavior.
+- Privacy: the repository, commit, branches, pane titles, and agent identity are
+  synthetic. The strict footer crop contains no terminal content, commands,
+  clipboard data, credentials, private paths, or arbitrary agent output.
+
 ## 2026-08-29 — SwiftGtk4 fuzzy sidebar search
 
 - Linux image: [ordered multi-range highlight](swift-gtk/progress/33-fuzzy-sidebar-search/ordered-multi-range-highlight-x11.png).
