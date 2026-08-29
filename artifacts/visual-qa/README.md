@@ -1,5 +1,34 @@
 # Visual QA
 
+## 2026-08-28 — SwiftGtk4 multi-pane workspace peek
+
+- Linux image: [Pinned multi-pane workspace peek](swift-gtk/progress/11-multi-pane-peek/pinned-multi-pane-peek-x11.png).
+- Reference: `SidebarSessionPeekCard.swift`, `PanePeekItem.swift`, and
+  `SidebarSessionTile.swift` at macOS baseline
+  `fed33ff47c559344fc6db6fa53f16e75fcc4a116`.
+- Captured content size: 1440 × 852 on the verified X11/GLX path under
+  XWayland, with two real independently rendered Ghostty panes.
+- Implemented behavior: expanded multi-pane rows reveal a 240-point card after
+  the reference 180 ms delay. It carries workspace rollup state, focused cwd,
+  pane-tree numbering, pane-local state, active identity, and click-to-focus
+  routing. The same host follows a workspace into Needs Input or Pinned rather
+  than remaining attached to its hidden ownership row; the image exercises the
+  Pinned case. Row-to-card handoff retains the reference 220 ms grace.
+- Keyboard/screen-reader path: the row context surface exposes the same pane
+  order as explicit `Jump to pane N` actions, including provider, state,
+  remote identity, and active-pane wording. The transient pointer card itself
+  does not take keyboard focus.
+- Capture note: GTK maps the popover as a separate native X11 surface. The app
+  client and popup were captured from the same live state and composited at
+  their recorded root-window coordinates; no UI pixels were otherwise edited.
+- Verification: the inspected image shows the 296-point sidebar, lifted row,
+  real split terminals, and continuous footer without a GL-context error. Full
+  preflight passed 59 Swift tests, release integration (including OSC title/cwd
+  callbacks), and 100 two-surface lifecycle cycles.
+- Remaining row work: provider-specific owned glyphs/status shapes,
+  hover/focus close controls, jump-number overlays, pointer drag insertion,
+  and full physical-pointer/Orca action inspection.
+
 ## 2026-08-28 — SwiftGtk4 live sidebar chrome and rail
 
 - Linux images: [expanded populated sidebar](swift-gtk/progress/10-sidebar-live-chrome/expanded-populated-x11.png)
@@ -27,7 +56,8 @@
   commands, clipboard contents, credentials, or arbitrary agent output.
 - Visible remaining differences: GTK/portable glyph outlines differ from SF
   Symbols; workspace tiles still need provider-specific glyphs/status shapes,
-  hover/focus close controls, jump-number overlays, and multi-pane peek cards.
+  hover/focus close controls, and jump-number overlays. Multi-pane peek cards
+  are covered by the next milestone above.
   Pointer drag insertion indicators, announcement coverage, roster-popover
   capture, light/high-contrast/scale/right-side states, and the remaining
   completion-contract screenshots are still pending.
