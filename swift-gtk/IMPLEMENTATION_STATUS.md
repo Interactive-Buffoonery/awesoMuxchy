@@ -76,8 +76,14 @@ geometry and state styling have also passed a real-window visual correction.
   model tests cover matching, wraparound, priority groups, stable order, and
   selected identity. Real X11 inspection covers the grouped panel and the
   collapsed state controls.
-  Full preflight passes 66 Swift tests, real release terminal integration, and
+  Accessible count wording matches the reference plural catalog and keeps the
+  total count label separate from its Expanded/Collapsed description.
+  Full preflight passes 67 Swift tests, real release terminal integration, and
   100 two-surface lifecycle cycles after these changes.
+- Regular and lifted workspace rows now open the same complete native context
+  action surface through Menu or Shift+F10. Controller ownership is cleaned up
+  and recreated with row/menu identity during moves, lifted reprojection,
+  close/clear, and group teardown.
 - Footer resolution runs concurrently off the GTK thread and publishes through
   GLib's main context. Git/`gh` execution is non-shell, bounded, prompt-free,
   output-capped, HTTPS-validated, and guarded against stale pane identity.

@@ -54,6 +54,15 @@ import Testing
     #expect(summary.groups[0].rows.map(\.isSelected) == [true, false])
 }
 
+@Test func agentFooterAccessibilityWordingUsesReferencePluralBoundaries() {
+    #expect(AgentFooterWording.agentsInState(count: 0, state: .thinking) == "0 thinking agents")
+    #expect(AgentFooterWording.agentsInState(count: 1, state: .needsAttention) == "1 needs attention agent")
+    #expect(AgentFooterWording.agentsInState(count: 2, state: .output) == "2 output agents")
+    #expect(AgentFooterWording.agentsTotal(count: 0) == "0 agents")
+    #expect(AgentFooterWording.agentsTotal(count: 1) == "1 agent")
+    #expect(AgentFooterWording.agentsTotal(count: 2) == "2 agents")
+}
+
 @Test func porcelainStatusCountsEntriesAndAheadBehind() {
     let data = Data("""
     # branch.oid 012345

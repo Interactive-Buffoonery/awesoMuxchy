@@ -211,6 +211,7 @@ private final class ApplicationState: @unchecked Sendable {
     private var liftedRowChrome: [UUID: WorkspaceRowChrome] = [:]
     private var liftedTitles: [UUID: LabelRef] = [:]
     private var workspaceContextControllers: [UUID: GestureClick] = [:]
+    private var workspaceContextKeyControllers: [UUID: EventControllerKey] = [:]
     private var workspaceContextPopovers: [UUID: PopoverRef] = [:]
     private enum PanePeekPresence: Hashable { case rowPointer, rowFocus, cardPointer }
     private var workspacePanePeekPopovers: [UUID: PopoverRef] = [:]
@@ -225,6 +226,7 @@ private final class ApplicationState: @unchecked Sendable {
     private var regularPinActions: [UUID: ButtonRef] = [:]
     private var liftedPinActions: [UUID: ButtonRef] = [:]
     private var liftedContextControllers: [UUID: GestureClick] = [:]
+    private var liftedContextKeyControllers: [UUID: EventControllerKey] = [:]
     private var liftedContextPopovers: [UUID: PopoverRef] = [:]
     private var groupsContainer: BoxRef?
     private var noMatchesRoot: BoxRef?
@@ -1614,6 +1616,18 @@ private final class ApplicationState: @unchecked Sendable {
         _ = click.ref()
         if isLifted { liftedContextControllers[workspaceID] = click } else { workspaceContextControllers[workspaceID] = click }
         gtk_widget_add_controller(row.widget_ptr, click.event_controller_ptr)
+        let key = EventControllerKey()
+        key.onKeyPressed { _, keyval, _, modifiers in
+            let opensMenu = keyval == UInt(GDK_KEY_Menu)
+                || (keyval == UInt(GDK_KEY_F10) && modifiers.contains(.shiftMask))
+            guard opensMenu else { return false }
+            popover.popup()
+            return true
+        }
+        _ = key.ref()
+        if isLifted { liftedContextKeyControllers[workspaceID] = key }
+        else { workspaceContextKeyControllers[workspaceID] = key }
+        gtk_widget_add_controller(row.widget_ptr, key.event_controller_ptr)
         if isLifted { liftedContextPopovers[workspaceID] = popover } else { workspaceContextPopovers[workspaceID] = popover }
     }
 
@@ -1622,6 +1636,9 @@ private final class ApplicationState: @unchecked Sendable {
               let groupID = snapshot.groups.first(where: { $0.workspaces.contains { $0.id == workspaceID } })?.id
         else { return }
         if let controller = workspaceContextControllers.removeValue(forKey: workspaceID) {
+            gtk_widget_remove_controller(row.widget_ptr, controller.event_controller_ptr)
+        }
+        if let controller = workspaceContextKeyControllers.removeValue(forKey: workspaceID) {
             gtk_widget_remove_controller(row.widget_ptr, controller.event_controller_ptr)
         }
         workspaceContextPopovers.removeValue(forKey: workspaceID)?.unparent()
@@ -1858,6 +1875,9 @@ private final class ApplicationState: @unchecked Sendable {
                 if let controller = workspaceContextControllers.removeValue(forKey: workspaceID) {
                     gtk_widget_remove_controller(row.widget_ptr, controller.event_controller_ptr)
                 }
+                if let controller = workspaceContextKeyControllers.removeValue(forKey: workspaceID) {
+                    gtk_widget_remove_controller(row.widget_ptr, controller.event_controller_ptr)
+                }
                 workspaceContextPopovers.removeValue(forKey: workspaceID)?.unparent()
                 chrome.root.unparent()
                 for color in WorkspaceGroupColor.allCases { row.remove(cssClass: "aw-\(color.rawValue)") }
@@ -1979,7 +1999,19 @@ private final class ApplicationState: @unchecked Sendable {
         if let row = rows[workspace.id], let controller = workspaceContextControllers.removeValue(forKey: workspace.id) {
             gtk_widget_remove_controller(row.widget_ptr, controller.event_controller_ptr)
         }
+        if let row = rows[workspace.id], let controller = workspaceContextKeyControllers.removeValue(forKey: workspace.id) {
+            gtk_widget_remove_controller(row.widget_ptr, controller.event_controller_ptr)
+        }
         workspaceContextPopovers.removeValue(forKey: workspace.id)?.unparent()
+        if let liftedRow = attentionRows[workspace.id] ?? pinnedRows[workspace.id] {
+            if let controller = liftedContextControllers.removeValue(forKey: workspace.id) {
+                gtk_widget_remove_controller(liftedRow.widget_ptr, controller.event_controller_ptr)
+            }
+            if let controller = liftedContextKeyControllers.removeValue(forKey: workspace.id) {
+                gtk_widget_remove_controller(liftedRow.widget_ptr, controller.event_controller_ptr)
+            }
+        }
+        liftedContextPopovers.removeValue(forKey: workspace.id)?.unparent()
         removeWorkspacePanePeek(workspace.id)
         if let child = workspace.id.uuidString.withCString({ stack?.getChildBy(name: $0) }) { stack?.remove(child: child) }
         let paneSurfaces = workspace.layout.paneIDs.compactMap { surfacesByPane[$0] }
@@ -2007,18 +2039,21 @@ private final class ApplicationState: @unchecked Sendable {
         for (id, row) in attentionRows {
             if workspacePanePeekHosts[id]?.widget_ptr == row.widget_ptr { removeWorkspacePanePeek(id) }
             if let controller = liftedContextControllers[id] { gtk_widget_remove_controller(row.widget_ptr, controller.event_controller_ptr) }
+            if let controller = liftedContextKeyControllers[id] { gtk_widget_remove_controller(row.widget_ptr, controller.event_controller_ptr) }
             liftedContextPopovers[id]?.unparent(); liftedRowChrome.removeValue(forKey: id)?.detach()
         }
         for (id, row) in pinnedRows {
             if workspacePanePeekHosts[id]?.widget_ptr == row.widget_ptr { removeWorkspacePanePeek(id) }
             if let controller = liftedContextControllers[id] { gtk_widget_remove_controller(row.widget_ptr, controller.event_controller_ptr) }
+            if let controller = liftedContextKeyControllers[id] { gtk_widget_remove_controller(row.widget_ptr, controller.event_controller_ptr) }
             detachPinnedWorkspaceDrag(id)
             liftedContextPopovers[id]?.unparent(); liftedRowChrome.removeValue(forKey: id)?.detach()
         }
         attentionRows.removeAll(); pinnedRows.removeAll()
         liftedTitles.removeAll()
         liftedRowChrome.removeAll()
-        liftedPinActions.removeAll(); liftedContextControllers.removeAll(); liftedContextPopovers.removeAll()
+        liftedPinActions.removeAll(); liftedContextControllers.removeAll()
+        liftedContextKeyControllers.removeAll(); liftedContextPopovers.removeAll()
         let projection = SidebarLiftedProjection.project(snapshot: snapshot, query: sidebarSearchEntry?.text ?? "")
         for item in projection.attention {
             if let row = makeLiftedRow(item, attention: true) { attentionSectionBody?.append(child: row) }
@@ -2648,7 +2683,19 @@ private final class ApplicationState: @unchecked Sendable {
             if let row = rows[workspace.id], let controller = workspaceContextControllers.removeValue(forKey: workspace.id) {
                 gtk_widget_remove_controller(row.widget_ptr, controller.event_controller_ptr)
             }
+            if let row = rows[workspace.id], let controller = workspaceContextKeyControllers.removeValue(forKey: workspace.id) {
+                gtk_widget_remove_controller(row.widget_ptr, controller.event_controller_ptr)
+            }
             workspaceContextPopovers.removeValue(forKey: workspace.id)?.unparent()
+            if let liftedRow = attentionRows[workspace.id] ?? pinnedRows[workspace.id] {
+                if let controller = liftedContextControllers.removeValue(forKey: workspace.id) {
+                    gtk_widget_remove_controller(liftedRow.widget_ptr, controller.event_controller_ptr)
+                }
+                if let controller = liftedContextKeyControllers.removeValue(forKey: workspace.id) {
+                    gtk_widget_remove_controller(liftedRow.widget_ptr, controller.event_controller_ptr)
+                }
+            }
+            liftedContextPopovers.removeValue(forKey: workspace.id)?.unparent()
             removeWorkspacePanePeek(workspace.id)
             if let child = workspace.id.uuidString.withCString({ stack?.getChildBy(name: $0) }) { stack?.remove(child: child) }
             for paneID in workspace.layout.paneIDs {

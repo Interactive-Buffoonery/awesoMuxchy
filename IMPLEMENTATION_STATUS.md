@@ -64,7 +64,10 @@ help, and agent context while preserving the compact reference geometry.
   priority, shows pane/session titles and sanitized local/remote locations,
   marks the selected pane, closes on selection, restores focus on dismissal,
   and announces open/close without stealing terminal focus.
-  Full preflight passes 66 Swift tests, the release terminal integration, and
+  Count labels use the exact reference singular/plural forms (`1 agent`,
+  `2 agents`, and state-qualified equivalents), while total-button accessible
+  state distinguishes Expanded and Collapsed from its stable count label.
+  Full preflight passes 67 Swift tests, the release terminal integration, and
   100 two-surface lifecycle cycles after this roster/footer milestone.
 - Real inspected footer screenshots cover a working Git repository and a
   two-agent thinking/needs-attention fixture. The full local preflight passes
@@ -148,6 +151,12 @@ help, and agent context while preserving the compact reference geometry.
   drives edge enablement. GTK reorders the existing row and collapsed rail
   projections while retaining terminal runtimes, then refreshes affected menus
   after each identity-based mutation.
+- Every regular, Needs Input, and Pinned workspace row can open its complete
+  native action popover with Menu or Shift+F10. Keyboard controllers follow the
+  row across context-menu rebuilds, group moves, lifted projection changes,
+  close/clear, and group teardown, providing a non-pointer route to the same
+  rename, acknowledge, notification, pin, pane jump, move, close, and clear
+  actions as secondary click.
 - Native GTK drag sources and drop targets now reorder ownership rows within
   and across groups, append workspace drops on group headers, reorder group
   headers, and reorder Pinned rows. A process-scoped payload nonce rejects

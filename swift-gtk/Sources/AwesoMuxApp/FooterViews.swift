@@ -379,7 +379,8 @@ final class SidebarStatusFooter {
         help.set(alwaysShowArrow: false)
         help.set(iconName: "help-about-symbolic")
         help.setTooltip(text: "Help & Feedback")
-        setAccessibleLabel(help, "Help & Feedback")
+        setAccessibleLabel(help, "Help and feedback")
+        setAccessibleDescription(help, "Opens menu")
         let helpBox = BoxRef(orientation: .vertical, spacing: 2)
         helpBox.append(child: menuButton("Show Welcome Tour") { [actions] in actions.showWelcome() })
         helpBox.append(child: menuButton("Report a bug…") { [actions] in actions.reportBug() })
@@ -462,16 +463,18 @@ final class SidebarStatusFooter {
 
     func update(_ summary: AgentFooterSummary) {
         latestSummary = summary
-        stateButton(thinking, label: thinkingLabel, count: summary.thinkingCount, symbol: "●", name: "thinking")
-        stateButton(output, label: outputLabel, count: summary.outputCount, symbol: "●", name: "output ready")
-        stateButton(attention, label: attentionLabel, count: summary.needsAttentionCount, symbol: "●", name: "needs attention")
+        stateButton(thinking, label: thinkingLabel, count: summary.thinkingCount, symbol: "●", state: .thinking)
+        stateButton(output, label: outputLabel, count: summary.outputCount, symbol: "●", state: .output)
+        stateButton(attention, label: attentionLabel, count: summary.needsAttentionCount, symbol: "●", state: .needsAttention)
         totalLabel.label = "\(summary.totalCount) \(summary.totalCount == 1 ? "agent" : "agents")  \(isExpanded ? "⌄" : "⌃")"
         collapsedStateButton(collapsedThinking, label: collapsedThinkingLabel,
-            count: summary.thinkingCount, symbol: "●", name: "thinking")
+            count: summary.thinkingCount, symbol: "●", state: .thinking)
         collapsedStateButton(collapsedOutput, label: collapsedOutputLabel,
-            count: summary.outputCount, symbol: "●", name: "output ready")
+            count: summary.outputCount, symbol: "●", state: .output)
         collapsedStateButton(collapsedAttention, label: collapsedAttentionLabel,
-            count: summary.needsAttentionCount, symbol: "●", name: "needs attention")
+            count: summary.needsAttentionCount, symbol: "●", state: .needsAttention)
+        setAccessibleLabel(total, AgentFooterWording.agentsTotal(count: summary.totalCount))
+        updateTotalAccessibilityDescription()
 
         rebuildActivityRows()
     }
@@ -549,19 +552,22 @@ final class SidebarStatusFooter {
     }
 
     private func collapsedStateButton(
-        _ button: ButtonRef, label: LabelRef, count: Int, symbol: String, name: String
+        _ button: ButtonRef, label: LabelRef, count: Int, symbol: String, state: AgentState
     ) {
         label.label = "\(symbol)\n\(count > 99 ? "99+" : String(count))"
-        button.setTooltip(text: "\(name.capitalized) — Jump to Next Agent")
-        setAccessibleLabel(button, "\(count) \(name)")
+        button.setTooltip(text: "\(state.activityLabel) — Jump to Next Agent")
+        setAccessibleLabel(button, AgentFooterWording.agentsInState(count: count, state: state))
         setAccessibleDescription(button, "Jumps to the next matching agent")
         button.set(visible: count > 0)
     }
 
-    private func stateButton(_ button: ButtonRef, label: LabelRef, count: Int, symbol: String, name: String) {
+    private func stateButton(
+        _ button: ButtonRef, label: LabelRef, count: Int, symbol: String, state: AgentState
+    ) {
         label.label = "\(symbol) \(count)"
-        button.setTooltip(text: "\(count) \(name)")
-        setAccessibleLabel(button, "\(count) \(name)")
+        button.setTooltip(text: "\(state.activityLabel) — Show in Activity Panel")
+        setAccessibleLabel(button, AgentFooterWording.agentsInState(count: count, state: state))
+        setAccessibleDescription(button, "Shows the agent activity panel")
         button.set(visible: count > 0)
     }
 
@@ -578,11 +584,17 @@ final class SidebarStatusFooter {
         activityPanel.set(visible: expanded)
         totalLabel.label = totalLabel.label.replacingOccurrences(of: expanded ? "⌃" : "⌄", with: expanded ? "⌄" : "⌃")
         total.setTooltip(text: expanded ? "Hide agent activity" : "Show agent activity")
-        setAccessibleLabel(total, expanded ? "Hide agent activity" : "Show agent activity")
+        updateTotalAccessibilityDescription()
         setAccessibleExpanded(total, expanded)
         announceAccessibilityStatus(from: total,
             expanded ? "Agent activity panel opened" : "Agent activity panel closed")
         if !expanded { _ = total.grabFocus() }
+    }
+
+    private func updateTotalAccessibilityDescription() {
+        setAccessibleDescription(total, isExpanded
+            ? "Expanded. Hides the agent activity panel"
+            : "Collapsed. Shows the agent activity panel")
     }
 
     private func quickSettingsPopover() -> PopoverRef {

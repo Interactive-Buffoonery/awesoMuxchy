@@ -109,6 +109,16 @@ public extension AgentState {
     }
 }
 
+public enum AgentFooterWording {
+    public static func agentsInState(count: Int, state: AgentState) -> String {
+        "\(count) \(state.activityLabel.lowercased()) \(count == 1 ? "agent" : "agents")"
+    }
+
+    public static func agentsTotal(count: Int) -> String {
+        "\(count) \(count == 1 ? "agent" : "agents")"
+    }
+}
+
 public extension PaneLayout {
     var panes: [PaneSnapshot] {
         switch self {
