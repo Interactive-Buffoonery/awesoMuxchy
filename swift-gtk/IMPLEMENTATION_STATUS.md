@@ -68,6 +68,16 @@ geometry and state styling have also passed a real-window visual correction.
   state-prioritized agent counts, and an expandable activity list that returns
   to the exact workspace/pane. System/Light/Dark and notification mute persist
   in owner-only profile-scoped JSON.
+- Expanded agent activity is now one priority-grouped pane-grained projection
+  shared with the footer counts. Rows preserve sidebar traversal order, expose
+  live pane/session titles plus sanitized local/remote locations, publish
+  selected state, and close with exact-pane focus handoff. The collapsed rail
+  renders 32-point state-specific controls that cycle only matching panes;
+  model tests cover matching, wraparound, priority groups, stable order, and
+  selected identity. Real X11 inspection covers the grouped panel and the
+  collapsed state controls.
+  Full preflight passes 66 Swift tests, real release terminal integration, and
+  100 two-surface lifecycle cycles after these changes.
 - Footer resolution runs concurrently off the GTK thread and publishes through
   GLib's main context. Git/`gh` execution is non-shell, bounded, prompt-free,
   output-capped, HTTPS-validated, and guarded against stale pane identity.

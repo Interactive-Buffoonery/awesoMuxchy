@@ -56,6 +56,16 @@ help, and agent context while preserving the compact reference geometry.
   Help & Feedback, live thinking/output/attention chips, total agents, and an
   expandable agent activity panel that routes back to the exact pane. Theme
   and notification-mute preferences persist as owner-only profile JSON.
+- The collapsed 60-point footer now mirrors the reference vertical contract:
+  Quick Settings, Help & Feedback, then only nonzero Thinking, Output, and
+  Needs Attention controls. Each 32-point state control cycles through exact
+  matching panes in stable sidebar traversal order instead of using a generic
+  all-agent button. The expanded panel groups the same authoritative roster by
+  priority, shows pane/session titles and sanitized local/remote locations,
+  marks the selected pane, closes on selection, restores focus on dismissal,
+  and announces open/close without stealing terminal focus.
+  Full preflight passes 66 Swift tests, the release terminal integration, and
+  100 two-surface lifecycle cycles after this roster/footer milestone.
 - Real inspected footer screenshots cover a working Git repository and a
   two-agent thinking/needs-attention fixture. The full local preflight passes
   33 tests after the GLib main-loop publication and resolver hardening; the

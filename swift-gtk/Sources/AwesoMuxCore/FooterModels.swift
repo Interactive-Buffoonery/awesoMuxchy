@@ -13,9 +13,18 @@ public struct AgentActivityRow: Equatable, Sendable {
     public let pane: String
     public let agent: String
     public let state: AgentState
+    public let displayTitle: String
+    public let location: String
+    public let isSelected: Bool
+}
+
+public struct AgentActivityGroup: Equatable, Sendable {
+    public let state: AgentState
+    public let rows: [AgentActivityRow]
 }
 
 public struct AgentFooterSummary: Equatable, Sendable {
+    public let groups: [AgentActivityGroup]
     public let rows: [AgentActivityRow]
     public let thinkingCount: Int
     public let outputCount: Int
@@ -23,29 +32,52 @@ public struct AgentFooterSummary: Equatable, Sendable {
 
     public var totalCount: Int { rows.count }
 
+    public func rows(matching state: AgentState) -> [AgentActivityRow] {
+        rows.filter { $0.state == state }
+    }
+
+    public func nextRow(matching state: AgentState, after paneID: UUID?) -> AgentActivityRow? {
+        let matches = rows(matching: state)
+        guard !matches.isEmpty else { return nil }
+        guard let paneID, let index = matches.firstIndex(where: { $0.paneID == paneID }) else {
+            return matches[0]
+        }
+        return matches[(index + 1) % matches.count]
+    }
+
     public init(snapshot: SessionSnapshot) {
-        var result: [AgentActivityRow] = []
+        var traversalRows: [AgentActivityRow] = []
         for group in snapshot.groups {
             for workspace in group.workspaces where !workspace.isSoftClosed {
+                let panes = workspace.layout.panes
                 for pane in workspace.layout.panes {
                     guard let rawAgent = pane.agent,
                           !rawAgent.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { continue }
-                    result.append(AgentActivityRow(
+                    let path = FocusedPaneContext.displayPath(
+                        pane.workingDirectory, homeDirectory: NSHomeDirectory()
+                    )
+                    traversalRows.append(AgentActivityRow(
                         workspaceID: workspace.id,
                         paneID: pane.id,
                         workspace: ChromeText.sanitized(workspace.name, limit: 80),
                         pane: ChromeText.sanitized(pane.title, limit: 80),
                         agent: ChromeText.sanitized(rawAgent, limit: 80),
-                        state: pane.agentState
+                        state: pane.agentState,
+                        displayTitle: ChromeText.sanitized(
+                            panes.count > 1 ? pane.title : workspace.name, limit: 80
+                        ),
+                        location: pane.ownership == .remoteZmx ? "Remote · \(path)" : path,
+                        isSelected: snapshot.selectedWorkspaceID == workspace.id
+                            && workspace.focusedPaneID == pane.id
                     ))
                 }
             }
         }
-        rows = result.sorted {
-            let left = Self.priority($0.state)
-            let right = Self.priority($1.state)
-            return left == right ? $0.workspace.localizedCaseInsensitiveCompare($1.workspace) == .orderedAscending : left < right
+        let grouped = Dictionary(grouping: traversalRows, by: \.state)
+        groups = grouped.keys.sorted { Self.priority($0) < Self.priority($1) }.map {
+            AgentActivityGroup(state: $0, rows: grouped[$0] ?? [])
         }
+        rows = groups.flatMap(\.rows)
         thinkingCount = rows.count { $0.state == .thinking }
         outputCount = rows.count { $0.state == .output }
         needsAttentionCount = rows.count { $0.state == .needsAttention }
@@ -58,6 +90,21 @@ public struct AgentFooterSummary: Equatable, Sendable {
         case .thinking: 2
         case .running, .waiting: 3
         case .idle, .done: 4
+        }
+    }
+}
+
+public extension AgentState {
+    var activityLabel: String {
+        switch self {
+        case .idle: "Idle"
+        case .running: "Running"
+        case .waiting: "Waiting"
+        case .thinking: "Thinking"
+        case .output: "Output"
+        case .needsAttention: "Needs Attention"
+        case .done: "Done"
+        case .error: "Error"
         }
     }
 }

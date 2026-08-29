@@ -305,7 +305,7 @@ final class SidebarStatusFooter {
     }
 
     let root = BoxRef(orientation: .vertical, spacing: 0)
-    let collapsedRoot = BoxRef(orientation: .horizontal, spacing: 2)
+    let collapsedRoot = BoxRef(orientation: .vertical, spacing: 8)
     private let activityPanel = BoxRef(orientation: .vertical, spacing: 4)
     private let activityRows = BoxRef(orientation: .vertical, spacing: 2)
     private let thinking = ButtonRef()
@@ -317,13 +317,17 @@ final class SidebarStatusFooter {
     private let total = ButtonRef()
     private let totalLabel = LabelRef(str: "0 agents  ⌃")
     private let quickSettings = MenuButtonRef()
-    private let collapsedTotal = ButtonRef()
-    private let collapsedTotalLabel = LabelRef(str: "0")
+    private let collapsedThinking = ButtonRef()
+    private let collapsedThinkingLabel = LabelRef(str: "")
+    private let collapsedOutput = ButtonRef()
+    private let collapsedOutputLabel = LabelRef(str: "")
+    private let collapsedAttention = ButtonRef()
+    private let collapsedAttentionLabel = LabelRef(str: "")
     private let actions: Actions
     private var preferences: AppPreferences
     private var isExpanded = false
     private var latestSummary = AgentFooterSummary(snapshot: SessionSnapshot())
-    private var collapsedSelectionIndex = 0
+    private var collapsedSelectionPaneIDs: [AgentState: UUID] = [:]
     private var activityFilter: AgentState?
 
     init(preferences: AppPreferences, actions: Actions) {
@@ -409,6 +413,9 @@ final class SidebarStatusFooter {
         collapsedRoot.add(cssClass: "aw-sidebar-footer")
         collapsedRoot.setMarginStart(margin: 4)
         collapsedRoot.setMarginEnd(margin: 4)
+        collapsedRoot.setMarginTop(margin: 10)
+        collapsedRoot.setMarginBottom(margin: 10)
+        collapsedRoot.setHalign(align: .fill)
         let collapsedSettings = MenuButtonRef()
         collapsedSettings.add(cssClass: "aw-icon-menu")
         collapsedSettings.set(hasFrame: false)
@@ -417,13 +424,40 @@ final class SidebarStatusFooter {
         collapsedSettings.setTooltip(text: "Quick Settings")
         setAccessibleLabel(collapsedSettings, "Quick Settings")
         collapsedSettings.set(popover: quickSettingsPopover())
+        collapsedSettings.setHalign(align: .center)
         collapsedRoot.append(child: collapsedSettings)
-        collapsedTotal.add(cssClass: "aw-agent-total")
-        collapsedTotal.set(child: collapsedTotalLabel)
-        collapsedTotal.setTooltip(text: "No agents running")
-        setAccessibleLabel(collapsedTotal, "No agents running")
-        collapsedTotal.onClicked { [weak self] _ in self?.selectNextCollapsedAgent() }
-        collapsedRoot.append(child: collapsedTotal)
+
+        let collapsedHelp = MenuButtonRef()
+        collapsedHelp.add(cssClass: "aw-icon-menu")
+        collapsedHelp.set(hasFrame: false)
+        collapsedHelp.set(alwaysShowArrow: false)
+        collapsedHelp.set(iconName: "help-about-symbolic")
+        collapsedHelp.setTooltip(text: "Help & Feedback")
+        setAccessibleLabel(collapsedHelp, "Help and feedback")
+        setAccessibleDescription(collapsedHelp, "Opens menu")
+        let collapsedHelpBox = BoxRef(orientation: .vertical, spacing: 2)
+        collapsedHelpBox.append(child: menuButton("Show Welcome Tour") { [actions] in actions.showWelcome() })
+        collapsedHelpBox.append(child: menuButton("Report a bug…") { [actions] in actions.reportBug() })
+        collapsedHelpBox.append(child: menuButton("Suggest a feature…") { [actions] in actions.suggestFeature() })
+        collapsedHelp.set(popover: menuPopover(collapsedHelpBox))
+        collapsedHelp.setHalign(align: .center)
+        collapsedRoot.append(child: collapsedHelp)
+
+        for (button, label, css, state) in [
+            (collapsedThinking, collapsedThinkingLabel, "aw-agent-thinking", AgentState.thinking),
+            (collapsedOutput, collapsedOutputLabel, "aw-agent-output", AgentState.output),
+            (collapsedAttention, collapsedAttentionLabel, "aw-agent-attention", AgentState.needsAttention),
+        ] {
+            button.add(cssClass: "aw-agent-state")
+            button.add(cssClass: "aw-collapsed-agent-state")
+            button.add(cssClass: css)
+            button.set(child: label)
+            button.setHalign(align: .center)
+            button.setSizeRequest(width: 32, height: 32)
+            button.set(visible: false)
+            button.onClicked { [weak self] _ in self?.selectNextCollapsedAgent(matching: state) }
+            collapsedRoot.append(child: button)
+        }
     }
 
     func update(_ summary: AgentFooterSummary) {
@@ -432,46 +466,96 @@ final class SidebarStatusFooter {
         stateButton(output, label: outputLabel, count: summary.outputCount, symbol: "●", name: "output ready")
         stateButton(attention, label: attentionLabel, count: summary.needsAttentionCount, symbol: "●", name: "needs attention")
         totalLabel.label = "\(summary.totalCount) \(summary.totalCount == 1 ? "agent" : "agents")  \(isExpanded ? "⌄" : "⌃")"
-        collapsedTotalLabel.label = summary.totalCount > 99 ? "99+" : String(summary.totalCount)
-        collapsedTotal.setTooltip(text: summary.rows.isEmpty ? "No agents running" : "Jump to next agent pane")
-        setAccessibleLabel(collapsedTotal, summary.rows.isEmpty ? "No agents running" : "Jump to next agent pane, \(summary.totalCount) agents")
-        collapsedTotal.set(sensitive: !summary.rows.isEmpty)
+        collapsedStateButton(collapsedThinking, label: collapsedThinkingLabel,
+            count: summary.thinkingCount, symbol: "●", name: "thinking")
+        collapsedStateButton(collapsedOutput, label: collapsedOutputLabel,
+            count: summary.outputCount, symbol: "●", name: "output ready")
+        collapsedStateButton(collapsedAttention, label: collapsedAttentionLabel,
+            count: summary.needsAttentionCount, symbol: "●", name: "needs attention")
 
         rebuildActivityRows()
     }
 
     private func rebuildActivityRows() {
-        let rows = activityFilter.map { state in latestSummary.rows.filter { $0.state == state } } ?? latestSummary.rows
+        let groups = activityFilter.map { state in latestSummary.groups.filter { $0.state == state } }
+            ?? latestSummary.groups
 
         var child = activityRows.getFirstChild()
         while let current = child {
             child = current.getNextSibling()
             activityRows.remove(child: current)
         }
-        if rows.isEmpty {
+        if groups.isEmpty {
             let empty = LabelRef(str: activityFilter == nil ? "No agents running" : "No agents in this state")
             empty.add(cssClass: "aw-menu-disabled")
             empty.setMarginTop(margin: 8)
             empty.setMarginBottom(margin: 8)
             activityRows.append(child: empty)
         } else {
-            for row in rows {
-                let title = "\(row.agent)  ·  \(row.workspace)"
-                let button = menuButton(title) { [actions] in actions.selectPane(row.workspaceID, row.paneID) }
-                button.setTooltip(text: "\(row.pane), \(row.state.rawValue)")
-                setAccessibleLabel(button, title)
-                setAccessibleDescription(button, "\(row.pane), \(row.state.rawValue)")
-                activityRows.append(child: button)
+            for group in groups {
+                let heading = LabelRef(str: "●  \(group.state.activityLabel.uppercased()) · \(group.rows.count)")
+                heading.add(cssClass: "aw-agent-group-heading")
+                heading.add(cssClass: agentStateCSS(group.state))
+                heading.xalign = 0
+                heading.setMarginTop(margin: 6)
+                setAccessibleLabel(heading, "\(group.state.activityLabel), \(group.rows.count)")
+                activityRows.append(child: heading)
+                for row in group.rows {
+                    let button = ButtonRef()
+                    button.add(cssClass: "aw-agent-activity-row")
+                    if row.isSelected { button.add(cssClass: "aw-selected") }
+                    button.setHalign(align: .fill)
+                    button.setSizeRequest(width: -1, height: 32)
+                    let content = BoxRef(orientation: .vertical, spacing: 2)
+                    let title = LabelRef(str: "\(row.agent) — \(row.displayTitle)")
+                    title.add(cssClass: "aw-agent-activity-title")
+                    title.xalign = 0
+                    title.setEllipsize(mode: PangoEllipsizeMode(rawValue: 3))
+                    let location = LabelRef(str: row.location)
+                    location.add(cssClass: "aw-agent-activity-location")
+                    location.xalign = 0
+                    location.setEllipsize(mode: PangoEllipsizeMode(rawValue: 2))
+                    content.append(child: title); content.append(child: location)
+                    button.set(child: content)
+                    button.onClicked { [weak self] _ in
+                        self?.setExpanded(false)
+                        self?.actions.selectPane(row.workspaceID, row.paneID)
+                    }
+                    setAccessibleLabel(button,
+                        "\(row.agent), \(group.state.activityLabel), \(row.displayTitle), \(row.location)")
+                    setAccessibleDescription(button, "Jumps to this agent's pane")
+                    setAccessibleSelected(button, row.isSelected)
+                    activityRows.append(child: button)
+                }
             }
         }
     }
 
-    private func selectNextCollapsedAgent() {
-        guard !latestSummary.rows.isEmpty else { return }
-        let index = collapsedSelectionIndex % latestSummary.rows.count
-        let row = latestSummary.rows[index]
-        collapsedSelectionIndex = (index + 1) % latestSummary.rows.count
+    private func agentStateCSS(_ state: AgentState) -> String {
+        switch state {
+        case .thinking: "aw-agent-thinking"
+        case .output: "aw-agent-output"
+        case .needsAttention, .error: "aw-agent-attention"
+        default: "aw-agent-neutral"
+        }
+    }
+
+    private func selectNextCollapsedAgent(matching state: AgentState) {
+        guard let row = latestSummary.nextRow(
+            matching: state, after: collapsedSelectionPaneIDs[state]
+        ) else { return }
+        collapsedSelectionPaneIDs[state] = row.paneID
         actions.selectPane(row.workspaceID, row.paneID)
+    }
+
+    private func collapsedStateButton(
+        _ button: ButtonRef, label: LabelRef, count: Int, symbol: String, name: String
+    ) {
+        label.label = "\(symbol)\n\(count > 99 ? "99+" : String(count))"
+        button.setTooltip(text: "\(name.capitalized) — Jump to Next Agent")
+        setAccessibleLabel(button, "\(count) \(name)")
+        setAccessibleDescription(button, "Jumps to the next matching agent")
+        button.set(visible: count > 0)
     }
 
     private func stateButton(_ button: ButtonRef, label: LabelRef, count: Int, symbol: String, name: String) {
@@ -488,6 +572,7 @@ final class SidebarStatusFooter {
     }
 
     private func setExpanded(_ expanded: Bool) {
+        guard expanded != isExpanded else { return }
         isExpanded = expanded
         if !expanded { activityFilter = nil; rebuildActivityRows() }
         activityPanel.set(visible: expanded)
@@ -495,6 +580,9 @@ final class SidebarStatusFooter {
         total.setTooltip(text: expanded ? "Hide agent activity" : "Show agent activity")
         setAccessibleLabel(total, expanded ? "Hide agent activity" : "Show agent activity")
         setAccessibleExpanded(total, expanded)
+        announceAccessibilityStatus(from: total,
+            expanded ? "Agent activity panel opened" : "Agent activity panel closed")
+        if !expanded { _ = total.grabFocus() }
     }
 
     private func quickSettingsPopover() -> PopoverRef {

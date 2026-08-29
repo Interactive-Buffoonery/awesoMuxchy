@@ -16,6 +16,42 @@ import Testing
     #expect(summary.thinkingCount == 1)
     #expect(summary.needsAttentionCount == 1)
     #expect(summary.rows.first?.paneID == attention.id)
+    #expect(summary.groups.map(\.state) == [.needsAttention, .thinking])
+    #expect(summary.rows.first?.displayTitle == "Fix")
+    #expect(summary.rows.first?.location == "/tmp")
+    #expect(summary.rows.first?.isSelected == false)
+}
+
+@Test func collapsedFooterStateRoutingCyclesOnlyMatchingAgentPanes() {
+    let thinkingOne = PaneSnapshot(title: "Plan", workingDirectory: "/tmp", agent: "Codex", agentState: .thinking)
+    let output = PaneSnapshot(title: "Result", workingDirectory: "/tmp", agent: "Pi", agentState: .output)
+    let thinkingTwo = PaneSnapshot(title: "Review", workingDirectory: "/tmp", agent: "Claude", agentState: .thinking)
+    let workspace = WorkspaceSnapshot(name: "Development", focusedPaneID: thinkingOne.id,
+        layout: .split(axis: .horizontal, fraction: 0.5, first: .pane(thinkingOne),
+            second: .split(axis: .vertical, fraction: 0.5, first: .pane(output), second: .pane(thinkingTwo))))
+    let summary = AgentFooterSummary(snapshot: SessionSnapshot(selectedWorkspaceID: workspace.id,
+        groups: [WorkspaceGroupSnapshot(name: "Local", workspaces: [workspace])]))
+
+    #expect(summary.rows(matching: .thinking).map(\.paneID) == [thinkingOne.id, thinkingTwo.id])
+    #expect(summary.nextRow(matching: .thinking, after: nil)?.paneID == thinkingOne.id)
+    #expect(summary.nextRow(matching: .thinking, after: thinkingOne.id)?.paneID == thinkingTwo.id)
+    #expect(summary.nextRow(matching: .thinking, after: thinkingTwo.id)?.paneID == thinkingOne.id)
+    #expect(summary.nextRow(matching: .needsAttention, after: nil) == nil)
+}
+
+@Test func activityRosterPreservesSessionTraversalWithinPriorityGroupsAndSelectedPane() {
+    let laterAlphabetically = PaneSnapshot(title: "Zeta", workingDirectory: "/work/zeta", agent: "Codex", agentState: .thinking)
+    let earlierAlphabetically = PaneSnapshot(title: "Alpha", workingDirectory: "/work/alpha", agent: "Claude", agentState: .thinking)
+    let workspace = WorkspaceSnapshot(name: "Workspace", focusedPaneID: laterAlphabetically.id,
+        layout: .split(axis: .horizontal, fraction: 0.5,
+            first: .pane(laterAlphabetically), second: .pane(earlierAlphabetically)))
+    let summary = AgentFooterSummary(snapshot: SessionSnapshot(selectedWorkspaceID: workspace.id,
+        groups: [WorkspaceGroupSnapshot(name: "Local", workspaces: [workspace])]))
+
+    #expect(summary.groups.count == 1)
+    #expect(summary.groups[0].rows.map(\.paneID) == [laterAlphabetically.id, earlierAlphabetically.id])
+    #expect(summary.groups[0].rows.map(\.displayTitle) == ["Zeta", "Alpha"])
+    #expect(summary.groups[0].rows.map(\.isSelected) == [true, false])
 }
 
 @Test func porcelainStatusCountsEntriesAndAheadBehind() {
