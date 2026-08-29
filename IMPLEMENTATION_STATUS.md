@@ -320,6 +320,11 @@ help, and agent context while preserving the compact reference geometry.
   by the same exact return event, proving the two promotion semantics remain
   distinct through delivery. Full spoken navigation and audible Orca output
   verification remain pending.
+- Background live-agent outcome crossings now publish the reference accessibility
+  status copy without changing sidebar ownership. Real Codex `done` and `error`
+  events on Review emitted `Codex in Review completed.` and `Codex in Review
+  reported an error.` as medium-priority AT-SPI announcements; the intervening
+  Running state stayed silent and the workspace never entered Needs Input.
 - Workspace rows now expose real soft close and permanent clear actions. Soft
   close records a bounded, 24-hour recovery snapshot, removes the row from all
   projections, selects the next live workspace, and powers Ctrl-Shift-T

@@ -1032,6 +1032,10 @@ private func snapshot(_ workspaces: [WorkspaceSnapshot]) -> SessionSnapshot {
         == "Review is still waiting for a reply, moved to Needs Input")
     #expect(SidebarAnnouncement.attentionPromoted(agent: "Claude Code", title: "Review")
         == "Claude Code in Review needs input.")
+    #expect(SidebarAnnouncement.agentCompleted(agent: "Codex", title: "Review")
+        == "Codex in Review completed.")
+    #expect(SidebarAnnouncement.agentReportedError(agent: "OpenCode", title: "Review")
+        == "OpenCode in Review reported an error.")
 }
 
 @Test func sidebarAccessibilityCopyRejectsInvalidPositionsAndUsesSingularCounts() {

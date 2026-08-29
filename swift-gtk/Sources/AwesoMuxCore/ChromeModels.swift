@@ -257,6 +257,14 @@ public enum SidebarAnnouncement {
     public static func attentionPromoted(agent: String, title: String) -> String {
         "\(agent) in \(title) needs input."
     }
+
+    public static func agentCompleted(agent: String, title: String) -> String {
+        "\(agent) in \(title) completed."
+    }
+
+    public static func agentReportedError(agent: String, title: String) -> String {
+        "\(agent) in \(title) reported an error."
+    }
 }
 
 public enum SidebarAccessibilityCopy {

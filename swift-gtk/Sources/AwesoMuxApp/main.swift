@@ -612,6 +612,9 @@ private final class ApplicationState: @unchecked Sendable {
     ) {
         let wasUnanswered = snapshot.unansweredTurnPaneIDs.contains(paneID)
         let wasLifted = snapshot.attentionWorkspaceIDs.contains(workspaceID)
+        let previousRollup = snapshot.workspace(id: workspaceID).map(
+            SidebarAgentTilePresentation.project(workspace:)
+        )
         guard acceptsPanePublication(paneID, workspaceID: workspaceID, generation: generation),
               (try? snapshot.updatePaneAgentRuntime(
                   paneID: paneID, workspaceID: workspaceID, update: update
@@ -642,6 +645,24 @@ private final class ApplicationState: @unchecked Sendable {
                 agent: ChromeText.sanitized(update.agent, limit: 80),
                 title: SidebarWorkspaceTitle.resolve(workspace: workspace)
             ))
+        } else if snapshot.selectedWorkspaceID != workspaceID,
+                  let previousRollup,
+                  let workspace = snapshot.workspace(id: workspaceID)
+        {
+            let rollup = SidebarAgentTilePresentation.project(workspace: workspace)
+            guard rollup.state != previousRollup.state else { return }
+            switch rollup.state {
+            case .done:
+                announce(SidebarAnnouncement.agentCompleted(
+                    agent: rollup.name, title: SidebarWorkspaceTitle.resolve(workspace: workspace)
+                ))
+            case .error:
+                announce(SidebarAnnouncement.agentReportedError(
+                    agent: rollup.name, title: SidebarWorkspaceTitle.resolve(workspace: workspace)
+                ))
+            default:
+                announceAttentionReturnIfNeeded(workspaceID, wasAttention: wasLifted)
+            }
         } else {
             announceAttentionReturnIfNeeded(workspaceID, wasAttention: wasLifted)
         }

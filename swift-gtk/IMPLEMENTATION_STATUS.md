@@ -210,6 +210,10 @@ geometry and state styling have also passed a real-window visual correction.
   pass delivered `Claude Code in Review needs input.` before its exact return,
   confirming it is not conflated with the unanswered-turn copy. Full preflight
   passes 86 Swift tests.
+  Background rollup crossings into Done and Error now use the reference
+  agent-plus-workspace completion/error copy without lifting the row. Live Codex
+  events delivered both exact medium-priority AT-SPI announcements; Running
+  remained silent as intended.
   Injected-clock GTK coverage and audible Orca output inspection remain pending.
 - Non-pinned workspace menus now expose tested, bounded within-group Up/Down
   moves plus named previous/next-group and arbitrary-group alternatives.
