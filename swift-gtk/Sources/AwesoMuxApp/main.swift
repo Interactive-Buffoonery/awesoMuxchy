@@ -505,9 +505,8 @@ private final class ApplicationState: @unchecked Sendable {
         SidebarStatusFooter(preferences: preferences, actions: .init(
             selectPane: { [weak self] workspace, pane in self?.select(workspace); self?.focus(pane) },
             updatePreferences: { [weak self] in self?.updatePreferences($0) },
-            showWelcome: { [weak self] in self?.showInformation(title: "Welcome to awesoMux", body: "Workspaces live in the sidebar, splits stay inside one native window, and the focused pane owns the Git and agent context shown in the footer.") },
-            reportBug: { [weak self] in self?.openFeedback() }, suggestFeature: { [weak self] in self?.openFeedback() },
-            showSettings: { [weak self] in self?.showInformation(title: "Settings", body: "Theme and notification controls are available in Quick settings. More application settings will appear here as their features land on Linux.") }
+            reportBug: { [weak self] in self?.openFeedback() },
+            suggestFeature: { [weak self] in self?.openFeedback() }
         ))
     }
 

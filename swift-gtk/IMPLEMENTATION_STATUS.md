@@ -68,6 +68,9 @@ geometry and state styling have also passed a real-window visual correction.
   state-prioritized agent counts, and an expandable activity list that returns
   to the exact workspace/pane. System/Light/Dark and notification mute persist
   in owner-only profile-scoped JSON.
+- Quick Settings and feedback menus now expose only implemented behavior.
+  Placeholder Welcome Tour and More settings windows were removed rather than
+  presenting informational stand-ins as functioning product routes.
 - Expanded agent activity is now one priority-grouped pane-grained projection
   shared with the footer counts. Rows preserve sidebar traversal order, expose
   live pane/session titles plus sanitized local/remote locations, publish

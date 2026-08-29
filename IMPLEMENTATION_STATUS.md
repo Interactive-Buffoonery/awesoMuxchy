@@ -56,6 +56,11 @@ help, and agent context while preserving the compact reference geometry.
   Help & Feedback, live thinking/output/attention chips, total agents, and an
   expandable agent activity panel that routes back to the exact pane. Theme
   and notification-mute preferences persist as owner-only profile JSON.
+- Footer menus expose only real routes: Quick Settings directly changes the
+  implemented theme, density, and notification preferences, while Report a
+  bug… and Suggest a feature… open the verified feedback intake. Placeholder
+  Welcome Tour and More settings informational windows were removed; those
+  entries stay absent until their full product surfaces exist.
 - The collapsed 60-point footer now mirrors the reference vertical contract:
   Quick Settings, Help & Feedback, then only nonzero Thinking, Output, and
   Needs Attention controls. Each 32-point state control cycles through exact

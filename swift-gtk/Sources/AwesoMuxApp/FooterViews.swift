@@ -298,10 +298,8 @@ final class SidebarStatusFooter {
     struct Actions {
         let selectPane: (UUID, UUID) -> Void
         let updatePreferences: (AppPreferences) -> Void
-        let showWelcome: () -> Void
         let reportBug: () -> Void
         let suggestFeature: () -> Void
-        let showSettings: () -> Void
     }
 
     let root = BoxRef(orientation: .vertical, spacing: 0)
@@ -382,7 +380,6 @@ final class SidebarStatusFooter {
         setAccessibleLabel(help, "Help and feedback")
         setAccessibleDescription(help, "Opens menu")
         let helpBox = BoxRef(orientation: .vertical, spacing: 2)
-        helpBox.append(child: menuButton("Show Welcome Tour") { [actions] in actions.showWelcome() })
         helpBox.append(child: menuButton("Report a bug…") { [actions] in actions.reportBug() })
         helpBox.append(child: menuButton("Suggest a feature…") { [actions] in actions.suggestFeature() })
         help.set(popover: menuPopover(helpBox))
@@ -437,7 +434,6 @@ final class SidebarStatusFooter {
         setAccessibleLabel(collapsedHelp, "Help and feedback")
         setAccessibleDescription(collapsedHelp, "Opens menu")
         let collapsedHelpBox = BoxRef(orientation: .vertical, spacing: 2)
-        collapsedHelpBox.append(child: menuButton("Show Welcome Tour") { [actions] in actions.showWelcome() })
         collapsedHelpBox.append(child: menuButton("Report a bug…") { [actions] in actions.reportBug() })
         collapsedHelpBox.append(child: menuButton("Suggest a feature…") { [actions] in actions.suggestFeature() })
         collapsedHelp.set(popover: menuPopover(collapsedHelpBox))
@@ -652,7 +648,6 @@ final class SidebarStatusFooter {
             self.actions.updatePreferences(self.preferences)
         }
         box.append(child: mute)
-        box.append(child: menuButton("More settings…") { [actions] in actions.showSettings() })
         return menuPopover(box)
     }
 }
