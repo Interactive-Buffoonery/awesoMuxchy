@@ -609,6 +609,71 @@ private func snapshot(_ workspaces: [WorkspaceSnapshot]) -> SessionSnapshot {
     ).unicodeScalars.count == WorkspaceGroupNameDraft.inputScalarLimit)
 }
 
+@Test func workspaceCloseRiskUsesProcessPromptAndFreshAgentEvidence() {
+    let now = Date(timeIntervalSince1970: 20_000)
+    func input(
+        agent: String? = nil,
+        state: AgentState = .idle,
+        changedAt: Date? = nil,
+        away: Bool = false,
+        liveness: ForegroundProcessLiveness
+    ) -> PaneCloseRiskInput {
+        PaneCloseRiskInput(
+            agentName: agent, agentState: state,
+            lastAgentStateChangeAt: changedAt,
+            terminalAwayFromPrompt: away, liveness: liveness
+        )
+    }
+
+    #expect(!WorkspaceCloseRiskPolicy.decision(input(liveness: .exited), at: now).isRisk)
+    #expect(!WorkspaceCloseRiskPolicy.decision(input(liveness: .idleShell), at: now).isRisk)
+    #expect(WorkspaceCloseRiskPolicy.decision(input(away: true, liveness: .idleShell), at: now).reason == .terminalAwayFromPrompt)
+    #expect(WorkspaceCloseRiskPolicy.decision(input(liveness: .busyShell), at: now).reason == .backgroundJob)
+    #expect(WorkspaceCloseRiskPolicy.decision(input(liveness: .liveCommand), at: now).reason == .liveForegroundProcess)
+    #expect(WorkspaceCloseRiskPolicy.decision(input(liveness: .indeterminate), at: now).reason == .indeterminate)
+    #expect(WorkspaceCloseRiskPolicy.decision(
+        input(agent: "Codex", state: .running, changedAt: now.addingTimeInterval(-1), liveness: .idleShell), at: now
+    ).reason == .activeAgentExecution)
+    #expect(!WorkspaceCloseRiskPolicy.decision(
+        input(
+            agent: "Codex", state: .running,
+            changedAt: now.addingTimeInterval(-(WorkspaceCloseRiskPolicy.staleAgentActivityThreshold + 1)),
+            liveness: .idleShell
+        ), at: now
+    ).isRisk)
+    #expect(WorkspaceCloseRiskPolicy.workspaceHasRisk([
+        input(liveness: .idleShell), input(liveness: .liveCommand),
+    ], at: now))
+}
+
+@Test func foregroundProcessAndDestructiveClosePresentationMatchReference() {
+    #expect(ForegroundProcessLiveness.classify(
+        processExited: true, commandName: "sleep", hasChildren: nil
+    ) == .exited)
+    #expect(ForegroundProcessLiveness.classify(
+        processExited: false, commandName: "/usr/bin/zsh", hasChildren: false
+    ) == .idleShell)
+    #expect(ForegroundProcessLiveness.classify(
+        processExited: false, commandName: "bash", hasChildren: true
+    ) == .busyShell)
+    #expect(ForegroundProcessLiveness.classify(
+        processExited: false, commandName: "vim", hasChildren: false
+    ) == .liveCommand)
+    #expect(ForegroundProcessLiveness.classify(
+        processExited: false, commandName: nil, hasChildren: nil
+    ) == .indeterminate)
+
+    let isolated = "\u{2068}Review\u{2069}"
+    #expect(DestructiveClosePresentation.closeWorkspaceTitle("Review") == "Close \(isolated)?")
+    #expect(DestructiveClosePresentation.closeWorkspaceBody("Review")
+        == "\(isolated) has activity that will be interrupted. Closing will terminate the running process.")
+    #expect(DestructiveClosePresentation.clearWorkspaceTitle("Review") == "Clear \(isolated)?")
+    #expect(DestructiveClosePresentation.closeGroupTitle("Local") == "Close group \u{2068}Local\u{2069}?")
+    #expect(DestructiveClosePresentation.closeGroupBody(riskyWorkspaceCount: 1)
+        == "1 workspace in this group has running activity that will be interrupted. Closing will terminate its running process.")
+    #expect(DestructiveClosePresentation.spoken("Close \(isolated)?") == "Close Review?")
+}
+
 @Test func workspaceAcknowledgementAndNotificationOverridesPersistIndependently() throws {
     let waitingPane = PaneSnapshot(title: "Approval", workingDirectory: "/tmp", agentState: .needsAttention)
     let quietPane = PaneSnapshot(title: "Shell", workingDirectory: "/tmp")

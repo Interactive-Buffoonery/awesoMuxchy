@@ -111,6 +111,37 @@ private final class IntegrationState {
             return false
         }
 
+        guard let shellProcessID = second.foregroundProcessID else {
+            fail(reason: "foreground shell process unavailable")
+            return false
+        }
+        second.send(text: "sleep 2")
+        second.sendEnter()
+        timeout(add: 250) { [weak self] in
+            self?.verifyCloseRisk(shellProcessID: shellProcessID)
+            return false
+        }
+        return false
+    }
+
+    func verifyCloseRisk(shellProcessID: UInt64) {
+        guard let activeProcessID = second.foregroundProcessID,
+              activeProcessID != shellProcessID
+        else {
+            fail(reason: "foreground process did not change for running command")
+            return
+        }
+        guard second.needsConfirmQuit else {
+            fail(reason: "running command did not require close confirmation")
+            return
+        }
+        timeout(add: 2_100) { [weak self] in
+            self?.requestClipboardWrite()
+            return false
+        }
+    }
+
+    func requestClipboardWrite() {
         let encoded = Data(clipboardToken.utf8).base64EncodedString()
         second.send(text: "printf '\\033]52;c;\(encoded)\\a'")
         second.sendEnter()
@@ -118,7 +149,6 @@ private final class IntegrationState {
             self?.readClipboard()
             return false
         }
-        return false
     }
 
     func readClipboard() {
@@ -233,4 +263,4 @@ guard status != nil, !failed else {
     print("terminal integration: failed (\(failureReason))")
     exit(1)
 }
-print("terminal integration: passed input, Unicode, focus, resize, clipboard, environment, title/cwd callbacks, and pane independence")
+print("terminal integration: passed input, Unicode, focus, resize, clipboard, environment, title/cwd callbacks, close-risk signals, and pane independence")

@@ -201,6 +201,17 @@ help, and agent context while preserving the compact reference geometry.
   verified heading/label/text-box/button semantics, disabled empty Save,
   successful persisted Save, non-mutating Cancel, and command disable/re-enable
   around the sheet. The final owned Latte surface was captured and inspected.
+- Workspace close now samples each real Ghostty surface's foreground PID and
+  process tree, combines that with fresh pane-agent execution, and shows the
+  exact destructive confirmation only when work is at risk. Close, clear, and
+  aggregate group close share one non-stacking main-window-owned sheet with
+  safe-default Cancel, exact keyboard hints, bidi-isolated bounded titles, and
+  named AT-SPI actions. Soft close now destroys its GTK/Ghostty runtime and
+  reopen reconstructs fresh surfaces instead of retaining hidden processes.
+  Live QA verified Cancel, persisted close/recovery, fresh reconstruction,
+  permanent group teardown, and app survival; all three final Latte sheets
+  were inspected. Ghostty's raw prompt state remains excluded until the shim
+  can pair it with the reference's required prompt-observed bit.
 - Regular and Needs Input row menus now provide non-pointer workspace ordering:
   bounded `Move Workspace Up`/`Move Workspace Down`, named previous/next-group
   alternatives, and arbitrary destination groups. A tested availability model

@@ -23,6 +23,33 @@ private func performOnGTKMain(_ action: @escaping () -> Void) {
     }, data: pointer)
 }
 
+private enum LinuxForegroundProcessProbe {
+    static func liveness(for surface: TerminalSurface) -> ForegroundProcessLiveness {
+        if surface.processExited { return .exited }
+        guard let processID = surface.foregroundProcessID,
+              processID <= UInt64(Int32.max)
+        else { return .indeterminate }
+        let identifier = String(processID)
+        let command = boundedText(at: "/proc/\(identifier)/comm", maximumBytes: 256)?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        let children = boundedText(
+            at: "/proc/\(identifier)/task/\(identifier)/children", maximumBytes: 4_096
+        ).map { !$0.split(whereSeparator: \Character.isWhitespace).isEmpty }
+        return ForegroundProcessLiveness.classify(
+            processExited: false,
+            commandName: command?.isEmpty == false ? command : nil,
+            hasChildren: children
+        )
+    }
+
+    private static func boundedText(at path: String, maximumBytes: Int) -> String? {
+        guard let data = FileManager.default.contents(atPath: path),
+              data.count <= maximumBytes
+        else { return nil }
+        return String(data: data, encoding: .utf8)
+    }
+}
+
 private func applySearchMatch(_ range: Swift.Range<Int>?, to label: LabelRef) {
     guard let range else { label.setAttributes(attrs: nil as Pango.AttrListRef?); return }
     let attributes = Pango.AttrList()
@@ -177,6 +204,7 @@ private final class ApplicationState: @unchecked Sendable {
     private var surfacesByPane: [UUID: TerminalSurface] = [:]
     private var workspaceByPane: [UUID: UUID] = [:]
     private var surfaceGenerationByPane: [UUID: Int] = [:]
+    private var lastAgentStateChangeAt: [UUID: Foundation.Date] = [:]
     private let runtimeSessionID = UUID()
     private var agentEventWatchers: [UUID: AgentEventWatcher] = [:]
     private var runtimes: [UUID: WorkspaceRuntime] = [:]
@@ -614,6 +642,7 @@ private final class ApplicationState: @unchecked Sendable {
     private func publishPaneAgentUpdate(
         _ update: AgentRuntimeUpdate, paneID: UUID, workspaceID: UUID, generation: Int
     ) {
+        let previousState = snapshot.workspace(id: workspaceID)?.layout.pane(id: paneID)?.agentState
         let wasUnanswered = snapshot.unansweredTurnPaneIDs.contains(paneID)
         let wasLifted = snapshot.attentionWorkspaceIDs.contains(workspaceID)
         let previousRollup = snapshot.workspace(id: workspaceID).map(
@@ -624,6 +653,7 @@ private final class ApplicationState: @unchecked Sendable {
                   paneID: paneID, workspaceID: workspaceID, update: update
               )) != nil
         else { return }
+        if previousState != update.state { lastAgentStateChangeAt[paneID] = Foundation.Date() }
         let promotedUnansweredTurn = update.reportsUnansweredTurn
             && !snapshot.pinnedWorkspaceIDs.contains(workspaceID)
             && !wasUnanswered
@@ -1369,7 +1399,7 @@ private final class ApplicationState: @unchecked Sendable {
         rows[workspace.id] = row; metadata[workspace.id] = meta; workspaceTitles[workspace.id] = name
         regularAgentTileHosts[workspace.id] = agentHost; regularAgentTiles[workspace.id] = agentWidget
         if !(workspaceIDsByGroup[groupID] ?? []).contains(workspace.id) { workspaceIDsByGroup[groupID, default: []].append(workspace.id) }
-        let chrome = WorkspaceRowChrome(row: row) { [weak self] in self?.softCloseWorkspace(workspace.id) }
+        let chrome = WorkspaceRowChrome(row: row) { [weak self] in self?.requestSoftCloseWorkspace(workspace.id) }
         regularRowChrome[workspace.id] = chrome
         installRegularWorkspaceDrag(on: chrome, workspaceID: workspace.id)
         return chrome.root
@@ -1757,7 +1787,7 @@ private final class ApplicationState: @unchecked Sendable {
         installWorkspaceContextMenu(on: button, workspaceID: workspace.id, groupID: item.originGroupID, isLifted: true)
         liftedTitles[workspace.id] = title
         if attention { attentionRows[workspace.id] = button } else { pinnedRows[workspace.id] = button }
-        let chrome = WorkspaceRowChrome(row: button) { [weak self] in self?.softCloseWorkspace(workspace.id) }
+        let chrome = WorkspaceRowChrome(row: button) { [weak self] in self?.requestSoftCloseWorkspace(workspace.id) }
         liftedRowChrome[workspace.id] = chrome
         if !attention { installPinnedWorkspaceDrag(on: chrome, workspaceID: workspace.id) }
         return chrome.root
@@ -1829,7 +1859,7 @@ private final class ApplicationState: @unchecked Sendable {
             }
         }
         box.append(child: SeparatorRef(orientation: .horizontal))
-        _ = action("Close Workspace") { [weak self] in self?.softCloseWorkspace(workspaceID) }
+        _ = action("Close Workspace") { [weak self] in self?.requestSoftCloseWorkspace(workspaceID) }
         box.append(child: SeparatorRef(orientation: .horizontal))
         _ = action("Clear Workspace") { [weak self] in self?.presentClearWorkspaceConfirmation(workspaceID) }
         if isLifted { liftedPinActions[workspaceID] = pin } else { regularPinActions[workspaceID] = pin }
@@ -2062,11 +2092,22 @@ private final class ApplicationState: @unchecked Sendable {
         refreshCommandEnablement()
     }
 
-    private func installActiveSheetDismissal(on window: WindowRef) {
+    private func installActiveSheetDismissal(
+        on window: WindowRef,
+        destructiveAction: (() -> Void)? = nil
+    ) {
         let keys = EventControllerKey()
-        keys.onKeyPressed { [weak self] _, keyval, _, _ in
-            guard keyval == UInt(GDK_KEY_Escape) else { return false }
-            self?.dismissActiveSheet(); return true
+        keys.onKeyPressed { [weak self] _, keyval, _, modifiers in
+            if keyval == UInt(GDK_KEY_Escape) {
+                self?.dismissActiveSheet(); return true
+            }
+            if let destructiveAction,
+               (keyval == UInt(GDK_KEY_Return) || keyval == UInt(GDK_KEY_KP_Enter)),
+               modifiers.contains(.superMask)
+            {
+                destructiveAction(); return true
+            }
+            return false
         }
         _ = keys.ref()
         activeSheetKeyController = keys
@@ -2077,6 +2118,55 @@ private final class ApplicationState: @unchecked Sendable {
             self?.refreshCommandEnablement()
             return false
         }
+    }
+
+    private func presentDestructiveConfirmation(
+        title: String,
+        bodyText: String,
+        keyboardHint: String,
+        destructiveTitle: String,
+        onConfirm: @escaping () -> Void
+    ) {
+        if let activeSheetWindow { activeSheetWindow.present(); return }
+        guard let parent = window else { return }
+        let spokenTitle = DestructiveClosePresentation.spoken(title)
+        let window = WindowRef(); activeSheetWindow = window
+        window.title = spokenTitle; window.setDefaultSize(width: 480, height: 230)
+        window.setTransientFor(parent: parent); window.set(modal: true)
+        window.setDestroyWithParent(setting: true); window.set(resizable: false)
+        window.add(cssClass: "aw-sheet"); applyThemeClasses(to: window)
+        let box = BoxRef(orientation: .vertical, spacing: 14)
+        box.add(cssClass: "aw-sheet"); applyThemeClasses(to: box)
+        box.setMarginStart(margin: 20); box.setMarginEnd(margin: 20)
+        box.setMarginTop(margin: 20); box.setMarginBottom(margin: 20)
+        setAccessibleLabel(box, spokenTitle)
+        let heading = makeAccessibleLabel(title, role: GTK_ACCESSIBLE_ROLE_HEADING)
+        heading.add(cssClass: "aw-menu-title"); heading.xalign = 0
+        setAccessibleDescription(heading, spokenTitle)
+        let body = LabelRef(str: bodyText); body.add(cssClass: "aw-sheet-body")
+        body.xalign = 0; body.set(wrap: true)
+        setAccessibleLabel(body, DestructiveClosePresentation.spoken(bodyText))
+        let hint = LabelRef(str: keyboardHint); hint.add(cssClass: "aw-sheet-hint")
+        hint.xalign = 0; hint.set(wrap: true)
+        let actions = BoxRef(orientation: .horizontal, spacing: 8); actions.setHalign(align: .end)
+        let cancel = ButtonRef(label: "Cancel")
+        let destructive = ButtonRef(label: destructiveTitle)
+        cancel.add(cssClass: "aw-sheet-secondary")
+        destructive.add(cssClass: "aw-sheet-destructive")
+        setAccessibleDescription(destructive, keyboardHint)
+        let confirmAndDismiss = { [weak self] in
+            guard let self else { return }
+            self.dismissActiveSheet()
+            onConfirm()
+        }
+        cancel.onClicked { [weak self] _ in self?.dismissActiveSheet() }
+        destructive.onClicked { _ in confirmAndDismiss() }
+        window.set(defaultWidget: cancel)
+        installActiveSheetDismissal(on: window, destructiveAction: confirmAndDismiss)
+        actions.append(child: cancel); actions.append(child: destructive)
+        box.append(child: heading); box.append(child: body); box.append(child: hint)
+        box.append(child: actions)
+        window.set(child: box); refreshCommandEnablement(); window.present(); _ = cancel.grabFocus()
     }
 
     func presentWorkspaceNameDialog(_ workspaceID: UUID) {
@@ -2194,15 +2284,54 @@ private final class ApplicationState: @unchecked Sendable {
         return true
     }
 
+    private func closeRiskInputs(for workspace: WorkspaceSnapshot) -> [PaneCloseRiskInput] {
+        workspace.layout.panes.map { pane in
+            guard let surface = surfacesByPane[pane.id] else {
+                return PaneCloseRiskInput(
+                    agentName: pane.agent, agentState: pane.agentState,
+                    lastAgentStateChangeAt: lastAgentStateChangeAt[pane.id],
+                    terminalAwayFromPrompt: false, liveness: .indeterminate
+                )
+            }
+            return PaneCloseRiskInput(
+                agentName: pane.agent, agentState: pane.agentState,
+                lastAgentStateChangeAt: lastAgentStateChangeAt[pane.id],
+                // Ghostty's value is also true before the first trustworthy
+                // OSC-133 marker. Until the shim exposes that observed bit,
+                // process liveness is the authoritative app-side signal.
+                terminalAwayFromPrompt: false,
+                liveness: LinuxForegroundProcessProbe.liveness(for: surface)
+            )
+        }
+    }
+
+    private func workspaceHasCloseRisk(
+        _ workspace: WorkspaceSnapshot,
+        at now: Foundation.Date = Foundation.Date()
+    ) -> Bool {
+        WorkspaceCloseRiskPolicy.workspaceHasRisk(closeRiskInputs(for: workspace), at: now)
+    }
+
+    private func requestSoftCloseWorkspace(_ workspaceID: UUID) {
+        guard let workspace = snapshot.workspace(id: workspaceID), !workspace.isSoftClosed else { return }
+        guard workspaceHasCloseRisk(workspace) else { softCloseWorkspace(workspaceID); return }
+        let displayedTitle = SidebarWorkspaceTitle.resolve(workspace: workspace)
+        presentDestructiveConfirmation(
+            title: DestructiveClosePresentation.closeWorkspaceTitle(displayedTitle),
+            bodyText: DestructiveClosePresentation.closeWorkspaceBody(displayedTitle),
+            keyboardHint: DestructiveClosePresentation.closeWorkspaceHint,
+            destructiveTitle: "Close Workspace"
+        ) { [weak self] in self?.softCloseWorkspace(workspaceID) }
+    }
+
     private func softCloseWorkspace(_ workspaceID: UUID) {
         let closesLastWorkspace = snapshot.workspaces.filter({ !$0.isSoftClosed }).count == 1
-        guard let groupID = snapshot.groups.first(where: { $0.workspaces.contains { $0.id == workspaceID } })?.id,
+        guard let workspace = snapshot.workspace(id: workspaceID),
+              let groupID = snapshot.groups.first(where: { $0.workspaces.contains { $0.id == workspaceID } })?.id,
               (try? snapshot.softCloseWorkspace(workspaceID)) != nil else { return }
-        rows[workspaceID]?.set(visible: false); regularRowChrome[workspaceID]?.root.set(visible: false)
-        liftedRowChrome[workspaceID]?.root.set(visible: false); railRows[workspaceID]?.set(visible: false)
-        dismissWorkspacePanePeek(workspaceID)
+        removeWorkspaceUI(workspace)
         groupCounts[groupID]?.label = "\(snapshot.groups.first(where: { $0.id == groupID })?.workspaces.filter { !$0.isSoftClosed }.count ?? 0)"
-        refreshLiftedRows(); refreshCommandEnablement()
+        refreshLiftedRows(); refreshGroupActionEnablement(); refreshCommandEnablement()
         if closesLastWorkspace { persist(); window?.close(); return }
         if let selected = snapshot.selectedWorkspaceID { select(selected) } else { persist() }
     }
@@ -2255,23 +2384,14 @@ private final class ApplicationState: @unchecked Sendable {
 
     private func presentClearWorkspaceConfirmation(_ workspaceID: UUID) {
         guard let workspace = snapshot.workspace(id: workspaceID) else { return }
-        let hasActivity = workspace.layout.panes.contains { [.running, .waiting, .thinking, .needsAttention].contains($0.agentState) }
-        let safeName = ChromeText.sanitized(workspace.name, limit: 120)
-        let window = WindowRef(); window.title = "Clear Workspace"; window.setDefaultSize(width: 480, height: 190)
-        let box = BoxRef(orientation: .vertical, spacing: 12)
-        box.setMarginStart(margin: 20); box.setMarginEnd(margin: 20); box.setMarginTop(margin: 20); box.setMarginBottom(margin: 20)
-        let heading = LabelRef(str: "Clear Workspace"); heading.add(cssClass: "aw-menu-title"); heading.xalign = 0
-        let body = LabelRef(str: hasActivity
-            ? "\(safeName) has activity that will be interrupted. The workspace will be closed permanently and can't be reopened."
-            : "\(safeName) will be closed permanently and can't be reopened.")
-        body.xalign = 0; body.set(wrap: true)
-        let actions = BoxRef(orientation: .horizontal, spacing: 8); actions.setHalign(align: .end)
-        let cancel = ButtonRef(label: "Cancel"); let clear = ButtonRef(label: "Clear Workspace")
-        cancel.onClicked { [window] _ in window.close() }
-        clear.onClicked { [weak self, window] _ in self?.clearWorkspace(workspaceID); window.close() }
-        actions.append(child: cancel); actions.append(child: clear)
-        box.append(child: heading); box.append(child: body); box.append(child: actions)
-        window.set(child: box); window.present()
+        let title = SidebarWorkspaceTitle.resolve(workspace: workspace)
+        let hasRisk = workspaceHasCloseRisk(workspace)
+        presentDestructiveConfirmation(
+            title: DestructiveClosePresentation.clearWorkspaceTitle(title),
+            bodyText: DestructiveClosePresentation.clearWorkspaceBody(title, hasRisk: hasRisk),
+            keyboardHint: DestructiveClosePresentation.clearWorkspaceHint,
+            destructiveTitle: "Clear Workspace"
+        ) { [weak self] in self?.clearWorkspace(workspaceID) }
     }
 
     private func clearWorkspace(_ workspaceID: UUID) {
@@ -2310,6 +2430,7 @@ private final class ApplicationState: @unchecked Sendable {
             surfacesByPane.removeValue(forKey: paneID)
             workspaceByPane.removeValue(forKey: paneID)
             surfaceGenerationByPane.removeValue(forKey: paneID)
+            lastAgentStateChangeAt.removeValue(forKey: paneID)
             agentEventWatchers.removeValue(forKey: paneID)?.stop()
         }
         surfaces.removeAll { surface in paneSurfaces.contains { $0 === surface } }
@@ -2699,6 +2820,8 @@ private final class ApplicationState: @unchecked Sendable {
             .jumpWorkspace5, .jumpWorkspace6, .jumpWorkspace7, .jumpWorkspace8,
             .jumpWorkspace9,
             .focusSidebar, .toggleSidebarWidth, .toggleSidebarVisibility]
+        let selectedWorkspaceCommands: Set<CommandID> = [.renameWorkspace, .closeWorkspace, .clearWorkspace]
+        let sheetCommands: Set<CommandID> = [.newWorkspaceGroup, .renameWorkspace, .closeWorkspace, .clearWorkspace]
         let menu = GIO.Menu()
         for section in [CommandSection.file, .view, .workspace, .pane] {
             let submenu = GIO.Menu()
@@ -2706,8 +2829,8 @@ private final class ApplicationState: @unchecked Sendable {
                 let action = GIO.SimpleAction(name: definition.id.rawValue, parameterType: nil as VariantTypeRef?)
                 action.set(enabled: implemented.contains(definition.id)
                     && (definition.id != .reopenClosedWorkspace || !snapshot.recentlyClosedWorkspaces.isEmpty)
-                    && (definition.id != .renameWorkspace || snapshot.selectedWorkspaceID != nil)
-                    && (definition.id != .newWorkspaceGroup || activeSheetWindow == nil)
+                    && (!selectedWorkspaceCommands.contains(definition.id) || snapshot.selectedWorkspaceID != nil)
+                    && (!sheetCommands.contains(definition.id) || activeSheetWindow == nil)
                     && (definition.id.workspaceJumpIndex.map { workspaceJumpOrder().indices.contains($0) } ?? true))
                 action.onActivate { [weak self] _, _ in self?.perform(definition.id) }
                 application.add(action: action)
@@ -2727,6 +2850,12 @@ private final class ApplicationState: @unchecked Sendable {
             enabled: snapshot.selectedWorkspaceID != nil && activeSheetWindow == nil
         )
         commandActions[.newWorkspaceGroup]?.set(enabled: activeSheetWindow == nil)
+        commandActions[.closeWorkspace]?.set(
+            enabled: snapshot.selectedWorkspaceID != nil && activeSheetWindow == nil
+        )
+        commandActions[.clearWorkspace]?.set(
+            enabled: snapshot.selectedWorkspaceID != nil && activeSheetWindow == nil
+        )
         commandActions[.reopenClosedWorkspace]?.set(enabled: !snapshot.recentlyClosedWorkspaces.isEmpty)
         for command in CommandID.allCases {
             if let index = command.workspaceJumpIndex {
@@ -2763,7 +2892,7 @@ private final class ApplicationState: @unchecked Sendable {
         case .renameWorkspace: presentWorkspaceNameDialog(selected)
         case .acknowledgeWorkspace: acknowledgeWorkspace(selected)
         case .togglePinWorkspace: togglePinned(selected)
-        case .closeWorkspace: softCloseWorkspace(selected)
+        case .closeWorkspace: requestSoftCloseWorkspace(selected)
         case .clearWorkspace: presentClearWorkspaceConfirmation(selected)
         case .reopenClosedWorkspace: break
         case .focusSidebar, .toggleSidebarWidth, .toggleSidebarVisibility,
@@ -2831,6 +2960,7 @@ private final class ApplicationState: @unchecked Sendable {
             surfacesByPane.removeValue(forKey: pane.id)
             workspaceByPane.removeValue(forKey: pane.id)
             surfaceGenerationByPane.removeValue(forKey: pane.id)
+            lastAgentStateChangeAt.removeValue(forKey: pane.id)
             agentEventWatchers.removeValue(forKey: pane.id)?.stop()
             surfaces.removeAll { $0 === surface }
             return
@@ -3030,30 +3160,15 @@ private final class ApplicationState: @unchecked Sendable {
 
     private func presentCloseGroupConfirmation(_ groupID: UUID) {
         guard let group = snapshot.groups.first(where: { $0.id == groupID }) else { return }
-        let riskyStates: Set<AgentState> = [.running, .waiting, .thinking, .needsAttention]
-        let riskyCount = group.workspaces.count { workspace in
-            workspace.layout.panes.contains { $0.agent != nil && riskyStates.contains($0.agentState) }
-        }
+        let now = Foundation.Date()
+        let riskyCount = group.workspaces.count { workspaceHasCloseRisk($0, at: now) }
         guard riskyCount > 0 else { closeGroup(groupID); return }
-        let safeName = ChromeText.sanitized(group.name, limit: 120)
-        let window = WindowRef(); window.title = "Close group \(safeName)?"
-        window.setDefaultSize(width: 440, height: 180)
-        let box = BoxRef(orientation: .vertical, spacing: 14)
-        box.setMarginStart(margin: 20); box.setMarginEnd(margin: 20)
-        box.setMarginTop(margin: 20); box.setMarginBottom(margin: 20)
-        let heading = LabelRef(str: "Close group \(safeName)?"); heading.add(cssClass: "aw-menu-title"); heading.xalign = 0
-        let detailText = riskyCount == 1
-            ? "1 workspace in this group has running activity that will be interrupted. Closing will terminate its running process."
-            : "\(riskyCount) workspaces in this group have running activity that will be interrupted. Closing will terminate their running processes."
-        let detail = LabelRef(str: detailText)
-        detail.xalign = 0; detail.set(wrap: true)
-        let actions = BoxRef(orientation: .horizontal, spacing: 8); actions.setHalign(align: .end)
-        let cancel = ButtonRef(label: "Cancel"); let close = ButtonRef(label: "Close Group")
-        cancel.onClicked { [window] _ in window.close() }
-        close.onClicked { [weak self, window] _ in self?.closeGroup(groupID); window.close() }
-        actions.append(child: cancel); actions.append(child: close)
-        box.append(child: heading); box.append(child: detail); box.append(child: actions)
-        window.set(child: box); window.present()
+        presentDestructiveConfirmation(
+            title: DestructiveClosePresentation.closeGroupTitle(group.name),
+            bodyText: DestructiveClosePresentation.closeGroupBody(riskyWorkspaceCount: riskyCount),
+            keyboardHint: DestructiveClosePresentation.closeGroupHint,
+            destructiveTitle: "Close Group"
+        ) { [weak self] in self?.closeGroup(groupID) }
     }
 
     private func closeGroup(_ groupID: UUID) {
@@ -3086,6 +3201,7 @@ private final class ApplicationState: @unchecked Sendable {
                 surfacesByPane.removeValue(forKey: paneID)
                 workspaceByPane.removeValue(forKey: paneID)
                 surfaceGenerationByPane.removeValue(forKey: paneID)
+                lastAgentStateChangeAt.removeValue(forKey: paneID)
                 agentEventWatchers.removeValue(forKey: paneID)?.stop()
             }
             surfaces.removeAll { surface in paneSurfaces.contains { $0 === surface } }

@@ -195,6 +195,17 @@ geometry and state styling have also passed a real-window visual correction.
   Save/Cancel paths. Live AT-SPI Save and Cancel passes verified persistence,
   command recovery, and crash-free controller teardown; the corrected owned
   Latte sheet was inspected at 420×196.
+- Destructive workspace/group actions now use one owned modal sheet family.
+  A pure close-risk policy mirrors the reference priority for process exit,
+  foreground commands, shell children, indeterminate liveness, and fresh
+  agent execution; the language-neutral shim exposes Ghostty's foreground PID
+  and close-confirmation signal. Soft close now releases its real terminal
+  surfaces and reconstructs them on reopen. Live AT-SPI verified exact
+  headings, bodies, hints, safe-default Cancel, destructive actions, command
+  gating, persisted recovery, aggregate group count, teardown, and app
+  survival. The three 480×230 Latte sheets were inspected under X11/GLX. Raw
+  prompt state is integration-tested but not used as app evidence until an
+  observed-marker bit can prevent Ghostty's startup default from false prompts.
 - `SidebarLiftedProjection` now composes search, sticky Needs Input arrival
   order, and explicit Pinned order without duplicating origin rows. The schema
   additions decode absent legacy fields safely and validate every ordered ID.

@@ -167,6 +167,15 @@ public final class TerminalSurface {
         amx_ghostty_surface_process_exited(handle)
     }
 
+    public var needsConfirmQuit: Bool {
+        amx_ghostty_surface_needs_confirm_quit(handle)
+    }
+
+    public var foregroundProcessID: UInt64? {
+        let value = amx_ghostty_surface_foreground_process_id(handle)
+        return value == 0 ? nil : value
+    }
+
     public var isReady: Bool {
         amx_ghostty_surface_is_ready(handle)
     }

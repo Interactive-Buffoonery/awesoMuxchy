@@ -597,6 +597,17 @@ bool amx_ghostty_surface_process_exited(amx_ghostty_surface *surface) {
       ghostty_surface_process_exited(surface->core);
 }
 
+bool amx_ghostty_surface_needs_confirm_quit(amx_ghostty_surface *surface) {
+  return surface != NULL && surface->core != NULL &&
+      ghostty_surface_needs_confirm_quit(surface->core);
+}
+
+uint64_t amx_ghostty_surface_foreground_process_id(
+    amx_ghostty_surface *surface) {
+  if (surface == NULL || surface->core == NULL) return 0;
+  return ghostty_surface_foreground_pid(surface->core);
+}
+
 bool amx_ghostty_surface_binding_action(amx_ghostty_surface *surface,
                                         const char *action) {
   return surface != NULL && surface->core != NULL && action != NULL &&
