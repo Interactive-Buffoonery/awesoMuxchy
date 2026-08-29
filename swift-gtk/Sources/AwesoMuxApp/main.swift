@@ -120,6 +120,10 @@ private final class ApplicationState: @unchecked Sendable {
     private var expandedSidebarWidget: BoxRef?
     private var collapsedSidebarWidget: BoxRef?
     private var sidebarRailRows: BoxRef?
+    private var collapsedEmptyAction: ButtonRef?
+    private var emptyWorkspacePage: BoxRef?
+    private var emptyWorkspaceCopy: LabelRef?
+    private var emptyWorkspaceReopen: ButtonRef?
     private var sidebarEdgeTab: ButtonRef?
     private var isApplyingSidebarWidth = false
     private var isSidebarOverlayMounted = false
@@ -428,6 +432,31 @@ private final class ApplicationState: @unchecked Sendable {
 
     func attachGroupsContainer(_ groups: BoxRef) { groupsContainer = groups }
 
+    func attachEmptyState(
+        page: BoxRef, copy: LabelRef, reopen: ButtonRef, collapsedAction: ButtonRef
+    ) {
+        emptyWorkspacePage = page
+        emptyWorkspaceCopy = copy
+        emptyWorkspaceReopen = reopen
+        collapsedEmptyAction = collapsedAction
+        refreshEmptyState()
+    }
+
+    private func refreshEmptyState() {
+        let presentation = EmptyWorkspacePresentation.resolve(snapshot: snapshot, isFiltering: isSidebarFiltering)
+        collapsedEmptyAction?.set(visible: presentation.showsCollapsedSidebarAction)
+        emptyWorkspaceReopen?.set(visible: presentation.showsReopenAction)
+        emptyWorkspaceCopy?.label = presentation.visibleCopy
+        if let copy = emptyWorkspaceCopy { setAccessibleDescription(copy, presentation.accessibleCopy) }
+        if snapshot.selectedWorkspaceID == nil, let stack {
+            "awesomux-empty-workspace".withCString { stack.setVisibleChild(name: $0) }
+            title?.label = ""
+            focusedPaneID = nil; focusedSurface = nil
+        }
+    }
+
+    func reopenLastClosedWorkspace() { reopenMostRecentlyClosedWorkspace() }
+
     func attachLiftedSections(attention: (BoxRef, BoxRef), pinned: (BoxRef, BoxRef)) {
         attentionSectionRoot = attention.0; attentionSectionBody = attention.1
         pinnedSectionRoot = pinned.0; pinnedSectionBody = pinned.1
@@ -478,6 +507,7 @@ private final class ApplicationState: @unchecked Sendable {
         }
         refreshGroupTints()
         refreshGroupActionEnablement()
+        refreshEmptyState()
     }
 
     private func refreshRailProjection(_ projection: SidebarLiftedOutput) {
@@ -952,7 +982,7 @@ private final class ApplicationState: @unchecked Sendable {
         groupCounts[groupID]?.label = "\(snapshot.groups.first(where: { $0.id == groupID })?.workspaces.filter { !$0.isSoftClosed }.count ?? 0)"
         refreshLiftedRows(); refreshCommandEnablement()
         if let selected = snapshot.selectedWorkspaceID { select(selected) }
-        else { title?.label = ""; focusedPaneID = nil; focusedSurface = nil; persist() }
+        else { refreshEmptyState(); persist() }
     }
 
     private func removeWorkspaceUI(_ workspace: WorkspaceSnapshot) {
@@ -1283,6 +1313,8 @@ private final class ApplicationState: @unchecked Sendable {
         if command == .newWorkspace { createDefaultWorkspace(); return }
         if command == .newWorkspaceInCurrentDirectory { createWorkspaceInCurrentDirectory(); return }
         if command == .reopenClosedWorkspace { reopenMostRecentlyClosedWorkspace(); return }
+        if command == .toggleSidebarWidth { toggleSidebarWidth(); return }
+        if command == .toggleSidebarVisibility { toggleSidebarVisibility(); return }
         guard let selected = snapshot.selectedWorkspaceID, let runtime = runtimes[selected] else { return }
         switch command {
         case .renameWorkspace: presentWorkspaceNameDialog(selected)
@@ -1291,8 +1323,7 @@ private final class ApplicationState: @unchecked Sendable {
         case .closeWorkspace: softCloseWorkspace(selected)
         case .clearWorkspace: presentClearWorkspaceConfirmation(selected)
         case .reopenClosedWorkspace: break
-        case .toggleSidebarWidth: toggleSidebarWidth()
-        case .toggleSidebarVisibility: toggleSidebarVisibility()
+        case .toggleSidebarWidth, .toggleSidebarVisibility: break
         case .previousWorkspace: selectRelative(-1)
         case .nextWorkspace: selectRelative(1)
         case .previousPane: focusRelative(-1, runtime)
@@ -1388,6 +1419,7 @@ private final class ApplicationState: @unchecked Sendable {
             let section = makeGroupSection(group: group, projection: projection)
             groupsContainer.append(child: section.root)
             refreshWorkspaceOptionsMenus()
+            refreshEmptyState()
             persist()
             return id
         } catch SessionMutationError.duplicateGroupName {
@@ -1523,12 +1555,13 @@ private final class ApplicationState: @unchecked Sendable {
         groupDefaultColorActions.removeValue(forKey: groupID); groupColorActions.removeValue(forKey: groupID)
         workspaceIDsByGroup.removeValue(forKey: groupID)
         if let selected = snapshot.selectedWorkspaceID { select(selected) }
-        else { title?.label = ""; focusedPaneID = nil; focusedSurface = nil }
+        else { refreshEmptyState() }
         _ = removed
         refreshGroupTints()
         refreshGroupActionEnablement()
         refreshWorkspaceOptionsMenus()
         refreshLiftedRows()
+        refreshEmptyState()
         persist()
     }
 
@@ -1671,6 +1704,13 @@ private func buildWindow(for application: Gtk.ApplicationRef) {
     railAdd.add(cssClass: "aw-rail-control")
     rail.append(child: railSearch); rail.append(child: railAdd)
     let railRows = BoxRef(orientation: .vertical, spacing: 5)
+    let collapsedEmpty = ButtonRef(); collapsedEmpty.set(iconName: "list-add-symbolic")
+    collapsedEmpty.add(cssClass: "aw-collapsed-empty")
+    collapsedEmpty.setSizeRequest(width: 40, height: 40)
+    collapsedEmpty.setTooltip(text: "New Workspace")
+    setAccessibleLabel(collapsedEmpty, "New workspace")
+    collapsedEmpty.onClicked { [weak state] _ in state?.createDefaultWorkspace() }
+    collapsedEmpty.set(visible: false); railRows.append(child: collapsedEmpty)
     let railScroller = ScrolledWindowRef(); railScroller.setPolicy(hscrollbarPolicy: .never, vscrollbarPolicy: .automatic)
     railScroller.setVexpand(expand: true); railScroller.set(child: railRows); rail.append(child: railScroller)
     sidebarFooter.collapsedRoot.add(cssClass: "aw-rail-footer")
@@ -1681,7 +1721,27 @@ private func buildWindow(for application: Gtk.ApplicationRef) {
 
     let stack = StackRef(); stack.add(cssClass: "aw-content"); stack.setHexpand(expand: true); stack.setVexpand(expand: true)
     stack.set(hhomogeneous: true); stack.set(vhomogeneous: true)
+    let emptyPage = BoxRef(orientation: .vertical, spacing: 16); emptyPage.add(cssClass: "aw-empty-workspace")
+    emptyPage.setHalign(align: .center); emptyPage.setValign(align: .center)
+    let emptyBrand = LabelRef(str: ">_  AWESOMUX"); emptyBrand.add(cssClass: "aw-empty-brand")
+    let emptyHeading = LabelRef(str: "WELCOME TO AWESOMUX"); emptyHeading.add(cssClass: "aw-empty-heading"); emptyHeading.xalign = 0
+    let emptyCopy = LabelRef(str: "Create a workspace with Ctrl+Super+N."); emptyCopy.add(cssClass: "aw-empty-copy")
+    emptyCopy.xalign = 0; emptyCopy.set(wrap: true); emptyCopy.setMaxWidthChars(nChars: 52)
+    setAccessibleDescription(emptyCopy, "Create a workspace with Control-Super-N")
+    let emptyActions = BoxRef(orientation: .horizontal, spacing: 10)
+    let emptyCreate = ButtonRef(label: "+  New Workspace"); emptyCreate.add(cssClass: "aw-empty-primary")
+    emptyCreate.setTooltip(text: "Create a new workspace"); setAccessibleLabel(emptyCreate, "New Workspace")
+    emptyCreate.onClicked { [weak state] _ in state?.createDefaultWorkspace() }
+    let emptyReopen = ButtonRef(label: "↶  Reopen Closed Workspace"); emptyReopen.add(cssClass: "aw-empty-secondary")
+    emptyReopen.setTooltip(text: "Reopen the most recently closed workspace (kept for 24 hours)")
+    setAccessibleLabel(emptyReopen, "Reopen Closed Workspace")
+    emptyReopen.onClicked { [weak state] _ in state?.reopenLastClosedWorkspace() }
+    emptyActions.append(child: emptyCreate); emptyActions.append(child: emptyReopen)
+    emptyPage.append(child: emptyBrand); emptyPage.append(child: emptyHeading)
+    emptyPage.append(child: emptyCopy); emptyPage.append(child: emptyActions)
+    "awesomux-empty-workspace".withCString { _ = stack.addNamed(child: emptyPage, name: $0) }
     state.attach(window: window, stack: stack, title: title, root: root, sidebarFooter: sidebarFooter)
+    state.attachEmptyState(page: emptyPage, copy: emptyCopy, reopen: emptyReopen, collapsedAction: collapsedEmpty)
 
     for projection in SidebarChromeProjection(snapshot: snapshot).groups {
         guard let group = snapshot.groups.first(where: { $0.id == projection.id }) else { continue }

@@ -98,6 +98,13 @@ help, and agent context while preserving the compact reference geometry.
   title/location matches. GTK applies bold underlined Pango attributes to
   regular and lifted rows and clears them transactionally with the query;
   agent/state/group-only matches remain visible without inventing a highlight.
+- The zero-group state now presents the reference first-launch workspace
+  guidance and New Workspace action in the content area, with Reopen Closed
+  Workspace appearing only when recovery exists. The 60-point rail renders
+  the reference dashed 40-point creation action. A pure presentation policy
+  covers filtering/recovery branches, sidebar width/hide commands now work
+  without a selected workspace, and expanded/collapsed real windows were
+  inspected from an isolated empty profile.
 - Expanded search keyboard routing uses that same projection order: Escape
   clears or restores terminal focus, Up/Down moves a visible current-result
   outline, and Return selects and focuses the routed workspace.

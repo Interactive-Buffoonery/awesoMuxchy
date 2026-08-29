@@ -443,6 +443,24 @@ private func snapshot(_ workspaces: [WorkspaceSnapshot]) -> SessionSnapshot {
     #expect(hiddenToken?.locationMatch == nil)
 }
 
+@Test func emptyWorkspacePresentationTracksGroupsFilteringAndRecovery() {
+    let empty = SessionSnapshot()
+    let initial = EmptyWorkspacePresentation.resolve(snapshot: empty, isFiltering: false)
+    #expect(initial.showsCollapsedSidebarAction)
+    #expect(!initial.showsReopenAction)
+    #expect(initial.visibleCopy == "Create a workspace with Ctrl+Super+N.")
+    #expect(!EmptyWorkspacePresentation.resolve(snapshot: empty, isFiltering: true).showsCollapsedSidebarAction)
+
+    let live = snapshot([workspace(panes: 1)])
+    #expect(!EmptyWorkspacePresentation.resolve(snapshot: live, isFiltering: false).showsCollapsedSidebarAction)
+
+    var recovered = SessionSnapshot()
+    recovered.recentlyClosedWorkspaces = [RecentlyClosedWorkspaceRecord(workspaceID: UUID(), closedAt: Date())]
+    let reopen = EmptyWorkspacePresentation.resolve(snapshot: recovered, isFiltering: false)
+    #expect(reopen.showsReopenAction)
+    #expect(reopen.visibleCopy.contains("reopen the last one you closed"))
+}
+
 @Test func liftedSidebarProjectionOrdersAttentionThenPinnedWithoutDuplicatingOrigins() {
     let attentionOnePane = PaneSnapshot(title: "Approve", workingDirectory: "/one", agent: "Codex", agentState: .needsAttention)
     let attentionTwoPane = PaneSnapshot(title: "Review", workingDirectory: "/two", agent: "Claude", agentState: .needsAttention)

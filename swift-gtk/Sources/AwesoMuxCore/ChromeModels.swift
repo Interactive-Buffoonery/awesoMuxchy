@@ -122,6 +122,27 @@ public struct SidebarSearchOutput: Equatable, Sendable {
     public var hasMatches: Bool { !orderedWorkspaceIDs.isEmpty }
 }
 
+public struct EmptyWorkspacePresentation: Equatable, Sendable {
+    public let showsCollapsedSidebarAction: Bool
+    public let showsReopenAction: Bool
+    public let visibleCopy: String
+    public let accessibleCopy: String
+
+    public static func resolve(snapshot: SessionSnapshot, isFiltering: Bool) -> EmptyWorkspacePresentation {
+        let canReopen = !snapshot.recentlyClosedWorkspaces.isEmpty
+        return EmptyWorkspacePresentation(
+            showsCollapsedSidebarAction: snapshot.groups.isEmpty && !isFiltering,
+            showsReopenAction: canReopen,
+            visibleCopy: canReopen
+                ? "Create a workspace with Ctrl+Super+N, or reopen the last one you closed."
+                : "Create a workspace with Ctrl+Super+N.",
+            accessibleCopy: canReopen
+                ? "Create a workspace with Control-Super-N, or reopen the last one you closed."
+                : "Create a workspace with Control-Super-N."
+        )
+    }
+}
+
 public struct LiftedSidebarWorkspaceRow: Equatable, Sendable {
     public let row: SidebarWorkspaceRow
     public let originGroupID: UUID

@@ -94,6 +94,12 @@ geometry and state styling have also passed a real-window visual correction.
   attributes to regular and lifted rows. Hidden-token matches remain truthful
   without falsely highlighting unrelated visible text; multi-token/fuzzy
   highlight ranges remain pending.
+- A tested empty-workspace presentation now drives the centered first-launch
+  guidance, primary New Workspace action, conditional Reopen Closed Workspace,
+  and the collapsed rail's dashed 40-point creation control. Sidebar
+  width/visibility routing was lifted ahead of selected-workspace gating so
+  empty-state users can still collapse, expand, hide, and show the host. Both
+  expanded and collapsed empty states were run and inspected under X11/GLX.
 - Group mutations now cover sanitized unique create/rename, explicit color,
   stable-ID reorder, cross-group workspace insertion, and populated close with
   replacement selection. Native GTK group menus expose only implemented
