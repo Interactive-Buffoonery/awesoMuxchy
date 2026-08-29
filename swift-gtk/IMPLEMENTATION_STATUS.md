@@ -289,6 +289,12 @@ geometry and state styling have also passed a real-window visual correction.
   clean isolated-profile launch left an exact stored 0.500 fraction unchanged.
   Exact nested replacement/clamp tests pass; physical held-pointer evidence is
   still pending because XTest is not routed by the Smithay QA display.
+- Previous/Next Pane and Focus Pane 1–6 are now exported actions with exact
+  Control-Alt bracket/digit chords, depth-first routing, truthful per-pane-count
+  enablement, persisted focus/footer refresh, and `Focused pane N`
+  announcements. Real action introspection reported Pane 1/2 plus relative
+  actions enabled and Pane 3–6 disabled for a two-pane fixture; activating Pane
+  2 → Previous → disabled Pane 3 → Next persisted only the expected identities.
 - `Close Workspace`, `Reopen Closed Workspace`, and `Clear Workspace` now have
   persistent model semantics and awesoMux-owned Ctrl-Shift-W, Ctrl-Shift-T,
   and Ctrl-Alt-Shift-W routing. Recovery is capped at 20 entries/24 hours,

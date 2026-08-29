@@ -318,6 +318,14 @@ help, and agent context while preserving the compact reference geometry.
   allocation adjustment does not mutate a stored 0.500 fraction and produced
   no diagnostics. The Smithay-backed QA display does not route XTest pointer
   input, so a trustworthy physical held-pointer drag remains pending.
+- Previous/Next Pane and Focus Pane 1–6 now share the owned GTK menu, palette,
+  accelerator, persistence, focus, footer-refresh, and accessibility-announcement
+  route. Relative commands wrap depth-first and require multiple panes; indexed
+  commands use one-based depth-first order, keep Pane 1 available in a
+  single-pane workspace, and disable every out-of-range slot. Real D-Bus action
+  activation verified Pane 2, Previous, disabled Pane 3, and Next against two
+  live Ghostty surfaces with the expected persisted identities and no runtime
+  diagnostics.
 - Workspace rows, lifted Needs Input/Pinned rows, collapsed-rail controls, and
   multi-pane peek cards now share one provider-aware tile projection. Claude,
   Codex, OpenCode, Pi, Grok, and shell retain distinct owned scalable marks and
@@ -440,8 +448,8 @@ help, and agent context while preserving the compact reference geometry.
 
 1. Add the foreground-shell capability signal needed to gate inserted Git/gh
    commands as precisely as macOS does.
-2. Implement direct pane-index focus commands and rapid Unicode split-reflow
-   stress coverage on the now-live split/close/resize lifecycle.
+2. Add rapid Unicode split-reflow stress coverage on the now-live
+   split/close/resize/focus lifecycle.
 3. Physically verify pointer reorder and insertion indicators. Dynamic group
    menu enablement plus both left/right hidden attention reveal paths and timed
    retraction are captured and inspected.

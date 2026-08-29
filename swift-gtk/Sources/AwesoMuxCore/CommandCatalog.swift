@@ -26,6 +26,12 @@ public enum CommandID: String, CaseIterable, Codable, Sendable {
     case jumpWorkspace9
     case previousPane
     case nextPane
+    case focusPane1
+    case focusPane2
+    case focusPane3
+    case focusPane4
+    case focusPane5
+    case focusPane6
     case commandPalette
     case keyboardShortcuts
     case focusSidebar
@@ -43,6 +49,18 @@ public enum CommandID: String, CaseIterable, Codable, Sendable {
         case .jumpWorkspace7: 6
         case .jumpWorkspace8: 7
         case .jumpWorkspace9: 8
+        default: nil
+        }
+    }
+
+    public var paneFocusIndex: Int? {
+        switch self {
+        case .focusPane1: 1
+        case .focusPane2: 2
+        case .focusPane3: 3
+        case .focusPane4: 4
+        case .focusPane5: 5
+        case .focusPane6: 6
         default: nil
         }
     }
@@ -158,6 +176,18 @@ public enum CommandCatalog {
               defaultChord: chord("[", .control, .alt)),
         .init(id: .nextPane, action: "Next Pane", section: .pane,
               defaultChord: chord("]", .control, .alt)),
+        .init(id: .focusPane1, action: "Focus Pane 1", section: .pane,
+              defaultChord: chord("1", .control, .alt)),
+        .init(id: .focusPane2, action: "Focus Pane 2", section: .pane,
+              defaultChord: chord("2", .control, .alt)),
+        .init(id: .focusPane3, action: "Focus Pane 3", section: .pane,
+              defaultChord: chord("3", .control, .alt)),
+        .init(id: .focusPane4, action: "Focus Pane 4", section: .pane,
+              defaultChord: chord("4", .control, .alt)),
+        .init(id: .focusPane5, action: "Focus Pane 5", section: .pane,
+              defaultChord: chord("5", .control, .alt)),
+        .init(id: .focusPane6, action: "Focus Pane 6", section: .pane,
+              defaultChord: chord("6", .control, .alt)),
         .init(id: .commandPalette, action: "Command Palette", section: .view,
               defaultChord: chord("k", .control)),
         .init(id: .keyboardShortcuts, action: "Keyboard Shortcuts", section: .view,

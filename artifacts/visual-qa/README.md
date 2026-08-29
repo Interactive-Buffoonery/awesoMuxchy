@@ -24,13 +24,18 @@
   an isolated real launch preserved an exact 0.500 fraction without
   diagnostics. The Smithay display does not route XTest input, so no physical
   held-pointer claim is made.
+- Follow-up action introspection on the same two-pane fixture exposed Focus Pane
+  1/2 and Previous/Next as enabled while Pane 3–6 remained present but disabled.
+  Real Pane 2 → Previous → disabled Pane 3 → Next activation persisted only the
+  expected depth-first identities with clean runtime output. This is behavioral
+  evidence; the selected sidebar row is unchanged and needs no duplicate image.
 - Inspection: the 296×852 sidebar-only Latte capture was opened at original
   resolution and shows the selected `Pane Commands` row with the two-pane
   indicator/count while fixed header/footer geometry remains stable. The
   480×230 owned sheet was recaptured after rejecting an X11 partial-damage
   frame, then inspected at original resolution for exact heading, body, hint,
   safe-default Cancel, and destructive action treatment.
-- Verification: full local preflight passes the text baseline, all 98 Swift
+- Verification: full local preflight passes the text baseline, all 99 Swift
   tests, the production build, real terminal integration, and 100 two-surface
   lifecycle cycles.
 - Privacy: the profile, workspace, pane title, cwd, counts, and status are

@@ -213,6 +213,8 @@ private func snapshot(_ workspaces: [WorkspaceSnapshot]) -> SessionSnapshot {
     #expect(CommandCatalog.definition(for: .splitRight).action == "Split Right")
     #expect(CommandCatalog.definition(for: .growActivePane).action == "Grow Active Pane")
     #expect(CommandCatalog.definition(for: .shrinkActivePane).action == "Shrink Active Pane")
+    #expect(CommandCatalog.definition(for: .focusPane1).action == "Focus Pane 1")
+    #expect(CommandID.focusPane6.paneFocusIndex == 6)
     #expect(CommandCatalog.definition(for: .newWorkspaceGroup).action == "New Workspace Group…")
     #expect(CommandCatalog.definition(for: .focusSidebar) == CommandDefinition(
         id: .focusSidebar,
@@ -236,6 +238,17 @@ private func snapshot(_ workspaces: [WorkspaceSnapshot]) -> SessionSnapshot {
 
     try value.focusRelativePane(offset: -1, in: first.id)
     #expect(value.workspace(id: first.id)?.focusedPaneID == first.layout.paneIDs.last)
+}
+
+@Test func indexedPaneFocusUsesOneBasedDepthFirstOrderAndRejectsNoOps() throws {
+    let workspace = workspace(panes: 3)
+    var value = snapshot([workspace])
+
+    #expect(try value.focusPane(at: 3, in: workspace.id))
+    #expect(value.workspace(id: workspace.id)?.focusedPaneID == workspace.layout.paneIDs[2])
+    #expect(!(try value.focusPane(at: 3, in: workspace.id)))
+    #expect(!(try value.focusPane(at: 0, in: workspace.id)))
+    #expect(!(try value.focusPane(at: 4, in: workspace.id)))
 }
 
 @Test func workspaceOrderingStaysInsideOwningGroup() throws {

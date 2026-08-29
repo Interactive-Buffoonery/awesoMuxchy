@@ -167,6 +167,20 @@ public extension SessionSnapshot {
         }
     }
 
+    @discardableResult
+    mutating func focusPane(at index: Int, in workspaceID: UUID) throws -> Bool {
+        var changed = false
+        try updateWorkspace(id: workspaceID) { workspace in
+            let paneIDs = workspace.layout.paneIDs
+            guard index >= 1, index <= paneIDs.count else { return }
+            let target = paneIDs[index - 1]
+            guard target != workspace.focusedPaneID else { return }
+            workspace.focusedPaneID = target
+            changed = true
+        }
+        return changed
+    }
+
     mutating func selectRelativeWorkspace(offset: Int) throws {
         let visible = workspaces.filter { !$0.isSoftClosed }
         guard !visible.isEmpty else { throw SessionMutationError.noSelectedWorkspace }

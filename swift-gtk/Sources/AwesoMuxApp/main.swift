@@ -2894,6 +2894,8 @@ private final class ApplicationState: @unchecked Sendable {
             .splitRight, .splitDown, .closePane,
             .growActivePane, .shrinkActivePane,
             .previousWorkspace, .nextWorkspace, .previousPane, .nextPane,
+            .focusPane1, .focusPane2, .focusPane3,
+            .focusPane4, .focusPane5, .focusPane6,
             .jumpWorkspace1, .jumpWorkspace2, .jumpWorkspace3, .jumpWorkspace4,
             .jumpWorkspace5, .jumpWorkspace6, .jumpWorkspace7, .jumpWorkspace8,
             .jumpWorkspace9,
@@ -2904,6 +2906,10 @@ private final class ApplicationState: @unchecked Sendable {
             button.add(cssClass: "aw-menu-row"); button.setHalign(align: .fill)
             if let index = definition.id.workspaceJumpIndex {
                 button.set(sensitive: workspaceJumpOrder().indices.contains(index))
+            } else if let index = definition.id.paneFocusIndex {
+                button.set(sensitive: index <= (snapshot.selectedWorkspace?.layout.paneCount ?? 0))
+            } else if [.previousPane, .nextPane].contains(definition.id) {
+                button.set(sensitive: snapshot.selectedWorkspace?.layout.paneCount ?? 0 > 1)
             } else if [.growActivePane, .shrinkActivePane].contains(definition.id) {
                 button.set(sensitive: snapshot.selectedWorkspace?.layout.paneCount ?? 0 > 1)
             }
@@ -2979,6 +2985,8 @@ private final class ApplicationState: @unchecked Sendable {
             .splitRight, .splitDown, .closePane,
             .growActivePane, .shrinkActivePane,
             .previousWorkspace, .nextWorkspace, .previousPane, .nextPane,
+            .focusPane1, .focusPane2, .focusPane3,
+            .focusPane4, .focusPane5, .focusPane6,
             .jumpWorkspace1, .jumpWorkspace2, .jumpWorkspace3, .jumpWorkspace4,
             .jumpWorkspace5, .jumpWorkspace6, .jumpWorkspace7, .jumpWorkspace8,
             .jumpWorkspace9,
@@ -2987,11 +2995,17 @@ private final class ApplicationState: @unchecked Sendable {
             .renameWorkspace, .closeWorkspace, .clearWorkspace,
             .splitRight, .splitDown, .closePane,
             .growActivePane, .shrinkActivePane,
+            .previousPane, .nextPane,
+            .focusPane1, .focusPane2, .focusPane3,
+            .focusPane4, .focusPane5, .focusPane6,
         ]
         let sheetCommands: Set<CommandID> = [
             .newWorkspaceGroup, .renameWorkspace, .closeWorkspace, .clearWorkspace,
             .splitRight, .splitDown, .closePane,
             .growActivePane, .shrinkActivePane,
+            .previousPane, .nextPane,
+            .focusPane1, .focusPane2, .focusPane3,
+            .focusPane4, .focusPane5, .focusPane6,
         ]
         let menu = GIO.Menu()
         for section in [CommandSection.file, .view, .workspace, .pane] {
@@ -3003,6 +3017,11 @@ private final class ApplicationState: @unchecked Sendable {
                     && (!selectedWorkspaceCommands.contains(definition.id) || snapshot.selectedWorkspaceID != nil)
                     && (![CommandID.growActivePane, .shrinkActivePane].contains(definition.id)
                         || snapshot.selectedWorkspace?.layout.paneCount ?? 0 > 1)
+                    && (![CommandID.previousPane, .nextPane].contains(definition.id)
+                        || snapshot.selectedWorkspace?.layout.paneCount ?? 0 > 1)
+                    && (definition.id.paneFocusIndex.map {
+                        $0 <= (snapshot.selectedWorkspace?.layout.paneCount ?? 0)
+                    } ?? true)
                     && (!sheetCommands.contains(definition.id) || activeSheetWindow == nil)
                     && (definition.id.workspaceJumpIndex.map { workspaceJumpOrder().indices.contains($0) } ?? true))
                 action.onActivate { [weak self] _, _ in self?.perform(definition.id) }
@@ -3041,10 +3060,18 @@ private final class ApplicationState: @unchecked Sendable {
         commandActions[.shrinkActivePane]?.set(
             enabled: canResizePane && activeSheetWindow == nil
         )
+        commandActions[.previousPane]?.set(enabled: canResizePane && activeSheetWindow == nil)
+        commandActions[.nextPane]?.set(enabled: canResizePane && activeSheetWindow == nil)
         commandActions[.reopenClosedWorkspace]?.set(enabled: !snapshot.recentlyClosedWorkspaces.isEmpty)
         for command in CommandID.allCases {
             if let index = command.workspaceJumpIndex {
                 commandActions[command]?.set(enabled: workspaceJumpOrder().indices.contains(index))
+            }
+            if let index = command.paneFocusIndex {
+                commandActions[command]?.set(
+                    enabled: index <= (snapshot.selectedWorkspace?.layout.paneCount ?? 0)
+                        && activeSheetWindow == nil
+                )
             }
         }
     }
@@ -3072,7 +3099,8 @@ private final class ApplicationState: @unchecked Sendable {
         if command == .toggleSidebarWidth { toggleSidebarWidth(); return }
         if command == .toggleSidebarVisibility { toggleSidebarVisibility(); return }
         if let index = command.workspaceJumpIndex { selectWorkspace(atFlatIndex: index); return }
-        guard let selected = snapshot.selectedWorkspaceID, let runtime = runtimes[selected] else { return }
+        guard let selected = snapshot.selectedWorkspaceID, runtimes[selected] != nil else { return }
+        if let index = command.paneFocusIndex { focusPane(at: index); return }
         switch command {
         case .renameWorkspace: presentWorkspaceNameDialog(selected)
         case .acknowledgeWorkspace: acknowledgeWorkspace(selected)
@@ -3086,8 +3114,8 @@ private final class ApplicationState: @unchecked Sendable {
              .jumpWorkspace9: break
         case .previousWorkspace: selectRelative(-1)
         case .nextWorkspace: selectRelative(1)
-        case .previousPane: focusRelative(-1, runtime)
-        case .nextPane: focusRelative(1, runtime)
+        case .previousPane: focusRelative(-1)
+        case .nextPane: focusRelative(1)
         case .splitRight: splitFocusedPane(.horizontal)
         case .splitDown: splitFocusedPane(.vertical)
         case .closePane: requestPrimaryClosePane()
@@ -3553,7 +3581,7 @@ private final class ApplicationState: @unchecked Sendable {
         }
     }
 
-    private func focusRelative(_ offset: Int, _ runtime: WorkspaceRuntime) {
+    private func focusRelative(_ offset: Int) {
         guard let workspaceID = snapshot.selectedWorkspaceID,
               (try? snapshot.focusRelativePane(offset: offset, in: workspaceID)) != nil,
               let id = snapshot.workspace(id: workspaceID)?.focusedPaneID else { return }
@@ -3563,6 +3591,25 @@ private final class ApplicationState: @unchecked Sendable {
         // refresh the pane-owned row/footer projection at this command boundary.
         refreshWorkspaceRowPresentation(workspaceID)
         persist()
+        announceFocusedPane(in: workspaceID)
+    }
+
+    private func focusPane(at index: Int) {
+        guard let workspaceID = snapshot.selectedWorkspaceID,
+              (try? snapshot.focusPane(at: index, in: workspaceID)) == true,
+              let paneID = snapshot.workspace(id: workspaceID)?.focusedPaneID
+        else { return }
+        focus(paneID)
+        refreshWorkspaceRowPresentation(workspaceID)
+        persist()
+        announce("Focused pane \(index)")
+    }
+
+    private func announceFocusedPane(in workspaceID: UUID) {
+        guard let workspace = snapshot.workspace(id: workspaceID),
+              let index = workspace.layout.paneIDs.firstIndex(of: workspace.focusedPaneID)
+        else { return }
+        announce("Focused pane \(index + 1)")
     }
 }
 
