@@ -395,7 +395,7 @@ final class SidebarStatusFooter {
         heading.xalign = 0
         heading.setHexpand(expand: true)
         let close = ButtonRef()
-        setDecorativeButtonGlyph(close, "×")
+        setDecorativeButtonText(close, "×")
         close.add(cssClass: "aw-icon-button")
         close.setTooltip(text: "Hide agent activity")
         setAccessibleLabel(close, "Hide agent activity")

@@ -197,6 +197,13 @@ help, and agent context while preserving the compact reference geometry.
   covers filtering/recovery branches, sidebar width/hide commands now work
   without a selected workspace, and expanded/collapsed real windows were
   inspected from an isolated empty profile.
+- A genuinely missing-profile accessibility pass now proves the recovery path.
+  `Focus Sidebar` places focus on `Search sessions`; AT-SPI exposes the centered
+  action as an exact `New Workspace` button with one `Click` action, and
+  invoking it persisted exactly one group, selected workspace, and pane. Its
+  visible plus-prefixed text is now an accessibility-hidden child, preventing
+  decorative copy from overriding the parent name. The complete focused
+  1440×852 Latte empty state was inspected.
 - Expanded search keyboard routing uses that same projection order: Escape
   clears or restores terminal focus, Up/Down moves a visible current-result
   outline, and Return selects and focuses the routed workspace.

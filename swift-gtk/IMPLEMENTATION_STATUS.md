@@ -200,6 +200,12 @@ geometry and state styling have also passed a real-window visual correction.
   width/visibility routing was lifted ahead of selected-workspace gating so
   empty-state users can still collapse, expand, hide, and show the host. Both
   expanded and collapsed empty states were run and inspected under X11/GLX.
+- Missing-profile recovery was exercised through the real accessibility tree:
+  `Focus Sidebar` focused the named search box, the centered action exposed one
+  `Click` action and the exact `New Workspace` name, and invoking it persisted
+  exactly one group, selected workspace, and pane. Its visible plus-prefixed
+  text is now an accessibility-hidden child so GTK cannot override the parent
+  action name. The focused 1440×852 Latte empty surface was inspected.
 - Group mutations now cover sanitized unique create/rename, explicit color,
   stable-ID reorder, cross-group workspace insertion, and populated close with
   replacement selection. Native GTK group menus expose only implemented

@@ -112,7 +112,7 @@ private final class ApplicationState: @unchecked Sendable {
             self.row = row
             root = OverlayRef(); root.add(cssClass: "aw-workspace-row")
             root.setHalign(align: .fill); root.set(child: row)
-            close = ButtonRef(); setDecorativeButtonGlyph(close, "×")
+            close = ButtonRef(); setDecorativeButtonText(close, "×")
             close.add(cssClass: "aw-row-close")
             close.setSizeRequest(width: 24, height: 24)
             close.setHalign(align: .end); close.setValign(align: .center)
@@ -160,7 +160,7 @@ private final class ApplicationState: @unchecked Sendable {
             self.count = count; self.isEmpty = isEmpty; self.isCollapsed = isCollapsed
             root = OverlayRef(); root.add(cssClass: "aw-group-header")
             root.setHalign(align: .fill); root.setHexpand(expand: true); root.set(child: disclosure)
-            close = ButtonRef(); setDecorativeButtonGlyph(close, "×")
+            close = ButtonRef(); setDecorativeButtonText(close, "×")
             close.add(cssClass: "aw-group-close")
             close.setSizeRequest(width: 24, height: 24)
             close.setHalign(align: .end); close.setValign(align: .center)
@@ -3934,7 +3934,7 @@ private func buildWindow(for application: Gtk.ApplicationRef) {
     search.setWidthChars(nChars: 8); search.setMaxWidthChars(nChars: 8)
     search.onSearchChanged { [weak state] entry in state?.filter(entry.text ?? "") }
     let createSplit = BoxRef(orientation: .horizontal, spacing: 0); createSplit.add(cssClass: "aw-create-split")
-    let createPrimary = ButtonRef(); setDecorativeButtonGlyph(createPrimary, "+")
+    let createPrimary = ButtonRef(); setDecorativeButtonText(createPrimary, "+")
     createPrimary.add(cssClass: "aw-create-primary")
     setAccessibleLabel(createPrimary, "New Workspace")
     setAccessibleDescription(createPrimary, SidebarAccessibilityCopy.newWorkspaceHint)
@@ -4031,10 +4031,12 @@ private func buildWindow(for application: Gtk.ApplicationRef) {
     emptyCopy.xalign = 0; emptyCopy.set(wrap: true); emptyCopy.setMaxWidthChars(nChars: 52)
     setAccessibleDescription(emptyCopy, "Create a workspace with Control-Super-N")
     let emptyActions = BoxRef(orientation: .horizontal, spacing: 10)
-    let emptyCreate = ButtonRef(label: "+  New Workspace"); emptyCreate.add(cssClass: "aw-empty-primary")
+    let emptyCreate = ButtonRef(); setDecorativeButtonText(emptyCreate, "+  New Workspace")
+    emptyCreate.add(cssClass: "aw-empty-primary")
     emptyCreate.setTooltip(text: "Create a new workspace"); setAccessibleLabel(emptyCreate, "New Workspace")
     emptyCreate.onClicked { [weak state] _ in state?.createDefaultWorkspace() }
-    let emptyReopen = ButtonRef(label: "↶  Reopen Closed Workspace"); emptyReopen.add(cssClass: "aw-empty-secondary")
+    let emptyReopen = ButtonRef(); setDecorativeButtonText(emptyReopen, "↶  Reopen Closed Workspace")
+    emptyReopen.add(cssClass: "aw-empty-secondary")
     emptyReopen.setTooltip(text: "Reopen the most recently closed workspace (kept for 24 hours)")
     setAccessibleLabel(emptyReopen, "Reopen Closed Workspace")
     emptyReopen.onClicked { [weak state] _ in state?.reopenLastClosedWorkspace() }

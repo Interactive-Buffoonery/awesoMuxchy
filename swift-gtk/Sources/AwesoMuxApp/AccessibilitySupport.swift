@@ -91,11 +91,11 @@ func setAccessibleHidden<T: Gtk.AccessibleProtocol>(_ accessible: T, _ hidden: B
     accessible.updateStateValue(nStates: 1, states: &state, values: value.value_ptr)
 }
 
-/// Installs a visible text glyph without letting GTK derive the parent button's
+/// Installs visible button text without letting GTK derive the parent button's
 /// accessible name from that decorative child. Call `setAccessibleLabel` on
-/// the button with the real action name after installing the glyph.
-func setDecorativeButtonGlyph(_ button: ButtonRef, _ glyph: String) {
-    let label = LabelRef(str: glyph)
+/// the button with the real action name after installing the text.
+func setDecorativeButtonText(_ button: ButtonRef, _ text: String) {
+    let label = LabelRef(str: text)
     setAccessibleHidden(label, true)
     button.set(child: label)
 }

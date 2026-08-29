@@ -1,5 +1,37 @@
 # Visual QA
 
+## 2026-08-29 — SwiftGtk4 clean-profile recovery
+
+- Linux image: [missing-profile empty state with sidebar focus](swift-gtk/progress/44-clean-profile-recovery/empty-focus-sidebar-latte-x11.png).
+- Reference: `ContentView.swift`, `SidebarView.swift`, empty-workspace
+  presentation, and the `Focus Sidebar` command at macOS baseline
+  `fed33ff47c559344fc6db6fa53f16e75fcc4a116`.
+- Accessibility correction: the centered visible `+  New Workspace` label is
+  now an accessibility-hidden decorative child, so the parent button exposes
+  the exact `New Workspace` name rather than speaking the plus glyph. The same
+  seam protects the conditional reopen label and existing icon/text buttons.
+- Real-app QA: a genuinely missing profile launched with zero groups and no
+  selected workspace. The exported `Focus Sidebar` action moved focus to the
+  named `Search sessions` box. Direct AT-SPI inspection found the centered
+  button as a button named exactly `New Workspace` with one `Click` action;
+  invoking it returned true and persisted exactly one group, one selected
+  workspace, and one pane.
+- GTK note: `org.a11y.atspi.Component.GrabFocus` returned failure for ordinary
+  GTK header and empty-state buttons on this GTK 4.14 stack, so the evidence
+  uses the app-owned focus command plus the successful AT-SPI action rather
+  than claiming that inspector method as keyboard delivery.
+- Inspection: the privacy-safe 1440×852 Latte X11/GLX frame was inspected at
+  original resolution. It shows the complete zero-workspace surface, visible
+  search focus ring, fixed 296-point sidebar, centered actionable recovery,
+  and neutral zero-agent footer without fabricated terminal context.
+- Verification: full preflight passes the text baseline, all 113 Swift tests,
+  warnings-as-errors and release builds, the single-window activation probe,
+  both forced-termination persistence cases, real terminal integration, and
+  100 two-surface lifecycle cycles.
+- Privacy: no terminal exists in the captured state. The rejected post-create
+  crop contained shell-derived identity/path text and was removed before
+  staging; structural success was verified only from bounded identity counts.
+
 ## 2026-08-29 — SwiftGtk4 passive attention dwell
 
 - Linux images: [background attention promotion](swift-gtk/progress/43-attention-dwell/background-attention-mocha-x11.png)
