@@ -444,6 +444,13 @@ help, and agent context while preserving the compact reference geometry.
   by the same exact return event, proving the two promotion semantics remain
   distinct through delivery. Full spoken navigation and audible Orca output
   verification remain pending.
+- Sidebar structural mutations now preserve keyboard ownership by stable
+  identity. Pin/unpin, acknowledge, notification changes, pinned/workspace
+  reorder, cross-group moves, and group reorder restore focus only when the
+  initiating focus belonged to the sidebar, so terminal-invoked commands keep
+  terminal focus. Real GTK actions visibly carried the close/focus affordance
+  from an origin row to Pinned and back; an AT-SPI-opened group menu moved
+  Contrast below Archive and returned focus to the moved disclosure.
 - Expanded and collapsed creation/search controls now publish the exact
   reference action hints, not label-only approximations. Live AT-SPI inspection
   verifies `New Workspace` plus its current-group hint, `New Workspace Options`

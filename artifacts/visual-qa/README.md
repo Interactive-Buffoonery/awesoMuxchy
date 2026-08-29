@@ -1,5 +1,31 @@
 # Visual QA
 
+## 2026-08-29 — SwiftGtk4 structural focus recovery
+
+- Linux images: [focus after pin promotion](swift-gtk/progress/39-structural-focus-recovery/pinned-row-focus-recovery-x11.png),
+  [focus after return to the origin group](swift-gtk/progress/39-structural-focus-recovery/origin-row-focus-recovery-x11.png),
+  and [focus after group reorder](swift-gtk/progress/39-structural-focus-recovery/group-reorder-focus-recovery-x11.png).
+- Reference: Pinned/Needs Input projections, workspace/group reorder actions,
+  and keyboard-focus behavior at macOS commit
+  `fed33ff47c559344fc6db6fa53f16e75fcc4a116`.
+- Behavior: sidebar-owned focus is captured before pin, acknowledge, or mute
+  rebuilds and restored on the newly projected identity after GTK finishes the
+  mutation. Pinned, ordinary, and collapsed-rail destinations resolve by
+  stable workspace ID. Workspace/pinned/group reorder actions likewise return
+  focus to the moved identity; commands initiated from the terminal do not
+  steal focus back into the sidebar.
+- Real-app QA: exported GTK actions promoted and returned the selected
+  workspace while the visible focus-only close affordance followed it between
+  Pinned and its origin group. AT-SPI opened the real group action menu and
+  invoked `Move Group Down`; the persisted order became Archive, Contrast and
+  the moved Contrast disclosure retained its focus-only close affordance.
+- Inspection: all three 296×852 Latte X11 crops were opened at original
+  resolution. Focus is distinct from selection, the synthetic sections and
+  empty group remain aligned, and no row is duplicated or clipped.
+- Privacy: the isolated fixture uses synthetic names and `/tmp`; the crops
+  contain no terminal content, commands, credentials, clipboard data, private
+  paths, or arbitrary agent output.
+
 ## 2026-08-29 — SwiftGtk4 chrome contrast audit
 
 - Linux image: [Latte agent-state sidebar](swift-gtk/progress/38-contrast-audit/latte-agent-state-contrast-x11.png).

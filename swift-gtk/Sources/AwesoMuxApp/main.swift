@@ -474,6 +474,41 @@ private final class ApplicationState: @unchecked Sendable {
         }
     }
 
+    private func restoreSidebarFocus(to workspaceID: UUID) {
+        timeout(add: 10) { [weak self] in
+            guard let self, !self.preferences.isSidebarHidden else { return false }
+            if self.preferences.sidebarWidth < SidebarWidthPolicy.railThreshold {
+                _ = self.railRows[workspaceID]?.grabFocus()
+                return false
+            }
+            let candidates = [
+                self.pinnedRows[workspaceID],
+                self.attentionRows[workspaceID],
+                self.rows[workspaceID],
+            ]
+            for row in candidates where row?.getVisible() == true {
+                if row?.grabFocus() == true { break }
+            }
+            return false
+        }
+    }
+
+    private func sidebarOwnsKeyboardFocus(for workspaceID: UUID) -> Bool {
+        sidebarWidget?.getFocusChild() != nil
+            || workspaceContextPopovers[workspaceID]?.getVisible() == true
+            || liftedContextPopovers[workspaceID]?.getVisible() == true
+    }
+
+    private func restoreSidebarFocus(toGroup groupID: UUID) {
+        timeout(add: 10) { [weak self] in
+            guard let self, !self.preferences.isSidebarHidden,
+                  self.preferences.sidebarWidth >= SidebarWidthPolicy.railThreshold
+            else { return false }
+            _ = self.groupDisclosures[groupID]?.grabFocus()
+            return false
+        }
+    }
+
     private func updateSidebarVisibility() {
         mountSidebarOverlay(preferences.isSidebarHidden)
         isSidebarTemporarilyRevealed = false
@@ -2068,10 +2103,12 @@ private final class ApplicationState: @unchecked Sendable {
 
     private func acknowledgeWorkspace(_ workspaceID: UUID) {
         attentionAcknowledgementGeneration += 1
+        let shouldRestoreFocus = sidebarOwnsKeyboardFocus(for: workspaceID)
         let wasAttention = snapshot.attentionWorkspaceIDs.contains(workspaceID)
         guard (try? snapshot.acknowledgeWorkspace(workspaceID)) != nil else { return }
         rebuildWorkspaceContextMenu(workspaceID)
         refreshLiftedRows(); updateSidebarVisibility(); persist()
+        if shouldRestoreFocus { restoreSidebarFocus(to: workspaceID) }
         announceAttentionReturnIfNeeded(workspaceID, wasAttention: wasAttention)
     }
 
@@ -2103,9 +2140,11 @@ private final class ApplicationState: @unchecked Sendable {
     }
 
     private func toggleWorkspaceNotifications(_ workspaceID: UUID) {
+        let shouldRestoreFocus = sidebarOwnsKeyboardFocus(for: workspaceID)
         guard (try? snapshot.toggleWorkspaceNotificationsMuted(workspaceID)) != nil else { return }
         rebuildWorkspaceContextMenu(workspaceID)
         refreshLiftedRows(); persist()
+        if shouldRestoreFocus { restoreSidebarFocus(to: workspaceID) }
     }
 
     private func createWorkspace(here workspaceID: UUID, fallbackGroupID: UUID) {
@@ -2117,6 +2156,7 @@ private final class ApplicationState: @unchecked Sendable {
     }
 
     private func togglePinned(_ workspaceID: UUID) {
+        let shouldRestoreFocus = sidebarOwnsKeyboardFocus(for: workspaceID)
         let wasPinned = snapshot.pinnedWorkspaceIDs.contains(workspaceID)
         guard (try? snapshot.togglePinnedWorkspace(workspaceID)) != nil else { return }
         snapshot.reconcileAttentionWorkspaceIDs()
@@ -2125,6 +2165,7 @@ private final class ApplicationState: @unchecked Sendable {
         liftedPinActions[workspaceID]?.label = isPinned ? "Unpin" : "Pin"
         refreshLiftedRows()
         persist()
+        if shouldRestoreFocus { restoreSidebarFocus(to: workspaceID) }
         guard let workspace = snapshot.workspace(id: workspaceID) else { return }
         let title = SidebarWorkspaceTitle.resolve(workspace: workspace)
         if !wasPinned {
@@ -2140,6 +2181,7 @@ private final class ApplicationState: @unchecked Sendable {
         guard (try? snapshot.movePinnedWorkspace(workspaceID, offset: offset)) != nil else { return }
         refreshLiftedRows()
         persist()
+        restoreSidebarFocus(to: workspaceID)
         announcePinnedReorder(workspaceID)
     }
 
@@ -2242,6 +2284,7 @@ private final class ApplicationState: @unchecked Sendable {
         refreshLiftedRows()
         performOnGTKMain { [weak self] in for id in affected { self?.rebuildWorkspaceContextMenu(id) } }
         persist()
+        restoreSidebarFocus(to: workspaceID)
         announceWorkspaceReorder(workspaceID)
     }
 
@@ -2444,6 +2487,7 @@ private final class ApplicationState: @unchecked Sendable {
         refreshLiftedRows(); refreshGroupActionEnablement()
         performOnGTKMain { [weak self] in for id in affected { self?.rebuildWorkspaceContextMenu(id) } }
         persist()
+        restoreSidebarFocus(to: workspaceID)
         announceWorkspaceReorder(workspaceID)
         return true
     }
@@ -3422,6 +3466,7 @@ private final class ApplicationState: @unchecked Sendable {
         }
         for group in snapshot.groups { refreshGroupAttention(group.id) }
         refreshGroupActionEnablement()
+        restoreSidebarFocus(toGroup: groupID)
         announceGroupReorder(groupID)
         persist()
     }

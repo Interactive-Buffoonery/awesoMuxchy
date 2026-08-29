@@ -369,6 +369,13 @@ geometry and state styling have also passed a real-window visual correction.
   built-in key handling cannot intercept Menu or Shift+F10 first.
   Footer state chips are real buttons that open a state-filtered activity
   panel, and Orca discovers the live app through AT-SPI.
+- Structural sidebar actions now restore focus by stable workspace/group
+  identity after their projected GTK rows move or are rebuilt. Pin/unpin,
+  acknowledge, notification changes, pinned/ordinary/cross-group reorder, and
+  group reorder cover expanded and collapsed destinations while explicitly
+  refusing to steal focus when a command originated in the terminal. Real
+  Latte QA inspected Pinned → origin focus transfer and an AT-SPI-invoked group
+  reorder with the moved disclosure's focus-only close affordance intact.
 - Header icon controls now use tested reference copy for AT-SPI hints. Direct
   bus traversal verifies expanded `New Workspace` and `New Workspace Options`
   name/description pairs plus collapsed `Search` and `New Workspace menu`
