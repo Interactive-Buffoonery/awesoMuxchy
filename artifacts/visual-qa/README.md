@@ -1,5 +1,39 @@
 # Visual QA
 
+## 2026-08-29 — SwiftGtk4 passive attention dwell
+
+- Linux images: [background attention promotion](swift-gtk/progress/43-attention-dwell/background-attention-mocha-x11.png)
+  and [return to the origin group after dwell and navigation](swift-gtk/progress/43-attention-dwell/returned-after-dwell-mocha-x11.png).
+- Reference: `SelectionAcknowledgementCoordinator.swift`,
+  `SidebarAttentionProjection.swift`, and Needs Input transition handling at
+  macOS baseline `fed33ff47c559344fc6db6fa53f16e75fcc4a116`.
+- Correctness: the production 500 ms callback now runs on GTK's GLib main loop
+  rather than Swift's dispatch main queue, which does not drain while this
+  Linux process is inside `g_application_run`. Attention arriving after pane
+  focus has already settled starts the same dwell as focus entry.
+- Timing seam: an injected scheduler pins the exact 500 ms delay, rejects a
+  changed workspace/pane identity, permits only the newest uninterrupted
+  request, and verifies explicit cancellation. Permission and user-input
+  prompts remain protected from passive acknowledgement by the model gate.
+- Real-app QA: an owner-only live event promoted a background pane, then the
+  release app selected and passively acknowledged that exact pane through the
+  GLib timeout. The owner-only snapshot retained the attention state while its
+  acknowledged-pane list changed from empty to that pane identity. Navigation
+  released the runtime-only sticky and returned the row to its unchanged
+  origin group.
+- Inspection: both 296×852 Mocha crops were inspected at original resolution
+  on X11/GLX. The promotion frame keeps Needs Input above Pinned; the return
+  frame has no duplicate lifted row, preserves origin ordering, and keeps the
+  fixed header/footer intact. The capture helper now requests a complete X11
+  expose before reading rootless-XWayland pixels, preventing damage holes.
+- Verification: full preflight passes the text baseline, all 113 Swift tests,
+  warnings-as-errors and release builds, the single-window activation probe,
+  both forced-termination persistence cases, real terminal integration, and
+  100 two-surface lifecycle cycles.
+- Privacy: the isolated fixture uses synthetic identities and `/tmp`; the
+  crops contain no terminal content, commands, credentials, clipboard data,
+  private paths, or arbitrary agent output.
+
 ## 2026-08-29 — SwiftGtk4 standard and compact sidebar density
 
 - Linux images: [compact sidebar](swift-gtk/progress/42-compact-density/compact-sidebar-mocha-x11.png)

@@ -309,7 +309,13 @@ private final class ApplicationState: @unchecked Sendable {
     private var isSidebarOverlayMounted = false
     private var isSidebarTemporarilyRevealed = false
     private var sidebarRevealGeneration = 0
-    private var attentionAcknowledgementGeneration = 0
+    private let attentionAcknowledgementDwell = AttentionAcknowledgementDwellCoordinator {
+        delayMilliseconds, action in
+        timeout(add: delayMilliseconds) {
+            action()
+            return false
+        }
+    }
     private var sidebarMotionController: EventControllerMotion?
     private var searchKeyController: EventControllerKey?
     private var sidebarNavigationKeyController: EventControllerKey?
@@ -775,6 +781,13 @@ private final class ApplicationState: @unchecked Sendable {
         refreshLiftedRows()
         sidebarFooter?.update(AgentFooterSummary(snapshot: snapshot))
         persist()
+        if snapshot.selectedWorkspaceID == workspaceID,
+           runtimes[workspaceID]?.focusedPaneID == paneID
+        {
+            // Attention can arrive after focus has already settled. Start the
+            // same passive-read dwell used by focus entry in that event order.
+            scheduleAttentionAcknowledgement(workspaceID: workspaceID, paneID: paneID)
+        }
         if promotedUnansweredTurn, let workspace = snapshot.workspace(id: workspaceID) {
             announce(SidebarAnnouncement.unansweredTurnPromoted(
                 title: SidebarWorkspaceTitle.resolve(workspace: workspace)
@@ -2195,7 +2208,7 @@ private final class ApplicationState: @unchecked Sendable {
     }
 
     private func acknowledgeWorkspace(_ workspaceID: UUID) {
-        attentionAcknowledgementGeneration += 1
+        attentionAcknowledgementDwell.cancel()
         let shouldRestoreFocus = sidebarOwnsKeyboardFocus(for: workspaceID)
         let wasAttention = snapshot.attentionWorkspaceIDs.contains(workspaceID)
         guard (try? snapshot.acknowledgeWorkspace(workspaceID)) != nil else { return }
@@ -2206,20 +2219,28 @@ private final class ApplicationState: @unchecked Sendable {
     }
 
     private func scheduleAttentionAcknowledgement(workspaceID: UUID, paneID: UUID) {
-        attentionAcknowledgementGeneration += 1
-        let generation = attentionAcknowledgementGeneration
+        attentionAcknowledgementDwell.cancel()
         guard let workspace = snapshot.workspace(id: workspaceID),
               let pane = workspace.layout.pane(id: paneID),
               (snapshot.unansweredTurnPaneIDs.contains(paneID)
                   || (pane.agentState == .needsAttention
                       && !workspace.acknowledgedAttentionPaneIDs.contains(paneID)))
         else { return }
-        DispatchQueue.main.asyncAfter(deadline: .now() + .milliseconds(500)) { [weak self] in
-            performOnGTKMain {
-                guard let self, self.attentionAcknowledgementGeneration == generation,
+        let request = AttentionAcknowledgementDwellRequest(
+            workspaceID: workspaceID,
+            paneID: paneID
+        )
+        attentionAcknowledgementDwell.schedule(
+            request: request,
+            currentRequest: { [weak self] in
+                guard let self,
                       self.snapshot.selectedWorkspaceID == workspaceID,
                       self.runtimes[workspaceID]?.focusedPaneID == paneID
-                else { return }
+                else { return nil }
+                return request
+            },
+            acknowledge: { [weak self] _ in
+                guard let self else { return }
                 let wasAttention = self.snapshot.attentionWorkspaceIDs.contains(workspaceID)
                 guard (try? self.snapshot.acknowledgePane(
                           paneID, in: workspaceID, passively: true
@@ -2229,7 +2250,7 @@ private final class ApplicationState: @unchecked Sendable {
                 self.refreshLiftedRows(); self.updateSidebarVisibility(); self.persist()
                 self.announceAttentionReturnIfNeeded(workspaceID, wasAttention: wasAttention)
             }
-        }
+        )
     }
 
     private func toggleWorkspaceNotifications(_ workspaceID: UUID) {

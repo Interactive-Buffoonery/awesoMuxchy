@@ -395,10 +395,14 @@ help, and agent context while preserving the compact reference geometry.
   runtime-only sticky until navigation away, and refuses to clear permission or
   explicit-input prompts. Ctrl-Shift-K and the row action deliberately clear
   every waiting pane immediately. Fast selection/focus changes invalidate the
-  pending dwell; the sticky is never serialized. Per-workspace notification
-  mute overrides also persist and use exact Mute/Unmute wording. Seventy-four
-  Swift tests and full preflight cover the transition model; physical dwell
-  timing and spoken return announcements remain real-app QA gaps.
+  pending dwell; the sticky is never serialized. The production timer now uses
+  GTK's GLib main loop, and attention arriving after focus has settled starts
+  the same dwell. An injected scheduler verifies the exact 500 ms edge,
+  newest-request/cancellation behavior, and selection/pane identity guard. A
+  real owner-only event persisted the exact pane acknowledgement; inspected
+  promotion/return captures verify lifted placement and origin restoration.
+  Per-workspace notification mute overrides also persist and use exact
+  Mute/Unmute wording. Audible Orca return inspection remains pending.
 - Sidebar and adjacent footer styling now live in an owned focused GTK
   stylesheet with Catppuccin Mocha/Latte and high-contrast ramps derived from
   the pinned design tokens. System appearance, explicit Light/Dark,

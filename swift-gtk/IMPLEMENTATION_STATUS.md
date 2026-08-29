@@ -267,9 +267,15 @@ geometry and state styling have also passed a real-window visual correction.
   transitions append new arrivals without moving rows already under the user's
   pointer. A guarded 500 ms focused-pane dwell preserves the selected row with
   a runtime-only sticky until navigation away, acknowledges only the active
-  pane, and does not passively clear permission or explicit-input prompts. The
-  immediate `Acknowledge Workspace` row action and Ctrl-Shift-K route release
-  the sticky and reconcile the lifted section and hidden edge cue. Exact
+  pane, and does not passively clear permission or explicit-input prompts. Its
+  production scheduler now uses the GTK/GLib main loop and also starts when an
+  event arrives after focus has settled. Injected scheduling tests verify the
+  exact 500 ms edge, stale selection/pane rejection, newest-request behavior,
+  and cancellation. A real owner-only event persisted the exact acknowledged
+  pane; paired inspected captures show background promotion and origin return
+  after dwell/navigation. The immediate `Acknowledge Workspace` row action and
+  Ctrl-Shift-K route release the sticky and reconcile the lifted section and
+  hidden edge cue. Exact
   per-workspace `Mute Notifications`/`Unmute Notifications` overrides persist.
   Pane-scoped `notification` + `waiting` runtime events now add a separate,
   non-persistent unanswered-turn mark, lift without an attention reason, honor
@@ -282,7 +288,7 @@ geometry and state styling have also passed a real-window visual correction.
   return-to-Local announcement at the same priority. A separate blocking-input
   pass delivered `Claude Code in Review needs input.` before its exact return,
   confirming it is not conflated with the unanswered-turn copy. Full preflight
-  passes 86 Swift tests.
+  passes 113 Swift tests.
   Background rollup crossings into Done and Error now use the reference
   agent-plus-workspace completion/error copy without lifting the row. Live Codex
   events delivered both exact medium-priority AT-SPI announcements; Running

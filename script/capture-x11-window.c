@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
 
 static Window find_named_window(Display *display, Window parent, const char *needle) {
   char *name = NULL;
@@ -61,6 +62,15 @@ int main(int argc, char **argv) {
   if (crop_x < 0 || crop_y < 0 || crop_width <= 0 || crop_height <= 0 ||
       crop_x + crop_width > attributes.width ||
       crop_y + crop_height > attributes.height) return 9;
+
+  /* Rootless XWayland can retain only the most recently damaged portions of
+     a GTK surface. Request and wait for one complete expose before reading it
+     so visual-QA captures do not preserve transparent/black damage holes. */
+  XClearArea(display, window, crop_x, crop_y,
+             (unsigned int)crop_width, (unsigned int)crop_height, True);
+  XSync(display, False);
+  sleep(1);
+
   XImage *image = XGetImage(display, window, crop_x, crop_y,
                            (unsigned int)crop_width,
                            (unsigned int)crop_height,
