@@ -45,8 +45,10 @@ integrations. Their missing UI is not counted as a shell-parity finding below.
 Session Manager is mentioned only because it is an existing macOS shell
 surface, not as a request to implement the deferred persistence domain.
 
-This was an audit only. No implementation, status-file, reference-repository,
-submodule, commit, push, issue, or remote change was made.
+This was an audit only. During the audit pass, no implementation, status-file,
+reference-repository, submodule, commit, push, issue, or remote change was
+made. The completed report was subsequently committed and uploaded with the
+user's explicit authorization.
 
 ## 3. Audit environment and revisions
 
