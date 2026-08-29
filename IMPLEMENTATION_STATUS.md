@@ -451,6 +451,14 @@ help, and agent context while preserving the compact reference geometry.
   terminal focus. Real GTK actions visibly carried the close/focus affordance
   from an origin row to Pinned and back; an AT-SPI-opened group menu moved
   Contrast below Archive and returned focus to the moved disclosure.
+- Needs Input and Pinned section insertion/removal now follows the pinned
+  140 ms structural timing through GTK revealers. The pure motion policy makes
+  initial layout, active filtering, and reduced-motion settings instantaneous;
+  concealed content leaves the accessibility tree immediately and stale
+  delayed hides cannot suppress a section that reappears. Real 296×852 Latte
+  captures inspect partial and settled insertion plus partial removal without
+  shifting the fixed header or footer. Full preflight passes 107 Swift tests
+  and every process-level harness.
 - Expanded and collapsed creation/search controls now publish the exact
   reference action hints, not label-only approximations. Live AT-SPI inspection
   verifies `New Workspace` plus its current-group hint, `New Workspace Options`

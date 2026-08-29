@@ -29,3 +29,18 @@ import Testing
         animationsEnabled: true
     ) == ChromeAppearance(theme: .dark, isHighContrast: true, reducesMotion: false))
 }
+
+@Test func sidebarStructuralMotionMatchesReferenceAndAccessibilityGates() {
+    #expect(SidebarStructuralMotionPolicy.duration(
+        reducesMotion: false, isFiltering: false, isInitialLayout: false
+    ) == 140)
+    #expect(SidebarStructuralMotionPolicy.duration(
+        reducesMotion: true, isFiltering: false, isInitialLayout: false
+    ) == 0)
+    #expect(SidebarStructuralMotionPolicy.duration(
+        reducesMotion: false, isFiltering: true, isInitialLayout: false
+    ) == 0)
+    #expect(SidebarStructuralMotionPolicy.duration(
+        reducesMotion: false, isFiltering: false, isInitialLayout: true
+    ) == 0)
+}

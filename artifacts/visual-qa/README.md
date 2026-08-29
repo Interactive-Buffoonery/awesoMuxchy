@@ -1,5 +1,32 @@
 # Visual QA
 
+## 2026-08-29 — SwiftGtk4 lifted-section structural motion
+
+- Linux images: [Pinned insertion mid-transition](swift-gtk/progress/40-structural-motion/pinned-section-transition-x11.png),
+  [Pinned insertion settled](swift-gtk/progress/40-structural-motion/pinned-section-settled-x11.png),
+  and [Pinned removal mid-transition](swift-gtk/progress/40-structural-motion/pinned-section-removal-x11.png).
+- Reference: `SidebarGroupView` and `SidebarSessionTile` at macOS commit
+  `fed33ff47c559344fc6db6fa53f16e75fcc4a116`; structural list motion uses
+  140 ms ease-out and becomes identity under reduced motion, while filtering
+  suppresses structural animation.
+- Behavior: Needs Input and Pinned sections now use GTK revealers for vertical
+  structural insertion/removal. Initial layout, active filtering, or GTK's
+  reduced-motion setting selects a zero-duration transition. Concealed section
+  content is hidden from accessibility immediately and its revealer is removed
+  from layout after the visual transition, with stale hide callbacks guarded
+  against a rapid reappearance.
+- Inspection: direct native action activation captured a partially revealed
+  Pinned section, its complete 140 ms destination, and its collapsing removal.
+  All three 296×852 Latte crops were inspected at original resolution; fixed
+  header/footer geometry, group rows, selection, and the existing Needs Input
+  projection remain stable.
+- Verification: full preflight passes the text baseline, all 107 Swift tests,
+  release build, forced-termination persistence cases, terminal integration,
+  and 100 two-surface lifecycle cycles.
+- Privacy: the isolated fixture uses synthetic names and `/tmp`; the crops
+  contain no terminal content, commands, credentials, clipboard data, private
+  paths, or arbitrary agent output.
+
 ## 2026-08-29 — SwiftGtk4 structural focus recovery
 
 - Linux images: [focus after pin promotion](swift-gtk/progress/39-structural-focus-recovery/pinned-row-focus-recovery-x11.png),

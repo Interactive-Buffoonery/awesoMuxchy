@@ -376,6 +376,13 @@ geometry and state styling have also passed a real-window visual correction.
   refusing to steal focus when a command originated in the terminal. Real
   Latte QA inspected Pinned → origin focus transfer and an AT-SPI-invoked group
   reorder with the moved disclosure's focus-only close affordance intact.
+- Lifted section structure now uses GTK revealers at the reference 140 ms
+  duration. `SidebarStructuralMotionPolicy` disables motion for initial layout,
+  filtering, and GTK reduced-motion preference; hiding also removes the section
+  from accessibility immediately and guards delayed layout removal against a
+  rapid reversal. Real Latte captures inspect Pinned insertion/removal during
+  transition and after settling with fixed chrome unchanged; full preflight
+  passes 107 tests and every process-level harness.
 - Header icon controls now use tested reference copy for AT-SPI hints. Direct
   bus traversal verifies expanded `New Workspace` and `New Workspace Options`
   name/description pairs plus collapsed `Search` and `New Workspace menu`

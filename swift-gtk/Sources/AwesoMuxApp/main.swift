@@ -252,10 +252,13 @@ private final class ApplicationState: @unchecked Sendable {
     private var groupColorActions: [UUID: [WorkspaceGroupColor: ButtonRef]] = [:]
     private var workspaceOptionMenus: [(menu: MenuButtonRef, includesPrimary: Bool)] = []
     private var isSidebarFiltering = false
-    private var attentionSectionRoot: BoxRef?
-    private var pinnedSectionRoot: BoxRef?
+    private var attentionSectionRoot: Revealer?
+    private var pinnedSectionRoot: Revealer?
+    private var attentionSectionContent: BoxRef?
+    private var pinnedSectionContent: BoxRef?
     private var attentionSectionBody: BoxRef?
     private var pinnedSectionBody: BoxRef?
+    private var hasAppliedLiftedSectionVisibility = false
     private var attentionRows: [UUID: ToggleButtonRef] = [:]
     private var pinnedRows: [UUID: ToggleButtonRef] = [:]
     private var liftedRowChrome: [UUID: WorkspaceRowChrome] = [:]
@@ -1028,9 +1031,46 @@ private final class ApplicationState: @unchecked Sendable {
 
     func reopenLastClosedWorkspace() { reopenMostRecentlyClosedWorkspace() }
 
-    func attachLiftedSections(attention: (BoxRef, BoxRef), pinned: (BoxRef, BoxRef)) {
-        attentionSectionRoot = attention.0; attentionSectionBody = attention.1
-        pinnedSectionRoot = pinned.0; pinnedSectionBody = pinned.1
+    func attachLiftedSections(
+        attention: (Revealer, BoxRef, BoxRef), pinned: (Revealer, BoxRef, BoxRef)
+    ) {
+        attentionSectionRoot = attention.0
+        attentionSectionContent = attention.1
+        attentionSectionBody = attention.2
+        pinnedSectionRoot = pinned.0
+        pinnedSectionContent = pinned.1
+        pinnedSectionBody = pinned.2
+    }
+
+    private func updateLiftedSectionVisibility(
+        _ revealer: Revealer?, content: BoxRef?, visible: Bool,
+        isFiltering: Bool
+    ) {
+        guard let revealer, let content else { return }
+        let appearance = GTKChromeAppearance.resolve(preference: preferences.theme)
+        let duration = SidebarStructuralMotionPolicy.duration(
+            reducesMotion: appearance.reducesMotion,
+            isFiltering: isFiltering,
+            isInitialLayout: !hasAppliedLiftedSectionVisibility
+        )
+        revealer.setTransition(duration: duration)
+        if visible {
+            revealer.set(visible: true)
+            setAccessibleHidden(content, false)
+            revealer.set(revealChild: true)
+        } else {
+            setAccessibleHidden(content, true)
+            revealer.set(revealChild: false)
+            guard duration > 0 else {
+                revealer.set(visible: false)
+                return
+            }
+            timeout(add: duration + 20) { [weak revealer] in
+                guard let revealer, !revealer.getRevealChild() else { return false }
+                revealer.set(visible: false)
+                return false
+            }
+        }
     }
 
     func toggleGroup(_ groupID: UUID) {
@@ -1107,8 +1147,15 @@ private final class ApplicationState: @unchecked Sendable {
             let visible = pinnedWorkspaceIDs.contains(id)
             row.set(visible: visible); liftedRowChrome[id]?.root.set(visible: visible)
         }
-        attentionSectionRoot?.set(visible: !projection.attention.isEmpty)
-        pinnedSectionRoot?.set(visible: !projection.pinned.isEmpty)
+        updateLiftedSectionVisibility(
+            attentionSectionRoot, content: attentionSectionContent,
+            visible: !projection.attention.isEmpty, isFiltering: projection.isFiltering
+        )
+        updateLiftedSectionVisibility(
+            pinnedSectionRoot, content: pinnedSectionContent,
+            visible: !projection.pinned.isEmpty, isFiltering: projection.isFiltering
+        )
+        hasAppliedLiftedSectionVisibility = true
         refreshRailProjection(projection)
         let showsNoMatches = projection.isFiltering && projection.orderedWorkspaceIDs.isEmpty
         noMatchesRoot?.set(visible: showsNoMatches)
@@ -3807,14 +3854,18 @@ private func buildWindow(for application: Gtk.ApplicationRef) {
     let groups = BoxRef(orientation: .vertical, spacing: 14)
     groups.setMarginStart(margin: 10); groups.setMarginEnd(margin: 10); groups.setMarginTop(margin: 6); groups.setMarginBottom(margin: 8)
     let scroller = ScrolledWindowRef(); scroller.setPolicy(hscrollbarPolicy: .never, vscrollbarPolicy: .automatic)
-    func liftedSection(title: String, symbol: String, needs: Bool) -> (BoxRef, BoxRef) {
+    func liftedSection(title: String, symbol: String, needs: Bool) -> (Revealer, BoxRef, BoxRef) {
         let root = BoxRef(orientation: .vertical, spacing: 5)
         let header = LabelRef(str: "\(symbol)  \(title.uppercased())"); header.add(cssClass: "aw-lifted-header")
         if needs { header.add(cssClass: "aw-lifted-needs") }
         header.xalign = 0; root.append(child: header)
         let body = BoxRef(orientation: .vertical, spacing: 5); root.append(child: body)
-        root.set(visible: false); groups.append(child: root)
-        return (root, body)
+        let revealer = Revealer(); revealer.set(child: root)
+        revealer.setTransitionType(transition: .slideDown)
+        revealer.set(revealChild: false); revealer.set(visible: false)
+        setAccessibleHidden(root, true)
+        groups.append(child: revealer)
+        return (revealer, root, body)
     }
     let attentionSection = liftedSection(title: "Needs Input", symbol: "!", needs: true)
     let pinnedSection = liftedSection(title: "Pinned", symbol: "◆", needs: false)

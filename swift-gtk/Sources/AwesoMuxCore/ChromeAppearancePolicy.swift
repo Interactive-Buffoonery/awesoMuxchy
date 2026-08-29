@@ -33,3 +33,15 @@ public enum ChromeAppearancePolicy {
         )
     }
 }
+
+public enum SidebarStructuralMotionPolicy {
+    public static let durationMilliseconds = 140
+
+    public static func duration(
+        reducesMotion: Bool,
+        isFiltering: Bool,
+        isInitialLayout: Bool
+    ) -> Int {
+        reducesMotion || isFiltering || isInitialLayout ? 0 : durationMilliseconds
+    }
+}
