@@ -322,6 +322,7 @@ private final class ApplicationState: @unchecked Sendable {
     private var globalModifierKeyController: EventControllerKey?
     private var activeSheetWindow: WindowRef?
     private var activeSheetKeyController: EventControllerKey?
+    private var commandPaletteController: CommandPaletteController?
     private var isWorkspaceJumpModifierHeld = false
     private let sidebarDragNonce = UUID().uuidString
     private var activeSidebarDrag: SidebarDragItem?
@@ -3094,15 +3095,13 @@ private final class ApplicationState: @unchecked Sendable {
     }
 
     func showCommandPalette() {
-        let window = WindowRef()
-        window.title = "Command Palette"
-        window.setDefaultSize(width: 520, height: 420)
-        let root = BoxRef(orientation: .vertical, spacing: 8)
-        root.setMarginStart(margin: 16); root.setMarginEnd(margin: 16)
-        root.setMarginTop(margin: 16); root.setMarginBottom(margin: 16)
-        let search = SearchEntryRef(); search.setPlaceholder(text: "Search workspaces and actions...")
-        let results = BoxRef(orientation: .vertical, spacing: 3)
-        let implemented: Set<CommandID> = [.newWorkspace, .newWorkspaceInCurrentDirectory, .newWorkspaceGroup,
+        if let commandPaletteController {
+            commandPaletteController.present()
+            return
+        }
+        guard let rootWidget else { return }
+        let implemented: Set<CommandID> = [
+            .newWorkspace, .newWorkspaceInCurrentDirectory, .newWorkspaceGroup,
             .renameWorkspace, .acknowledgeWorkspace, .togglePinWorkspace,
             .closeWorkspace, .clearWorkspace, .reopenClosedWorkspace,
             .splitRight, .splitDown, .closePane,
@@ -3113,33 +3112,27 @@ private final class ApplicationState: @unchecked Sendable {
             .jumpWorkspace1, .jumpWorkspace2, .jumpWorkspace3, .jumpWorkspace4,
             .jumpWorkspace5, .jumpWorkspace6, .jumpWorkspace7, .jumpWorkspace8,
             .jumpWorkspace9,
-            .focusSidebar, .toggleSidebarWidth, .toggleSidebarVisibility]
-        var commandRows: [(String, ButtonRef)] = []
-        for definition in CommandCatalog.definitions where implemented.contains(definition.id) {
-            let button = ButtonRef(label: definition.action)
-            button.add(cssClass: "aw-menu-row"); button.setHalign(align: .fill)
-            if let index = definition.id.workspaceJumpIndex {
-                button.set(sensitive: workspaceJumpOrder().indices.contains(index))
-            } else if let index = definition.id.paneFocusIndex {
-                button.set(sensitive: index <= (snapshot.selectedWorkspace?.layout.paneCount ?? 0))
-            } else if [.previousPane, .nextPane].contains(definition.id) {
-                button.set(sensitive: snapshot.selectedWorkspace?.layout.paneCount ?? 0 > 1)
-            } else if [.growActivePane, .shrinkActivePane].contains(definition.id) {
-                button.set(sensitive: snapshot.selectedWorkspace?.layout.paneCount ?? 0 > 1)
-            }
-            button.onClicked { [weak self, window] _ in
-                window.close(); self?.perform(definition.id)
-            }
-            results.append(child: button)
-            commandRows.append((definition.action.lowercased(), button))
-        }
-        search.onSearchChanged { entry in
-            let query = (entry.text ?? "").trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-            for (title, button) in commandRows { button.set(visible: query.isEmpty || title.contains(query)) }
-        }
-        let scroller = ScrolledWindowRef(); scroller.setVexpand(expand: true); scroller.set(child: results)
-        root.append(child: search); root.append(child: scroller)
-        window.set(child: root); window.present()
+            .focusSidebar, .toggleSidebarWidth, .toggleSidebarVisibility,
+        ]
+        let definitions = CommandCatalog.definitions.filter { implemented.contains($0.id) }
+        let controller = CommandPaletteController(
+            anchor: WidgetRef(rootWidget),
+            snapshot: snapshot,
+            definitions: definitions,
+            enabledCommandIDs: Set(implemented.filter {
+                commandActions[$0]?.getEnabled() == true
+            }),
+            onPerform: { [weak self] item in
+                switch item.target {
+                case let .workspace(id): self?.select(id)
+                case let .command(id): self?.perform(id)
+                }
+            },
+            onDismiss: { [weak self] in self?.commandPaletteController = nil }
+        )
+        commandPaletteController = controller
+        applyThemeClasses(to: controller.root)
+        controller.present()
     }
 
     private func persist() {
@@ -3235,7 +3228,7 @@ private final class ApplicationState: @unchecked Sendable {
             .jumpWorkspace1, .jumpWorkspace2, .jumpWorkspace3, .jumpWorkspace4,
             .jumpWorkspace5, .jumpWorkspace6, .jumpWorkspace7, .jumpWorkspace8,
             .jumpWorkspace9,
-            .focusSidebar, .toggleSidebarWidth, .toggleSidebarVisibility]
+            .commandPalette, .focusSidebar, .toggleSidebarWidth, .toggleSidebarVisibility]
         let selectedWorkspaceCommands: Set<CommandID> = [
             .renameWorkspace, .closeWorkspace, .clearWorkspace,
             .splitRight, .splitDown, .closePane,
@@ -3340,6 +3333,7 @@ private final class ApplicationState: @unchecked Sendable {
         if command == .newWorkspaceInCurrentDirectory { createWorkspaceInCurrentDirectory(); return }
         if command == .newWorkspaceGroup { presentGroupNameDialog(); return }
         if command == .reopenClosedWorkspace { reopenMostRecentlyClosedWorkspace(); return }
+        if command == .commandPalette { showCommandPalette(); return }
         if command == .focusSidebar { focusSidebar(); return }
         if command == .toggleSidebarWidth { toggleSidebarWidth(); return }
         if command == .toggleSidebarVisibility { toggleSidebarVisibility(); return }

@@ -198,6 +198,15 @@ geometry and state styling have also passed a real-window visual correction.
   `EditableText` under the `Search sessions` AT-SPI identity; `Clear search`
   exposes a named action whose AT-SPI invocation returned true and emptied the
   entry.
+- The 40-point collapsed Search action and Control-K now share a focused
+  `CommandPaletteController` popover inside the primary GTK window. Its tested
+  immutable summon projection unifies workspace and enabled-command results,
+  searches title/path/group fields with stable fuzzy scores, exposes curated
+  suggestions for an empty query, and maps leading `>` to actions-only mode.
+  Bare Return remains inert until selection; Up/Down, Return, and Escape use a
+  tested clamped policy and exact target routing. Real AT-SPI opened it through
+  collapsed Search, verified editable unified/actions-only results and result
+  positions, and a privacy-safe 606×506 Latte popup surface was inspected.
 - Visible title/location search matches now use tested case- and
   diacritic-insensitive fuzzy scoring with word-boundary/contiguous bonuses,
   bounded gap penalties, and best-alignment selection. Every matched UTF-8 byte

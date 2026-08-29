@@ -32,6 +32,34 @@ static Window find_named_window(Display *display, Window parent, const char *nee
   return 0;
 }
 
+static Window find_sized_window(Display *display, Window parent,
+                                int expected_width, int expected_height) {
+  XWindowAttributes attributes;
+  if (XGetWindowAttributes(display, parent, &attributes) != 0 &&
+      attributes.map_state == IsViewable &&
+      attributes.width == expected_width && attributes.height == expected_height) {
+    return parent;
+  }
+
+  Window root = 0;
+  Window ignored_parent = 0;
+  Window *children = NULL;
+  unsigned int child_count = 0;
+  if (XQueryTree(display, parent, &root, &ignored_parent, &children, &child_count) == 0) {
+    return 0;
+  }
+  for (unsigned int index = 0; index < child_count; index++) {
+    const Window match = find_sized_window(
+        display, children[index], expected_width, expected_height);
+    if (match != 0) {
+      XFree(children);
+      return match;
+    }
+  }
+  if (children != NULL) XFree(children);
+  return 0;
+}
+
 static unsigned char component(unsigned long pixel, unsigned long mask) {
   if (mask == 0) return 0;
   unsigned int shift = 0;
@@ -42,12 +70,22 @@ static unsigned char component(unsigned long pixel, unsigned long mask) {
 
 int main(int argc, char **argv) {
   if (argc != 3 && argc != 7) {
-    fprintf(stderr, "usage: capture-x11-window WINDOW_NAME OUTPUT.png [X Y WIDTH HEIGHT]\n");
+    fprintf(stderr, "usage: capture-x11-window WINDOW_NAME|@root|@size=WxH OUTPUT.png [X Y WIDTH HEIGHT]\n");
     return 2;
   }
   Display *display = XOpenDisplay(NULL);
   if (display == NULL) return 3;
-  const Window window = find_named_window(display, DefaultRootWindow(display), argv[1]);
+  const int captures_root = strcmp(argv[1], "@root") == 0;
+  int requested_width = 0;
+  int requested_height = 0;
+  const int captures_size = sscanf(
+      argv[1], "@size=%dx%d", &requested_width, &requested_height) == 2;
+  const Window window = captures_root
+      ? DefaultRootWindow(display)
+      : captures_size
+          ? find_sized_window(display, DefaultRootWindow(display),
+                              requested_width, requested_height)
+          : find_named_window(display, DefaultRootWindow(display), argv[1]);
   if (window == 0) {
     XCloseDisplay(display);
     return 4;
@@ -66,10 +104,12 @@ int main(int argc, char **argv) {
   /* Rootless XWayland can retain only the most recently damaged portions of
      a GTK surface. Request and wait for one complete expose before reading it
      so visual-QA captures do not preserve transparent/black damage holes. */
-  XClearArea(display, window, crop_x, crop_y,
-             (unsigned int)crop_width, (unsigned int)crop_height, True);
-  XSync(display, False);
-  sleep(1);
+  if (!captures_root) {
+    XClearArea(display, window, crop_x, crop_y,
+               (unsigned int)crop_width, (unsigned int)crop_height, True);
+    XSync(display, False);
+    sleep(1);
+  }
 
   XImage *image = XGetImage(display, window, crop_x, crop_y,
                            (unsigned int)crop_width,

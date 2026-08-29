@@ -213,6 +213,15 @@ help, and agent context while preserving the compact reference geometry.
 - Expanded search keyboard routing uses that same projection order: Escape
   clears or restores terminal focus, Up/Down moves a visible current-result
   outline, and Return selects and focuses the routed workspace.
+- Collapsed Search and Control-K now open one shared in-window command-palette
+  popover rather than a second GTK window. A pure snapshot projection provides
+  stable fuzzy workspace/action results, curated bare-query suggestions,
+  leading-`>` actions-only mode, disabled-command filtering, bounded workspace
+  results, and no implicit bare-Return target. Up/Down clamps selection, Return
+  routes the exact workspace or enabled command, and Escape dismisses. Real
+  AT-SPI invoked collapsed Search, edited both modes, and verified section,
+  result-position, and action semantics; the focused Latte capture was
+  inspected at original resolution.
 - Workspace-group state now has tested safe create/rename, explicit color,
   stable-ID reorder, cross-group workspace movement, and populated close with
   deterministic replacement selection. GTK headers expose the corresponding

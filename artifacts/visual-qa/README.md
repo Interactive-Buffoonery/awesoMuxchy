@@ -1,5 +1,39 @@
 # Visual QA
 
+## 2026-08-29 — SwiftGtk4 unified command palette
+
+- Linux image: [collapsed-search unified palette](swift-gtk/progress/45-command-palette/unified-command-palette-latte-x11.png).
+- Reference: `PaletteResult.swift`, `PalettePresenter.swift`, and
+  `CommandPaletteView.swift` at macOS baseline
+  `fed33ff47c559344fc6db6fa53f16e75fcc4a116`.
+- Architecture and behavior: collapsed Search and Control-K open one shared
+  focusable GTK popover parented to the primary window. A tested immutable
+  summon projection groups workspaces before enabled actions, keeps source
+  order as the fuzzy-score tie-breaker, searches workspace title/path/group,
+  caps workspace results at 50, exposes curated suggestions for a bare query,
+  and maps a leading `>` to actions-only mode. Bare Return has no implicit
+  target; Up/Down clamps from either edge, Return opens the exact selected
+  workspace/action, and Escape dismisses.
+- Real-app QA: AT-SPI invoked the collapsed 40-point `Search` action, found one
+  editable `Command palette search`, verified `WORKSPACES` and `SUGGESTED`
+  sections plus result positions, entered `> split`, and observed only the two
+  enabled split actions with the exact `Actions only mode` badge. GTK 4.14 on
+  this automated XWayland display reports no focused AT-SPI object for the
+  popup, but the inspected frame visibly proves the search focus ring and the
+  editable interface accepted both queries.
+- Inspection: the 606×506 native popup surface was inspected at original
+  resolution. Its 520×420 Latte card shows the synthetic owner-only
+  `Baseline`/`awesoMux`/`/tmp` fixture, exact placeholder, separate result
+  sections/counts, no selected result before user input, footer keyboard hints,
+  border, rounded corners, and complete shadow without terminal pixels.
+- Verification: full preflight passes the text baseline, all 119 Swift tests,
+  warnings-as-errors and release builds, single-window and dynamic-command
+  probes, both forced-termination cases, terminal integration, and 100
+  two-surface lifecycle cycles.
+- Privacy: the fixture was written by the repository persistence probe; the
+  popup-only capture contains no shell identity, terminal content, commands,
+  credentials, clipboard data, private paths, or arbitrary agent output.
+
 ## 2026-08-29 — SwiftGtk4 clean-profile recovery
 
 - Linux image: [missing-profile empty state with sidebar focus](swift-gtk/progress/44-clean-profile-recovery/empty-focus-sidebar-latte-x11.png).
