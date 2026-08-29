@@ -27,7 +27,13 @@
   original resolution on the verified X11/GLX path. The fixed footer geometry,
   selected state, keyboard-only focus outline, panel grouping, and readable
   live row metadata remain distinct and unclipped.
-- Verification: full preflight passes the text baseline, all 109 Swift tests,
+- Single-window follow-up: the activation handler now presents its retained
+  primary window instead of rebuilding application state and chrome. A real
+  release-process probe launches the executable once, launches it three more
+  times through GApplication activation, and requires exactly one X11 normal
+  window throughout. The probe uses an isolated profile and a test-only
+  application ID on the existing desktop bus so it cannot disturb AT-SPI.
+- Verification: full preflight passes the text baseline, all 110 Swift tests,
   the warnings-as-errors and release builds, both forced-termination
   persistence cases, real terminal integration, and 100 two-surface lifecycle
   cycles.

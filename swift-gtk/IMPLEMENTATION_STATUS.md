@@ -393,8 +393,16 @@ geometry and state styling have also passed a real-window visual correction.
   changes. Real GTK action plus AT-SPI QA verified close/non-resurrection,
   cleared search, and selected-row focus in both modes. Inspected 296×852 and
   60×852 Latte crops exposed and verified a selected activity-row contrast
-  correction covered by named WCAG requirements. Full preflight passes 109
+  correction covered by named WCAG requirements. Full preflight passes 110
   Swift tests and every process-level harness.
+- Repeated application activation now presents one retained primary window
+  instead of rebuilding state and creating duplicate native windows. Close
+  clears the retained window identity, while the completed application state
+  remains available for the final persistence flush. A pure activation-policy
+  test covers first versus subsequent activation, and the local preflight's
+  release-process probe launches three secondary instances and observes one
+  X11 normal window under an isolated profile/test application ID. The probe
+  reuses the desktop session bus and leaves AT-SPI intact.
 - Header icon controls now use tested reference copy for AT-SPI hints. Direct
   bus traversal verifies expanded `New Workspace` and `New Workspace Options`
   name/description pairs plus collapsed `Search` and `New Workspace menu`

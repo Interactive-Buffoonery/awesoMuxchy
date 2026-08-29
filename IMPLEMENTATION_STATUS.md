@@ -469,7 +469,15 @@ help, and agent context while preserving the compact reference geometry.
   dismissal, non-resurrection, cleared search, and selected-row focus in both
   modes. The inspected 296×852/60×852 Latte captures also drove a selected
   activity-row contrast correction now covered by named WCAG checks. Full
-  preflight passes 109 Swift tests and every process-level harness.
+  preflight passes 110 Swift tests and every process-level harness.
+- Repeated desktop activation now preserves the one-window product contract.
+  The activation handler presents the retained primary GTK window instead of
+  constructing another `ApplicationState` and chrome tree, and clears that
+  retained identity during real window close. A pure policy test covers the
+  build-versus-present decision. Preflight now launches the release executable
+  once plus three secondary activations under an isolated profile/test app ID
+  and observes exactly one X11 normal window without altering the desktop
+  AT-SPI bus.
 - Expanded and collapsed creation/search controls now publish the exact
   reference action hints, not label-only approximations. Live AT-SPI inspection
   verifies `New Workspace` plus its current-group hint, `New Workspace Options`

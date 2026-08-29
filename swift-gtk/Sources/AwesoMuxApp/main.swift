@@ -3817,12 +3817,21 @@ private final class ApplicationState: @unchecked Sendable {
 }
 
 nonisolated(unsafe) private var retainedState: ApplicationState?
+nonisolated(unsafe) private var retainedPrimaryWindow: ApplicationWindowRef?
 
 private func initialSnapshot() -> SessionSnapshot {
     return SessionSnapshot(selectedWorkspaceID: nil, groups: [])
 }
 
 private func buildWindow(for application: Gtk.ApplicationRef) {
+    switch PrimaryWindowActivationAction.resolve(hasPrimaryWindow: retainedPrimaryWindow != nil) {
+    case .presentPrimaryWindow:
+        retainedPrimaryWindow?.present()
+        return
+    case .buildPrimaryWindow:
+        break
+    }
+
     _ = BundledFonts.register()
     let fallback = initialSnapshot()
     let paths: SessionProfilePaths
@@ -3846,6 +3855,7 @@ private func buildWindow(for application: Gtk.ApplicationRef) {
     retainedState = state; state.installCommands(on: application)
 
     let window = ApplicationWindowRef(application: application); window.title = "awesoMux"
+    retainedPrimaryWindow = window
     window.setDefaultSize(width: 1440, height: 900)
     let root = BoxRef(orientation: .vertical, spacing: 0); root.add(cssClass: "aw-root")
     state.installStyles(on: WidgetRef(root))
@@ -4071,6 +4081,7 @@ private func buildWindow(for application: Gtk.ApplicationRef) {
     state.retainGlobalModifierController(modifierKeys)
     gtk_widget_add_controller(window.widget_ptr, modifierKeys.event_controller_ptr)
     window.onCloseRequest { [weak state] _ in
+        retainedPrimaryWindow = nil
         state?.prepareForWindowClose()
         return false
     }
@@ -4081,8 +4092,12 @@ private func buildWindow(for application: Gtk.ApplicationRef) {
     performOnGTKMain { [weak state] in state?.presentStartupRecoveryIfNeeded() }
 }
 
-let status = Application.run(id: "com.interactivebuffoonery.awesomux", arguments: CommandLine.arguments,
-    activationHandler: buildWindow)
+let applicationID = ProcessInfo.processInfo.environment["AWESOMUX_SINGLE_WINDOW_PROBE"] == "1"
+    ? "com.interactivebuffoonery.awesomux.activationprobe"
+    : "com.interactivebuffoonery.awesomux"
+let status = applicationID.withCString { identifier in
+    Application.run(id: identifier, arguments: CommandLine.arguments, activationHandler: buildWindow)
+}
 _ = retainedState?.flushPersistence()
 guard let status else { fatalError("Could not create GTK application") }
 exit(Int32(status))
