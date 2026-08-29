@@ -1,5 +1,34 @@
 # Visual QA
 
+## 2026-08-28 — SwiftGtk4 agent activity routing
+
+- Linux images: [expanded grouped activity panel](swift-gtk/progress/13-agent-activity-routing/expanded-activity-panel-x11.png),
+  [collapsed state footer](swift-gtk/progress/13-agent-activity-routing/collapsed-state-footer-x11.png),
+  and [collapsed Thinking control focus/routing](swift-gtk/progress/13-agent-activity-routing/collapsed-thinking-focus-x11.png).
+- Reference: `SidebarStatusFooter.swift`, `AgentActivityPanel.swift`, and
+  `AgentActivityRoster.swift` at macOS baseline
+  `fed33ff47c559344fc6db6fa53f16e75fcc4a116`.
+- Expanded behavior: one pane-grained roster drives footer counts and panel
+  rows. Groups appear in urgency order; rows preserve sidebar traversal order
+  and show provider, live pane/session title, sanitized location, and selected
+  identity. State chips open a targeted panel; row selection closes it and
+  routes to the exact workspace/pane.
+- Collapsed behavior: the 60-point rail now contains Quick Settings, Help &
+  Feedback, and separate nonzero Thinking, Output, and Needs Attention
+  controls. Each 32-point state control wraps only through matching agent panes
+  rather than cycling the entire roster. The focused-control image shows the
+  keyboard focus treatment and matching second-pane focus handoff.
+- Accessibility: controls expose names, descriptions, selected and expanded
+  state; panel open/close is announced; the close route restores a predictable
+  focus target. Native GTK hit targets were exercised through the isolated X11
+  QA display. Human pointer and Orca narration remain separate final checks.
+- Verification: all three images contain two live Ghostty surfaces and were
+  inspected at original resolution. Full preflight passes 66 Swift tests,
+  release terminal integration, and 100 two-surface lifecycle cycles.
+- Privacy: the profile contains intentionally synthetic workspace, pane,
+  provider, state, and prompt data only. No terminal history, typed commands,
+  clipboard data, credentials, arbitrary agent output, or private path appears.
+
 ## 2026-08-28 — SwiftGtk4 sidebar layout matrix
 
 - Linux images: [Latte left sidebar with long text](swift-gtk/progress/12-sidebar-layout-matrix/light-left-long-text-x11.png),
