@@ -116,7 +116,8 @@ geometry and state styling have also passed a real-window visual correction.
   focus and persists the hidden state. Real X11 pointer QA now covers the
   hidden attention tab, mirrored left/right 296-point overlay reveal, and
   leave-grace retraction while the terminal keeps its full hidden-mode
-  allocation.
+  allocation. AT-SPI exposes the hidden attention tab as the focusable
+  `Show Sidebar` button with its needs-input description and click action.
 - Collapsed mode now renders a dedicated 60-point GTK rail instead of a clipped
   expanded hierarchy. Its 40-point search control opens a working filtered
   command palette, its create control and workspace buttons route through the

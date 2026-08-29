@@ -18,7 +18,9 @@
   places and reveals the attention tab and sidebar from the opposite edge.
 - Inspection: all PNGs were inspected at original resolution with real Ghostty
   rendering. The reveal preserves selection, fixed footer alignment, and the
-  selected pane's focused-footer state.
+  selected pane's focused-footer state. Direct AT-SPI inspection reports the
+  visible edge control as a focusable `Show Sidebar` button with description
+  `A workspace needs input` and a `click` action.
 - Privacy: all workspace, location, and prompt content is synthetic; no command
   history, clipboard content, credentials, or arbitrary agent output is shown.
 
