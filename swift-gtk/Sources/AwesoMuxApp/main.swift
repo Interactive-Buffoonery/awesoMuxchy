@@ -102,6 +102,16 @@ private final class ApplicationState: @unchecked Sendable {
     private var liftedTitles: [UUID: LabelRef] = [:]
     private var workspaceContextControllers: [UUID: GestureClick] = [:]
     private var workspaceContextPopovers: [UUID: PopoverRef] = [:]
+    private enum PanePeekPresence: Hashable { case rowPointer, rowFocus, cardPointer }
+    private var workspacePanePeekPopovers: [UUID: PopoverRef] = [:]
+    private var workspacePanePeekPresence: [UUID: Set<PanePeekPresence>] = [:]
+    private var workspacePanePeekGeneration: [UUID: Int] = [:]
+    private var workspacePanePeekMotionControllers: [UUID: [EventControllerMotion]] = [:]
+    private var workspacePanePeekFocusControllers: [UUID: [EventControllerFocus]] = [:]
+    private var workspacePanePeekHosts: [UUID: ToggleButtonRef] = [:]
+    private var workspacePanePeekCards: [UUID: BoxRef] = [:]
+    private var workspacePanePeekCardMotionControllers: [UUID: [EventControllerMotion]] = [:]
+    private var workspacePanePeekCardMotionHosts: [UUID: [WidgetRef]] = [:]
     private var regularPinActions: [UUID: ButtonRef] = [:]
     private var liftedPinActions: [UUID: ButtonRef] = [:]
     private var liftedContextControllers: [UUID: GestureClick] = [:]
@@ -454,8 +464,13 @@ private final class ApplicationState: @unchecked Sendable {
             setAccessibleDescription(row, "Workspace in \(groupName); \(location)\(panes)")
         }
         if let row = railRows[workspaceID] { setAccessibleLabel(row, displayedTitle) }
+        liftedTitles[workspaceID]?.label = displayedTitle
+        if let liftedRow = attentionRows[workspaceID] ?? pinnedRows[workspaceID] {
+            setAccessibleLabel(liftedRow, displayedTitle)
+        }
         if snapshot.selectedWorkspaceID == workspaceID { title?.label = displayedTitle }
-        refreshLiftedRows()
+        configureWorkspacePanePeek(workspaceID)
+        filter(sidebarSearchEntry?.text ?? "")
     }
 
     func buildLayout(_ layout: PaneLayout, workspace: WorkspaceSnapshot) -> (WidgetRef, [TerminalSurface])? {
@@ -763,6 +778,7 @@ private final class ApplicationState: @unchecked Sendable {
         let paneDescription = workspace.layout.paneCount > 1 ? ", \(workspace.layout.paneCount) panes" : ""
         setAccessibleDescription(row, "Workspace in \(ChromeText.sanitized(group.name, limit: 120)); \(location)\(paneDescription)")
         installWorkspaceContextMenu(on: row, workspaceID: workspace.id, groupID: groupID)
+        installWorkspacePanePeek(on: row, workspace: workspace)
         rows[workspace.id] = row; metadata[workspace.id] = meta; workspaceTitles[workspace.id] = name
         if !(workspaceIDsByGroup[groupID] ?? []).contains(workspace.id) { workspaceIDsByGroup[groupID, default: []].append(workspace.id) }
         return row
@@ -794,6 +810,224 @@ private final class ApplicationState: @unchecked Sendable {
         railGroupRows[group.id] = button; railGroupAttentionLabels[group.id] = attention
         refreshRailGroupRoster(group.id); refreshGroupAttention(group.id)
         return button
+    }
+
+    private func paneStateLabel(_ state: AgentState) -> String {
+        switch state {
+        case .idle: "Idle"
+        case .running: "Running"
+        case .waiting: "Waiting"
+        case .thinking: "Thinking"
+        case .output: "Output"
+        case .needsAttention: "Needs Attention"
+        case .done: "Done"
+        case .error: "Error"
+        }
+    }
+
+    private func paneStateGlyph(_ state: AgentState) -> String {
+        switch state {
+        case .needsAttention: "!"
+        case .error: "×"
+        case .thinking, .waiting: "…"
+        case .running: "▶"
+        case .output: "↗"
+        case .done: "✓"
+        case .idle: "○"
+        }
+    }
+
+    private func panePeekRollupState(_ workspace: WorkspaceSnapshot) -> AgentState {
+        let priority: [AgentState] = [
+            .needsAttention, .error, .output, .thinking, .waiting, .running, .done, .idle,
+        ]
+        return priority.first { state in workspace.layout.panes.contains { $0.agentState == state } } ?? .idle
+    }
+
+    private func configureWorkspacePanePeek(_ workspaceID: UUID) {
+        guard let workspace = snapshot.workspace(id: workspaceID),
+              let popover = workspacePanePeekPopovers[workspaceID]
+        else { return }
+        if let hosts = workspacePanePeekCardMotionHosts[workspaceID],
+           let controllers = workspacePanePeekCardMotionControllers[workspaceID] {
+            for (host, controller) in zip(hosts, controllers) {
+                gtk_widget_remove_controller(host.widget_ptr, controller.event_controller_ptr)
+            }
+        }
+        let box = BoxRef(orientation: .vertical, spacing: 3); box.add(cssClass: "aw-pane-peek")
+        var cardMotionHosts: [WidgetRef] = []
+        var cardMotionControllers: [EventControllerMotion] = []
+        func retainCardPointer(on host: WidgetRef) {
+            let motion = EventControllerMotion(); motion.propagationPhase = .capture
+            motion.onEnter { [weak self] _, _, _ in
+                self?.setPanePeekPresence(.cardPointer, present: true, workspaceID: workspaceID)
+            }
+            motion.onLeave { [weak self] _ in
+                self?.setPanePeekPresence(.cardPointer, present: false, workspaceID: workspaceID)
+            }
+            _ = motion.ref(); gtk_widget_add_controller(host.widget_ptr, motion.event_controller_ptr)
+            cardMotionHosts.append(host); cardMotionControllers.append(motion)
+        }
+        retainCardPointer(on: WidgetRef(box))
+        box.setSizeRequest(width: 204, height: -1)
+        let header = BoxRef(orientation: .horizontal, spacing: 8)
+        let rollup = panePeekRollupState(workspace)
+        let glyph = LabelRef(str: paneStateGlyph(rollup)); glyph.add(cssClass: "aw-pane-peek-header-glyph")
+        glyph.setSizeRequest(width: 28, height: 28)
+        let headerText = BoxRef(orientation: .vertical, spacing: 1); headerText.setHexpand(expand: true)
+        let heading = LabelRef(str: SidebarWorkspaceTitle.resolve(workspace: workspace))
+        heading.add(cssClass: "aw-pane-peek-heading"); heading.xalign = 0
+        heading.setEllipsize(mode: PangoEllipsizeMode(rawValue: 3)); heading.setMaxWidthChars(nChars: 18)
+        let summary = LabelRef(str: paneStateLabel(rollup)); summary.add(cssClass: "aw-pane-peek-summary")
+        summary.xalign = 0
+        headerText.append(child: heading); headerText.append(child: summary)
+        header.append(child: glyph); header.append(child: headerText); box.append(child: header)
+        if let focused = workspace.layout.pane(id: workspace.focusedPaneID) {
+            let prefix = focused.ownership == .remoteZmx ? "⌁  " : ""
+            let location = LabelRef(str: prefix + FocusedPaneContext.displayPath(
+                focused.workingDirectory, homeDirectory: NSHomeDirectory()
+            ))
+            location.add(cssClass: "aw-pane-peek-location"); location.xalign = 0
+            location.setEllipsize(mode: PangoEllipsizeMode(rawValue: 2)); location.setMaxWidthChars(nChars: 28)
+            box.append(child: location)
+        }
+        let divider = SeparatorRef(orientation: .horizontal); divider.add(cssClass: "aw-pane-peek-divider")
+        box.append(child: divider)
+        for item in SidebarPanePeekItem.project(workspace: workspace) {
+            let row = ButtonRef(); row.add(cssClass: "aw-pane-peek-row"); row.setHalign(align: .fill)
+            let content = BoxRef(orientation: .horizontal, spacing: 8)
+            let number = LabelRef(str: "\(item.paneNumber)"); number.add(cssClass: "aw-pane-peek-number")
+            let state = LabelRef(str: paneStateGlyph(item.state)); state.add(cssClass: "aw-pane-peek-active")
+            if item.isActive { state.add(cssClass: "aw-pane-peek-is-active") }
+            let title = LabelRef(str: item.title); title.add(cssClass: "aw-pane-peek-title"); title.xalign = 0
+            title.setHexpand(expand: true); title.setEllipsize(mode: PangoEllipsizeMode(rawValue: 3))
+            title.setMaxWidthChars(nChars: item.isRemote ? 12 : 18)
+            content.append(child: number); content.append(child: state); content.append(child: title)
+            if item.isRemote {
+                let remote = LabelRef(str: "⌁ Remote"); remote.add(cssClass: "aw-pane-peek-meta")
+                content.append(child: remote)
+            }
+            row.set(child: content); row.setTooltip(text: item.location)
+            setAccessibleLabel(row, item.accessibilityLabel)
+            row.onClicked { [weak self, popover] _ in
+                self?.select(workspaceID); self?.focus(item.id); popover.popdown()
+            }
+            retainCardPointer(on: WidgetRef(row))
+            box.append(child: row)
+        }
+        workspacePanePeekCards[workspaceID] = box
+        workspacePanePeekCardMotionHosts[workspaceID] = cardMotionHosts
+        workspacePanePeekCardMotionControllers[workspaceID] = cardMotionControllers
+        popover.set(child: box)
+    }
+
+    private func setPanePeekPresence(
+        _ source: PanePeekPresence, present: Bool, workspaceID: UUID
+    ) {
+        if present { workspacePanePeekPresence[workspaceID, default: []].insert(source) }
+        else { workspacePanePeekPresence[workspaceID, default: []].remove(source) }
+        let generation = (workspacePanePeekGeneration[workspaceID] ?? 0) + 1
+        workspacePanePeekGeneration[workspaceID] = generation
+        let delay = workspacePanePeekPresence[workspaceID]?.isEmpty == false ? 180 : 220
+        timeout(add: delay) { [weak self] in
+            self?.settlePanePeekPresence(workspaceID: workspaceID, generation: generation) ?? false
+        }
+    }
+
+    private func settlePanePeekPresence(workspaceID: UUID, generation: Int) -> Bool {
+        guard workspacePanePeekGeneration[workspaceID] == generation,
+              let popover = workspacePanePeekPopovers[workspaceID]
+        else { return false }
+        let hasPublishedPresence = workspacePanePeekPresence[workspaceID]?.isEmpty == false
+        let pointerIsInsideCard = workspacePanePeekCardMotionControllers[workspaceID]?
+            .contains(where: { $0.containsPointer() }) == true
+        if hasPublishedPresence || pointerIsInsideCard {
+            popover.popup()
+            if !hasPublishedPresence && pointerIsInsideCard {
+                timeout(add: 80) { [weak self] in
+                    self?.settlePanePeekPresence(workspaceID: workspaceID, generation: generation) ?? false
+                }
+            }
+        } else {
+            popover.popdown()
+        }
+        return false
+    }
+
+    private func dismissWorkspacePanePeek(_ workspaceID: UUID) {
+        workspacePanePeekPresence[workspaceID] = []
+        workspacePanePeekGeneration[workspaceID] = (workspacePanePeekGeneration[workspaceID] ?? 0) + 1
+        workspacePanePeekPopovers[workspaceID]?.popdown()
+    }
+
+    private func removeWorkspacePanePeek(_ workspaceID: UUID) {
+        dismissWorkspacePanePeek(workspaceID)
+        if let host = workspacePanePeekHosts[workspaceID],
+           let controllers = workspacePanePeekMotionControllers[workspaceID], !controllers.isEmpty {
+            gtk_widget_remove_controller(host.widget_ptr, controllers[0].event_controller_ptr)
+        }
+        if let host = workspacePanePeekHosts[workspaceID],
+           let controllers = workspacePanePeekFocusControllers[workspaceID], !controllers.isEmpty {
+            gtk_widget_remove_controller(host.widget_ptr, controllers[0].event_controller_ptr)
+        }
+        if let hosts = workspacePanePeekCardMotionHosts[workspaceID],
+           let controllers = workspacePanePeekCardMotionControllers[workspaceID] {
+            for (host, controller) in zip(hosts, controllers) {
+                gtk_widget_remove_controller(host.widget_ptr, controller.event_controller_ptr)
+            }
+        }
+        if let popover = workspacePanePeekPopovers[workspaceID] {
+            if let controllers = workspacePanePeekFocusControllers[workspaceID], controllers.count > 1 {
+                gtk_widget_remove_controller(popover.widget_ptr, controllers[1].event_controller_ptr)
+            }
+            popover.unparent()
+        }
+        workspacePanePeekPopovers.removeValue(forKey: workspaceID)
+        workspacePanePeekPresence.removeValue(forKey: workspaceID)
+        workspacePanePeekGeneration.removeValue(forKey: workspaceID)
+        workspacePanePeekMotionControllers.removeValue(forKey: workspaceID)
+        workspacePanePeekFocusControllers.removeValue(forKey: workspaceID)
+        workspacePanePeekHosts.removeValue(forKey: workspaceID)
+        workspacePanePeekCards.removeValue(forKey: workspaceID)
+        workspacePanePeekCardMotionControllers.removeValue(forKey: workspaceID)
+        workspacePanePeekCardMotionHosts.removeValue(forKey: workspaceID)
+    }
+
+    private func installWorkspacePanePeek(on row: ToggleButtonRef, workspace: WorkspaceSnapshot) {
+        guard workspace.layout.paneCount > 1 else { return }
+        if workspacePanePeekHosts[workspace.id]?.widget_ptr == row.widget_ptr {
+            configureWorkspacePanePeek(workspace.id)
+            return
+        }
+        removeWorkspacePanePeek(workspace.id)
+        let popover = PopoverRef(); popover.add(cssClass: "aw-pane-peek-popover")
+        popover.set(position: configuredSidebarPosition == .left ? .right : .left)
+        popover.set(autohide: false); popover.set(hasArrow: true); popover.set(canFocus: false)
+        workspacePanePeekPopovers[workspace.id] = popover
+        workspacePanePeekHosts[workspace.id] = row
+        configureWorkspacePanePeek(workspace.id)
+        gtk_widget_set_parent(popover.widget_ptr, row.widget_ptr)
+
+        let rowMotion = EventControllerMotion()
+        rowMotion.onEnter { [weak self] _, _, _ in
+            self?.setPanePeekPresence(.rowPointer, present: true, workspaceID: workspace.id)
+        }
+        rowMotion.onLeave { [weak self] _ in
+            self?.setPanePeekPresence(.rowPointer, present: false, workspaceID: workspace.id)
+        }
+        _ = rowMotion.ref(); gtk_widget_add_controller(row.widget_ptr, rowMotion.event_controller_ptr)
+
+        let rowFocus = EventControllerFocus()
+        rowFocus.onEnter { [weak self] _ in
+            self?.setPanePeekPresence(.rowFocus, present: true, workspaceID: workspace.id)
+        }
+        rowFocus.onLeave { [weak self] _ in
+            self?.setPanePeekPresence(.rowFocus, present: false, workspaceID: workspace.id)
+        }
+        _ = rowFocus.ref(); gtk_widget_add_controller(row.widget_ptr, rowFocus.event_controller_ptr)
+
+        workspacePanePeekMotionControllers[workspace.id] = [rowMotion]
+        workspacePanePeekFocusControllers[workspace.id] = [rowFocus]
     }
 
     private func refreshRailGroupRoster(_ groupID: UUID) {
@@ -886,6 +1120,15 @@ private final class ApplicationState: @unchecked Sendable {
         let muteTitle = snapshot.workspace(id: workspaceID)?.notificationsMuted == true
             ? "Unmute Notifications" : "Mute Notifications"
         _ = action(muteTitle) { [weak self] in self?.toggleWorkspaceNotifications(workspaceID) }
+        if let workspace = snapshot.workspace(id: workspaceID), workspace.layout.paneCount > 1 {
+            let heading = LabelRef(str: "Panes"); heading.add(cssClass: "aw-menu-heading"); heading.xalign = 0
+            box.append(child: heading)
+            for item in SidebarPanePeekItem.project(workspace: workspace) {
+                _ = action(item.accessibilityLabel) { [weak self] in
+                    self?.select(workspaceID); self?.focus(item.id)
+                }
+            }
+        }
         let pin = action(snapshot.pinnedWorkspaceIDs.contains(workspaceID) ? "Unpin" : "Pin") { [weak self] in
             self?.togglePinned(workspaceID)
         }
@@ -929,7 +1172,9 @@ private final class ApplicationState: @unchecked Sendable {
         if isLifted { liftedPinActions[workspaceID] = pin } else { regularPinActions[workspaceID] = pin }
         popover.set(child: box); gtk_widget_set_parent(popover.widget_ptr, row.widget_ptr)
         let click = GestureClick(); click.set(button: 3)
-        click.onPressed { [popover] _, _, _, _ in popover.popup() }
+        click.onPressed { [weak self, popover] _, _, _, _ in
+            self?.dismissWorkspacePanePeek(workspaceID); popover.popup()
+        }
         _ = click.ref()
         if isLifted { liftedContextControllers[workspaceID] = click } else { workspaceContextControllers[workspaceID] = click }
         gtk_widget_add_controller(row.widget_ptr, click.event_controller_ptr)
@@ -1088,6 +1333,7 @@ private final class ApplicationState: @unchecked Sendable {
         guard let groupID = snapshot.groups.first(where: { $0.workspaces.contains { $0.id == workspaceID } })?.id,
               (try? snapshot.softCloseWorkspace(workspaceID)) != nil else { return }
         rows[workspaceID]?.set(visible: false); railRows[workspaceID]?.set(visible: false)
+        dismissWorkspacePanePeek(workspaceID)
         groupCounts[groupID]?.label = "\(snapshot.groups.first(where: { $0.id == groupID })?.workspaces.filter { !$0.isSoftClosed }.count ?? 0)"
         refreshLiftedRows(); refreshCommandEnablement()
         if closesLastWorkspace { persist(); window?.close(); return }
@@ -1175,6 +1421,7 @@ private final class ApplicationState: @unchecked Sendable {
             gtk_widget_remove_controller(row.widget_ptr, controller.event_controller_ptr)
         }
         workspaceContextPopovers.removeValue(forKey: workspace.id)?.unparent()
+        removeWorkspacePanePeek(workspace.id)
         if let child = workspace.id.uuidString.withCString({ stack?.getChildBy(name: $0) }) { stack?.remove(child: child) }
         let paneSurfaces = workspace.layout.paneIDs.compactMap { surfacesByPane[$0] }
         for paneID in workspace.layout.paneIDs {
@@ -1196,10 +1443,12 @@ private final class ApplicationState: @unchecked Sendable {
             refreshGroupAttention(group.id)
         }
         for (id, row) in attentionRows {
+            if workspacePanePeekHosts[id]?.widget_ptr == row.widget_ptr { removeWorkspacePanePeek(id) }
             if let controller = liftedContextControllers[id] { gtk_widget_remove_controller(row.widget_ptr, controller.event_controller_ptr) }
             liftedContextPopovers[id]?.unparent(); row.unparent()
         }
         for (id, row) in pinnedRows {
+            if workspacePanePeekHosts[id]?.widget_ptr == row.widget_ptr { removeWorkspacePanePeek(id) }
             if let controller = liftedContextControllers[id] { gtk_widget_remove_controller(row.widget_ptr, controller.event_controller_ptr) }
             liftedContextPopovers[id]?.unparent(); row.unparent()
         }
@@ -1212,6 +1461,12 @@ private final class ApplicationState: @unchecked Sendable {
         }
         for item in projection.pinned {
             if let row = makeLiftedRow(item, attention: false) { pinnedSectionBody?.append(child: row) }
+        }
+        for group in snapshot.groups {
+            for workspace in group.workspaces where !workspace.isSoftClosed && workspace.layout.paneCount > 1 {
+                guard let host = attentionRows[workspace.id] ?? pinnedRows[workspace.id] ?? rows[workspace.id] else { continue }
+                installWorkspacePanePeek(on: host, workspace: workspace)
+            }
         }
         filter(sidebarSearchEntry?.text ?? "")
     }
@@ -1735,6 +1990,7 @@ private final class ApplicationState: @unchecked Sendable {
                 gtk_widget_remove_controller(row.widget_ptr, controller.event_controller_ptr)
             }
             workspaceContextPopovers.removeValue(forKey: workspace.id)?.unparent()
+            removeWorkspacePanePeek(workspace.id)
             if let child = workspace.id.uuidString.withCString({ stack?.getChildBy(name: $0) }) { stack?.remove(child: child) }
             for paneID in workspace.layout.paneIDs {
                 surfacesByPane.removeValue(forKey: paneID)

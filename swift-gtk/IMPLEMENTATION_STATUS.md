@@ -39,6 +39,13 @@ geometry and state styling have also passed a real-window visual correction.
   the pane/workspace/generation still names the live surface. One GTK-main
   publication updates the authoritative snapshot and every title/location
   consumer; explicit workspace renames opt out of live-title replacement.
+- Multi-pane rows now own a 240-point transient pane card matching the reference
+  180 ms reveal and 220 ms row-to-card grace. A pure projection preserves pane
+  tree order, active identity, provider/state wording, remote identity, and
+  sanitized title/cwd values. The GTK host is reconciled onto regular, Needs
+  Input, or Pinned rows as projections change; pointer cards remain outside the
+  keyboard focus chain while row context actions expose every pane through the
+  same exact focus route. A real Pinned-row X11/GLX capture was inspected.
 - Thirty-three state tests cover grouped snapshots, defensive limits, selection,
   ordering, split/focus/close mutations, command chords, round trips,
   profile-scoped paths, owner-only persistence, quarantine, and recovery.
@@ -163,6 +170,9 @@ geometry and state styling have also passed a real-window visual correction.
   over Thinking; Output is intentionally excluded. Each rail group control
   opens a native, keyboard-operable roster with named `Jump to` workspace
   actions and refreshed accessible state text.
+- The full local preflight passes 59 Swift tests after the pane-peek milestone,
+  followed by the release build, real two-terminal title/cwd integration, and
+  100 two-surface lifecycle cycles.
 
 ## Remaining vertical-slice hardening
 

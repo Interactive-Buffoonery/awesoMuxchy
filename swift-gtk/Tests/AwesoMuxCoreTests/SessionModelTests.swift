@@ -812,3 +812,36 @@ private func snapshot(_ workspaces: [WorkspaceSnapshot]) -> SessionSnapshot {
         )
     }
 }
+
+@Test func panePeekProjectionPreservesLayoutOrderActiveIdentityAndAccessibleState() {
+    let first = PaneSnapshot(
+        title: "Build\nPane", workingDirectory: "/home/test/project",
+        agent: "Codex", agentState: .thinking
+    )
+    let second = PaneSnapshot(
+        title: "Review", workingDirectory: "/home/test/project/review",
+        agentState: .needsAttention
+    )
+    let workspace = WorkspaceSnapshot(
+        name: "Work", focusedPaneID: second.id,
+        layout: .split(axis: .horizontal, fraction: 0.5, first: .pane(first), second: .pane(second))
+    )
+    let items = SidebarPanePeekItem.project(workspace: workspace, homeDirectory: "/home/test")
+    #expect(items.map(\.id) == [first.id, second.id])
+    #expect(items.map(\.paneNumber) == [1, 2])
+    #expect(items[0].title == "BuildPane")
+    #expect(items[0].location == "~/project")
+    #expect(items[0].accessibilityLabel == "Jump to pane 1, BuildPane, Codex, Thinking")
+    #expect(items[1].isActive)
+    #expect(items[1].accessibilityLabel == "Jump to pane 2, Review, Shell, Needs Attention, active pane")
+
+    let remote = PaneSnapshot(
+        title: "Deploy", workingDirectory: "/srv/app", agent: "Claude",
+        agentState: .running, ownership: .remoteZmx
+    )
+    let remoteWorkspace = WorkspaceSnapshot(
+        name: "Remote", focusedPaneID: remote.id, layout: .pane(remote)
+    )
+    let remoteItem = SidebarPanePeekItem.project(workspace: remoteWorkspace)[0]
+    #expect(remoteItem.accessibilityLabel == "Jump to pane 1, Deploy, Claude, Running, remote, active pane")
+}

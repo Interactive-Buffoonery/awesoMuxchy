@@ -150,6 +150,16 @@ help, and agent context while preserving the compact reference geometry.
   focused-pane footer refresh. User-renamed workspace titles remain fixed.
   The real terminal integration emits OSC 2 and OSC 7 and requires both
   callbacks to arrive.
+- Expanded multi-pane workspace rows now publish a tested pane-tree-order peek
+  projection and reveal the reference-width card after 180 ms. The card shows
+  workspace rollup state, authoritative focused cwd, pane numbers, pane-local
+  state, and active identity, then routes a pane click through the existing
+  workspace-select/exact-pane-focus path. Its host follows a workspace into
+  Needs Input or Pinned, card handoff receives the reference 220 ms grace, and
+  transient popup content does not steal keyboard focus. The row context
+  surface exposes the same panes as explicit `Jump to pane N` actions for the
+  keyboard/screen-reader path. A real Pinned-row capture was inspected; full
+  physical-pointer and Orca action invocation remain pending.
 - Needs Input acknowledgement is pane-scoped and persistent: a focused waiting
   pane acknowledges only after a guarded 500 ms dwell, while Ctrl-Shift-K and
   the row action acknowledge every waiting pane in that workspace immediately.
@@ -176,7 +186,9 @@ help, and agent context while preserving the compact reference geometry.
   Clear always confirms with baseline permanent-close copy, creates no reopen
   entry, and tears down the workspace's terminal surfaces and UI ownership.
 - A real inspected screenshot and comparison index were pushed in focused
-  visual-QA commits `4149963` and `01cc8d7`.
+  visual-QA commits `4149963` and `01cc8d7`. The newer multi-pane peek capture
+  is retained locally and intentionally remains unpushed pending resolution of
+  the earlier implementation-history push boundary mistake.
 
 ## Active constraints
 

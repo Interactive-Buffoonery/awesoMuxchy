@@ -58,6 +58,65 @@ public enum SidebarWorkspaceTitle {
     }
 }
 
+public struct SidebarPanePeekItem: Equatable, Sendable, Identifiable {
+    public let id: UUID
+    public let paneNumber: Int
+    public let title: String
+    public let location: String
+    public let isActive: Bool
+    public let agent: String?
+    public let state: AgentState
+    public let isRemote: Bool
+
+    public static func project(
+        workspace: WorkspaceSnapshot,
+        homeDirectory: String = NSHomeDirectory()
+    ) -> [SidebarPanePeekItem] {
+        workspace.layout.panes.enumerated().map { index, pane in
+            SidebarPanePeekItem(
+                id: pane.id,
+                paneNumber: index + 1,
+                title: ChromeText.sanitized(pane.title, limit: 120).nonEmpty ?? "Terminal",
+                location: FocusedPaneContext.displayPath(
+                    pane.workingDirectory, homeDirectory: homeDirectory
+                ),
+                isActive: pane.id == workspace.focusedPaneID,
+                agent: pane.agent.map { ChromeText.sanitized($0, limit: 80) },
+                state: pane.agentState,
+                isRemote: pane.ownership == .remoteZmx
+            )
+        }
+    }
+
+    public var accessibilityLabel: String {
+        var parts = ["Jump to pane \(paneNumber)", title]
+        if let agent, !agent.isEmpty { parts.append(agent) } else { parts.append("Shell") }
+        parts.append(state.accessibilityLabel)
+        if isRemote { parts.append("remote") }
+        if isActive { parts.append("active pane") }
+        return parts.joined(separator: ", ")
+    }
+}
+
+private extension String {
+    var nonEmpty: String? { isEmpty ? nil : self }
+}
+
+private extension AgentState {
+    var accessibilityLabel: String {
+        switch self {
+        case .idle: "Idle"
+        case .running: "Running"
+        case .waiting: "Waiting"
+        case .thinking: "Thinking"
+        case .output: "Output"
+        case .needsAttention: "Needs Attention"
+        case .done: "Done"
+        case .error: "Error"
+        }
+    }
+}
+
 public struct SidebarGroupSection: Equatable, Sendable {
     public let id: UUID
     public let name: String
