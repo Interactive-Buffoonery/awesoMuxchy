@@ -69,6 +69,8 @@ public enum ChromeContrastAudit {
         .init("Latte control boundary", foreground: "6c6f85", background: "e6e9ef", minimumRatio: 3),
         .init("Latte focus on sidebar", foreground: "1e66f5", background: "e6e9ef", minimumRatio: 3),
         .init("Latte focus on selected row", foreground: "1e66f5", background: "ccd0da", minimumRatio: 3),
+        .init("Latte selected activity title", foreground: "4c4f69", background: "ccd0da", minimumRatio: 4.5),
+        .init("Latte selected activity location", foreground: "4c4f69", background: "ccd0da", minimumRatio: 4.5),
         .init("Latte selected action text", foreground: "eff1f5", background: "1859d1", minimumRatio: 4.5),
         .init("Latte thinking status", foreground: "6f20d1", background: "e6e9ef", minimumRatio: 4.5),
         .init("Latte output status", foreground: "00627d", background: "e6e9ef", minimumRatio: 4.5),

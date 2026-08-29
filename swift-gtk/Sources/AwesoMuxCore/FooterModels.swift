@@ -23,6 +23,35 @@ public struct AgentActivityGroup: Equatable, Sendable {
     public let rows: [AgentActivityRow]
 }
 
+public struct AgentActivityPanelState: Equatable, Sendable {
+    public private(set) var isExpanded = false
+    public private(set) var filter: AgentState?
+
+    public init() {}
+
+    @discardableResult
+    public mutating func open(filter: AgentState? = nil) -> Bool {
+        let changed = !isExpanded
+        isExpanded = true
+        self.filter = filter
+        return changed
+    }
+
+    @discardableResult
+    public mutating func close() -> Bool {
+        let changed = isExpanded
+        isExpanded = false
+        filter = nil
+        return changed
+    }
+
+    @discardableResult
+    public mutating func sidebarModeChanged(to mode: SidebarWidthMode) -> Bool {
+        guard mode == .collapsed else { return false }
+        return close()
+    }
+}
+
 public struct AgentFooterSummary: Equatable, Sendable {
     public let groups: [AgentActivityGroup]
     public let rows: [AgentActivityRow]
@@ -63,9 +92,9 @@ public struct AgentFooterSummary: Equatable, Sendable {
                         pane: ChromeText.sanitized(pane.title, limit: 80),
                         agent: ChromeText.sanitized(rawAgent, limit: 80),
                         state: pane.agentState,
-                        displayTitle: ChromeText.sanitized(
-                            panes.count > 1 ? pane.title : workspace.name, limit: 80
-                        ),
+                        displayTitle: panes.count > 1
+                            ? ChromeText.sanitized(pane.title, limit: 80)
+                            : SidebarWorkspaceTitle.resolve(workspace: workspace),
                         location: pane.ownership == .remoteZmx ? "Remote · \(path)" : path,
                         isSelected: snapshot.selectedWorkspaceID == workspace.id
                             && workspace.focusedPaneID == pane.id

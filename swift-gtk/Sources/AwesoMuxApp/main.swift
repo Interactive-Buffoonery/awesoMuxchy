@@ -298,6 +298,7 @@ private final class ApplicationState: @unchecked Sendable {
     private var sidebarWidget: BoxRef?
     private var expandedSidebarWidget: BoxRef?
     private var collapsedSidebarWidget: BoxRef?
+    private var renderedSidebarMode: SidebarWidthMode?
     private var sidebarRailRows: BoxRef?
     private var collapsedEmptyAction: ButtonRef?
     private var emptyWorkspacePage: BoxRef?
@@ -594,17 +595,42 @@ private final class ApplicationState: @unchecked Sendable {
     }
 
     private func updateSidebarGeometry(_ width: Int) {
+        let mode = SidebarWidthPolicy.mode(for: Double(width))
+        let previousMode = renderedSidebarMode
+        let sidebarOwnedFocus = previousMode != nil && sidebarWidget?.getFocusChild() != nil
+        if previousMode != mode, mode == .collapsed {
+            sidebarSearchEntry?.text = ""
+            filter("")
+        }
+        sidebarFooter?.sidebarModeChanged(to: mode)
         sidebarBrand?.setSizeRequest(width: width, height: 38)
-        sidebarBrand?.label = width < SidebarWidthPolicy.railThreshold ? ">_" : ">_  awesoMux"
+        sidebarBrand?.label = mode == .collapsed ? ">_" : ">_  awesoMux"
         sidebarWidget?.setSizeRequest(width: SidebarWidthPolicy.collapsedWidth, height: -1)
-        if width < SidebarWidthPolicy.railThreshold {
+        if mode == .collapsed {
             expandedSidebarWidget?.set(visible: false)
             collapsedSidebarWidget?.set(visible: true)
         } else {
             collapsedSidebarWidget?.set(visible: false)
             expandedSidebarWidget?.set(visible: true)
         }
+        renderedSidebarMode = mode
         refreshRailJumpNumbers()
+        if previousMode != nil, previousMode != mode, sidebarOwnedFocus {
+            restoreSidebarFocusAfterModeChange(mode)
+        }
+    }
+
+    private func restoreSidebarFocusAfterModeChange(_ mode: SidebarWidthMode) {
+        if let selected = snapshot.selectedWorkspaceID {
+            restoreSidebarFocus(to: selected)
+            return
+        }
+        timeout(add: 10) { [weak self] in
+            guard let self, !self.preferences.isSidebarHidden else { return false }
+            if mode == .collapsed { _ = self.collapsedEmptyAction?.grabFocus() }
+            else { _ = self.sidebarSearchEntry?.grabFocus() }
+            return false
+        }
     }
 
     func makePathBar() -> FocusedPanePathBar {
@@ -630,11 +656,20 @@ private final class ApplicationState: @unchecked Sendable {
 
     func makeSidebarFooter() -> SidebarStatusFooter {
         SidebarStatusFooter(preferences: preferences, actions: .init(
-            selectPane: { [weak self] workspace, pane in self?.select(workspace); self?.focus(pane) },
+            selectPane: { [weak self] workspace, pane in self?.selectAgentActivityPane(workspace, pane) },
             updatePreferences: { [weak self] in self?.updatePreferences($0) },
             reportBug: { [weak self] in self?.openFeedback() },
             suggestFeature: { [weak self] in self?.openFeedback() }
         ))
+    }
+
+    private func selectAgentActivityPane(_ workspaceID: UUID, _ paneID: UUID) {
+        if isSidebarFiltering, !searchResultIDs.contains(workspaceID) {
+            sidebarSearchEntry?.text = ""
+            filter("")
+        }
+        select(workspaceID)
+        focus(paneID)
     }
 
     func makeSurface(pane: PaneSnapshot, workspaceID: UUID, label: String, description: String) -> TerminalSurface? {
@@ -692,6 +727,7 @@ private final class ApplicationState: @unchecked Sendable {
               )) != nil
         else { return }
         refreshWorkspaceRowPresentation(workspaceID)
+        sidebarFooter?.update(AgentFooterSummary(snapshot: snapshot))
         persist()
     }
 
@@ -702,10 +738,15 @@ private final class ApplicationState: @unchecked Sendable {
               (try? snapshot.updatePanePresentation(
                   paneID: paneID, workspaceID: workspaceID, workingDirectory: rawDirectory
               )) != nil,
-              let workspace = snapshot.workspace(id: workspaceID), workspace.focusedPaneID == paneID
+              let workspace = snapshot.workspace(id: workspaceID)
         else { return }
-        refreshWorkspaceRowPresentation(workspaceID)
-        if snapshot.selectedWorkspaceID == workspaceID { updateChrome(workspaceID) }
+        if workspace.focusedPaneID == paneID {
+            refreshWorkspaceRowPresentation(workspaceID)
+            if snapshot.selectedWorkspaceID == workspaceID { updateChrome(workspaceID) }
+            else { sidebarFooter?.update(AgentFooterSummary(snapshot: snapshot)) }
+        } else {
+            sidebarFooter?.update(AgentFooterSummary(snapshot: snapshot))
+        }
         persist()
     }
 
@@ -2485,7 +2526,9 @@ private final class ApplicationState: @unchecked Sendable {
         railRows[workspaceID]?.setTooltip(text: safeName)
         if let row = rows[workspaceID] { setAccessibleLabel(row, safeName) }
         if let row = railRows[workspaceID] { setAccessibleLabel(row, safeName) }
-        refreshLiftedRows(); persist()
+        refreshLiftedRows()
+        sidebarFooter?.update(AgentFooterSummary(snapshot: snapshot))
+        persist()
         return true
     }
 

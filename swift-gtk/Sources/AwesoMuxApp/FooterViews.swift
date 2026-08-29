@@ -377,10 +377,9 @@ final class SidebarStatusFooter {
     private let collapsedAttentionLabel = LabelRef(str: "")
     private let actions: Actions
     private var preferences: AppPreferences
-    private var isExpanded = false
+    private var panelState = AgentActivityPanelState()
     private var latestSummary = AgentFooterSummary(snapshot: SessionSnapshot())
     private var collapsedSelectionPaneIDs: [AgentState: UUID] = [:]
-    private var activityFilter: AgentState?
 
     init(preferences: AppPreferences, actions: Actions) {
         self.preferences = preferences
@@ -459,7 +458,10 @@ final class SidebarStatusFooter {
         total.set(child: totalLabel)
         total.setTooltip(text: "Show agent activity")
         setAccessibleLabel(total, "Show agent activity")
-        total.onClicked { [weak self] _ in self?.setExpanded(!(self?.isExpanded ?? false)) }
+        total.onClicked { [weak self] _ in
+            guard let self else { return }
+            setExpanded(!panelState.isExpanded)
+        }
         bar.append(child: total)
         root.append(child: bar)
 
@@ -517,7 +519,7 @@ final class SidebarStatusFooter {
         stateButton(thinking, label: thinkingLabel, count: summary.thinkingCount, symbol: "●", state: .thinking)
         stateButton(output, label: outputLabel, count: summary.outputCount, symbol: "●", state: .output)
         stateButton(attention, label: attentionLabel, count: summary.needsAttentionCount, symbol: "●", state: .needsAttention)
-        totalLabel.label = "\(summary.totalCount) \(summary.totalCount == 1 ? "agent" : "agents")  \(isExpanded ? "⌄" : "⌃")"
+        totalLabel.label = "\(summary.totalCount) \(summary.totalCount == 1 ? "agent" : "agents")  \(panelState.isExpanded ? "⌄" : "⌃")"
         collapsedStateButton(collapsedThinking, label: collapsedThinkingLabel,
             count: summary.thinkingCount, symbol: "●", state: .thinking)
         collapsedStateButton(collapsedOutput, label: collapsedOutputLabel,
@@ -531,7 +533,7 @@ final class SidebarStatusFooter {
     }
 
     private func rebuildActivityRows() {
-        let groups = activityFilter.map { state in latestSummary.groups.filter { $0.state == state } }
+        let groups = panelState.filter.map { state in latestSummary.groups.filter { $0.state == state } }
             ?? latestSummary.groups
 
         var child = activityRows.getFirstChild()
@@ -540,7 +542,7 @@ final class SidebarStatusFooter {
             activityRows.remove(child: current)
         }
         if groups.isEmpty {
-            let empty = LabelRef(str: activityFilter == nil ? "No agents running" : "No agents in this state")
+            let empty = LabelRef(str: panelState.filter == nil ? "No agents running" : "No agents in this state")
             empty.add(cssClass: "aw-menu-disabled")
             empty.setMarginTop(margin: 8)
             empty.setMarginBottom(margin: 8)
@@ -623,15 +625,28 @@ final class SidebarStatusFooter {
     }
 
     private func showActivity(state: AgentState) {
-        activityFilter = state
-        rebuildActivityRows()
-        setExpanded(true)
+        setExpanded(true, filter: state)
     }
 
-    private func setExpanded(_ expanded: Bool) {
-        guard expanded != isExpanded else { return }
-        isExpanded = expanded
-        if !expanded { activityFilter = nil; rebuildActivityRows() }
+    private func setExpanded(
+        _ expanded: Bool,
+        filter: AgentState? = nil,
+        restoreDisclosureFocus: Bool = true
+    ) {
+        let changed = expanded ? panelState.open(filter: filter) : panelState.close()
+        rebuildActivityRows()
+        guard changed else { return }
+        applyPanelVisibility(restoreDisclosureFocus: restoreDisclosureFocus)
+    }
+
+    func sidebarModeChanged(to mode: SidebarWidthMode) {
+        guard panelState.sidebarModeChanged(to: mode) else { return }
+        rebuildActivityRows()
+        applyPanelVisibility(restoreDisclosureFocus: false)
+    }
+
+    private func applyPanelVisibility(restoreDisclosureFocus: Bool) {
+        let expanded = panelState.isExpanded
         activityPanel.set(visible: expanded)
         totalLabel.label = totalLabel.label.replacingOccurrences(of: expanded ? "⌃" : "⌄", with: expanded ? "⌄" : "⌃")
         total.setTooltip(text: expanded ? "Hide agent activity" : "Show agent activity")
@@ -639,11 +654,11 @@ final class SidebarStatusFooter {
         setAccessibleExpanded(total, expanded)
         announceAccessibilityStatus(from: total,
             expanded ? "Agent activity panel opened" : "Agent activity panel closed")
-        if !expanded { _ = total.grabFocus() }
+        if !expanded && restoreDisclosureFocus { _ = total.grabFocus() }
     }
 
     private func updateTotalAccessibilityDescription() {
-        setAccessibleDescription(total, isExpanded
+        setAccessibleDescription(total, panelState.isExpanded
             ? "Expanded. Hides the agent activity panel"
             : "Collapsed. Shows the agent activity panel")
     }

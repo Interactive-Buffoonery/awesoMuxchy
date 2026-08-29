@@ -1,5 +1,40 @@
 # Visual QA
 
+## 2026-08-29 — SwiftGtk4 activity-panel consistency
+
+- Linux images: [expanded activity panel with live title](swift-gtk/progress/41-activity-panel-consistency/activity-panel-live-title-x11.png)
+  and [collapsed panel dismissal with row focus](swift-gtk/progress/41-activity-panel-consistency/collapsed-panel-dismissal-focus-x11.png).
+- Reference: `SidebarStatusFooter.swift`, `AgentActivityPanel.swift`,
+  `AgentActivityRoster.swift`, and sidebar display-mode handling at macOS
+  baseline `fed33ff47c559344fc6db6fa53f16e75fcc4a116`.
+- Behavior: the panel now derives a single-pane row title from the same coarse
+  live-title projection as the sidebar, refreshes after workspace rename and
+  every pane title/cwd callback, and persists nonfocused-pane cwd updates
+  before reprojecting the roster. Collapsing the sidebar closes the panel,
+  clears its state filter and sidebar search, and restores sidebar-owned focus
+  to the selected rail row; expanding restores it to the selected expanded row.
+  A terminal-focused mode change still leaves focus in the terminal.
+- Real-app QA: AT-SPI edited `Search sessions` to a no-match query, opened the
+  total-agent disclosure, and invoked the real GTK collapse/expand action.
+  Direct inspection verified that the panel disappeared, did not resurrect,
+  the search value became empty, and the selected row owned keyboard focus in
+  both modes. The expanded roster showed the synthetic live title and `/tmp`
+  location and selected the same pane identity as the sidebar.
+- Visual correction: the first Latte activity-row pass exposed insufficient
+  selected-row text contrast. The selected title and location now use the
+  audited Latte foreground, and named WCAG checks cover both combinations.
+- Inspection: the 296×852 expanded crop and 60×852 rail crop were inspected at
+  original resolution on the verified X11/GLX path. The fixed footer geometry,
+  selected state, keyboard-only focus outline, panel grouping, and readable
+  live row metadata remain distinct and unclipped.
+- Verification: full preflight passes the text baseline, all 109 Swift tests,
+  the warnings-as-errors and release builds, both forced-termination
+  persistence cases, real terminal integration, and 100 two-surface lifecycle
+  cycles.
+- Privacy: the isolated fixture uses synthetic names and `/tmp`; the crops
+  contain no terminal content, commands, credentials, clipboard data, private
+  paths, or arbitrary agent output.
+
 ## 2026-08-29 — SwiftGtk4 lifted-section structural motion
 
 - Linux images: [Pinned insertion mid-transition](swift-gtk/progress/40-structural-motion/pinned-section-transition-x11.png),

@@ -459,6 +459,17 @@ help, and agent context while preserving the compact reference geometry.
   captures inspect partial and settled insertion plus partial removal without
   shifting the fixed header or footer. Full preflight passes 107 Swift tests
   and every process-level harness.
+- Agent activity now remains coherent through live metadata and sidebar-mode
+  changes. Single-pane roster rows use the sidebar's coarse live workspace
+  title, every pane title/cwd callback refreshes the roster, and nonfocused cwd
+  updates persist instead of being dropped. Collapsing closes the panel and
+  clears its filter plus sidebar search; selected-row keyboard focus follows
+  between the expanded hierarchy and 60-point rail only when the sidebar owned
+  focus, so terminal focus is preserved. Real GTK action and AT-SPI QA verified
+  dismissal, non-resurrection, cleared search, and selected-row focus in both
+  modes. The inspected 296×852/60×852 Latte captures also drove a selected
+  activity-row contrast correction now covered by named WCAG checks. Full
+  preflight passes 109 Swift tests and every process-level harness.
 - Expanded and collapsed creation/search controls now publish the exact
   reference action hints, not label-only approximations. Live AT-SPI inspection
   verifies `New Workspace` plus its current-group hint, `New Workspace Options`

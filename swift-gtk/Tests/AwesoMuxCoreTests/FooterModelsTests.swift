@@ -54,6 +54,38 @@ import Testing
     #expect(summary.groups[0].rows.map(\.isSelected) == [true, false])
 }
 
+@Test func activityPanelClosesAndClearsItsFilterWhenSidebarCollapses() {
+    var state = AgentActivityPanelState()
+
+    let opened = state.open(filter: .needsAttention)
+    #expect(opened)
+    #expect(state.isExpanded)
+    #expect(state.filter == .needsAttention)
+    let remainedOpen = state.sidebarModeChanged(to: .expanded)
+    #expect(!remainedOpen)
+    let closed = state.sidebarModeChanged(to: .collapsed)
+    #expect(closed)
+    #expect(!state.isExpanded)
+    #expect(state.filter == nil)
+    let remainedClosed = state.sidebarModeChanged(to: .collapsed)
+    #expect(!remainedClosed)
+}
+
+@Test func activityRosterUsesTheSameCoarseLiveTitleAsTheSidebar() {
+    let pane = PaneSnapshot(title: "Live build title", workingDirectory: "/tmp", agent: "Codex")
+    let workspace = WorkspaceSnapshot(
+        name: "Original workspace", isNameUserEdited: false,
+        focusedPaneID: pane.id, layout: .pane(pane)
+    )
+    let summary = AgentFooterSummary(snapshot: SessionSnapshot(
+        selectedWorkspaceID: workspace.id,
+        groups: [WorkspaceGroupSnapshot(name: "Local", workspaces: [workspace])]
+    ))
+
+    #expect(summary.rows.first?.displayTitle == SidebarWorkspaceTitle.resolve(workspace: workspace))
+    #expect(summary.rows.first?.displayTitle == "Live build title")
+}
+
 @Test func agentFooterAccessibilityWordingUsesReferencePluralBoundaries() {
     #expect(AgentFooterWording.agentsInState(count: 0, state: .thinking) == "0 thinking agents")
     #expect(AgentFooterWording.agentsInState(count: 1, state: .needsAttention) == "1 needs attention agent")

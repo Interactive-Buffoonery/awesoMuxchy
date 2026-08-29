@@ -383,6 +383,18 @@ geometry and state styling have also passed a real-window visual correction.
   rapid reversal. Real Latte captures inspect Pinned insertion/removal during
   transition and after settling with fixed chrome unchanged; full preflight
   passes 107 tests and every process-level harness.
+- The activity panel now owns one tested open/filter state machine and closes
+  transactionally when the sidebar enters its 60-point rail, clearing both the
+  activity filter and sidebar search. Sidebar-owned keyboard focus follows the
+  selected stable workspace identity into the rail and back into the expanded
+  hierarchy, while terminal-owned focus is not stolen. Roster titles share the
+  sidebar's coarse live-title projection; workspace rename and every pane
+  title/cwd callback refresh the panel, including persisted nonfocused cwd
+  changes. Real GTK action plus AT-SPI QA verified close/non-resurrection,
+  cleared search, and selected-row focus in both modes. Inspected 296×852 and
+  60×852 Latte crops exposed and verified a selected activity-row contrast
+  correction covered by named WCAG requirements. Full preflight passes 109
+  Swift tests and every process-level harness.
 - Header icon controls now use tested reference copy for AT-SPI hints. Direct
   bus traversal verifies expanded `New Workspace` and `New Workspace Options`
   name/description pairs plus collapsed `Search` and `New Workspace menu`
