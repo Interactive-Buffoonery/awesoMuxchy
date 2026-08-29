@@ -308,8 +308,9 @@ help, and agent context while preserving the compact reference geometry.
 1. Add the foreground-shell capability signal needed to gate inserted Git/gh
    commands as precisely as macOS does.
 2. Implement product-level split/close/recreate commands and teardown-race coverage.
-3. Capture hidden/revealed/right-side sidebar presentation and physically
-   verify pointer reorder, insertion indicators, and dynamic menu enablement.
+3. Physically verify pointer reorder, insertion indicators, dynamic menu
+   enablement, and the remaining right-side hidden reveal path. Left-side
+   hidden attention reveal and timed retraction are captured and inspected.
 4. Add bounded/coalesced persistence writes, recovery UI, and forced-termination tests.
 5. Continue through the root implementation order, capturing each required
    visual milestone.

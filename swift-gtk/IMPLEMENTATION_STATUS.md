@@ -113,7 +113,9 @@ geometry and state styling have also passed a real-window visual correction.
   Attention exposes a tested, side-aware dormant edge tab. Collapse/Expand
   Sidebar and Hide/Show Sidebar are native GTK
   actions with reference Linux-mapped shortcuts; hiding restores terminal
-  focus and persists the hidden state.
+  focus and persists the hidden state. Real X11 pointer QA now covers the
+  hidden attention tab, 296-point overlay reveal, and leave-grace retraction
+  while the terminal keeps its full hidden-mode allocation.
 - Collapsed mode now renders a dedicated 60-point GTK rail instead of a clipped
   expanded hierarchy. Its 40-point search control opens a working filtered
   command palette, its create control and workspace buttons route through the

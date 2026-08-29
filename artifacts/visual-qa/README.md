@@ -1,5 +1,24 @@
 # Visual QA
 
+## 2026-08-29 — SwiftGtk4 hidden-sidebar edge reveal
+
+- Linux images: [hidden attention edge](swift-gtk/progress/19-hidden-sidebar-reveal/hidden-attention-edge-x11.png),
+  [pointer-hover reveal](swift-gtk/progress/19-hidden-sidebar-reveal/edge-hover-revealed-x11.png),
+  and [retracted after pointer leave](swift-gtk/progress/19-hidden-sidebar-reveal/retracted-after-leave-x11.png).
+- Reference: `SidebarPresentationCommand.swift`, `SidebarView.swift`, and
+  hidden-discovery behavior at macOS baseline
+  `fed33ff47c559344fc6db6fa53f16e75fcc4a116`.
+- Display and geometry: release SwiftGtk4 app on X11/GLX at 1440×852. The
+  hidden image retains the full terminal allocation and exposes the pink
+  attention edge tab. Hovering that tab reveals the 296 px sidebar as an
+  overlay; moving back into the terminal retracts it after the leave grace
+  without changing the terminal footer width.
+- Inspection: all PNGs were inspected at original resolution with real Ghostty
+  rendering. The reveal preserves selection, fixed footer alignment, and the
+  selected pane's focused-footer state.
+- Privacy: all workspace, location, and prompt content is synthetic; no command
+  history, clipboard content, credentials, or arbitrary agent output is shown.
+
 ## 2026-08-29 — SwiftGtk4 sidebar interaction states
 
 - Linux images: [alternate workspace selected](swift-gtk/progress/18-sidebar-interaction-states/alternate-workspace-selected-x11.png),
@@ -183,8 +202,8 @@
   the same synthetic session fixture.
 - Hidden discovery: the hidden-sidebar image shows the attention edge tab
   without resizing either terminal. The persistent hidden state and tab click
-  route are implemented; physical edge-hover reveal remains a QA gap because
-  synthetic X11 pointer motion does not reach this remote application.
+  route are implemented. Physical reveal and timed retraction were subsequently
+  verified in the milestone-19 X11 captures above.
 - Scale verification: the 2× capture is 1706 × 852 physical pixels; its
   296-logical-point sidebar occupies 592 physical pixels, both real Ghostty
   panes remain visible, and the restored split fraction is computed from the
