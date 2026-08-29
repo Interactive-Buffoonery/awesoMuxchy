@@ -1,5 +1,33 @@
 # Visual QA
 
+## 2026-08-29 — SwiftGtk4 session recovery
+
+- Linux image: [quarantined-session recovery sheet](swift-gtk/progress/37-session-recovery/quarantined-session-sheet-x11.png).
+- Reference: `SessionPersistence.swift`, the recovery-warning routes in
+  `AwesoMuxApp.swift`, and exact localization baseline at macOS commit
+  `fed33ff47c559344fc6db6fa53f16e75fcc4a116`.
+- Behavior: a real isolated profile started with an invalid current snapshot
+  and no previous snapshot. Launch moved the original bytes into the profile's
+  quarantine at `0600`, selected the zero-workspace recovery surface, and
+  presented one main-window-owned modal with exact reference heading/body copy.
+  AT-SPI exposed the frame, heading, full message, and named `Done` button; its
+  action dismissed the sheet. A clean window close then flushed valid empty
+  state at `0600` while preserving the quarantine archive.
+- Forced termination: the release persistence probe seeds a valid baseline,
+  stages a newer snapshot through the production 500 ms coordinator, and is
+  killed with SIGKILL on both sides of that boundary. The pre-debounce kill
+  preserves and decodes the baseline; the post-debounce kill restores the newer
+  state. This process-level check is part of local preflight.
+- Verification: full preflight passes the text baseline, all 104 Swift tests,
+  the production build, both forced-termination cases, rapid-reflow terminal
+  integration, and 100 two-surface lifecycle cycles.
+- Inspection: the 520×230 Latte X11 sheet was opened at original resolution.
+  Its heading, wrapped recovery guidance, spacing, and focused blue `Done`
+  action are complete and unclipped.
+- Privacy: the invalid fixture is empty and the screenshot contains no terminal
+  content, commands, credentials, clipboard data, private paths, or arbitrary
+  agent output.
+
 ## 2026-08-29 — SwiftGtk4 split and close-pane commands
 
 - Linux images: [Split Right pane count](swift-gtk/progress/36-pane-commands/split-right-pane-count-x11.png)

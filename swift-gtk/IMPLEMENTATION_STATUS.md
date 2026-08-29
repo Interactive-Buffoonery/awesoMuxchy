@@ -140,6 +140,14 @@ geometry and state styling have also passed a real-window visual correction.
   snapshot after invalidating delayed work, and a failed write retains that
   value for the next mutation or explicit flush. Four focused tests cover burst
   coalescing, bounded automatic durability, latest-state flush, and retry.
+- Missing/invalid saved state now opens on the real zero-workspace surface
+  rather than developer fixture workspaces. A successfully quarantined invalid
+  snapshot presents one owned 520×230 recovery sheet using exact reference
+  wording; real AT-SPI verified its frame, heading, full message, and `Done`
+  action. The archive and subsequent clean empty snapshot both retained `0600`.
+  Local preflight now runs a release process probe that SIGKILLs scheduled
+  persistence before and after the 500 ms edge, decoding the prior safe snapshot
+  in the first case and the newest snapshot in the second.
 - The fixed 188-point host has been replaced by a native GTK split using the
   reference 296-point expanded default, 60-point collapsed settlement, and
   250-point mode threshold while reserving at least 480 points for terminal

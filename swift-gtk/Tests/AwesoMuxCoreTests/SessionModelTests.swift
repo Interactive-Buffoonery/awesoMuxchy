@@ -325,6 +325,20 @@ private func snapshot(_ workspaces: [WorkspaceSnapshot]) -> SessionSnapshot {
     #expect(paths.snapshotURL.path.hasSuffix("awesomux/profiles/default/session.json"))
 }
 
+@Test func startupRecoveryPresentationIsTruthfulAndUsesReferenceCopy() {
+    let value = snapshot([workspace(panes: 1)])
+    #expect(SessionRecoveryPresentation.resolve(.missing) == nil)
+    #expect(SessionRecoveryPresentation.resolve(.restored(value)) == nil)
+    #expect(SessionRecoveryPresentation.resolve(.recoveredPrevious(value)) == .init(
+        title: "Couldn't reopen your last workspaces",
+        message: "Saved workspaces could not be decoded; the original snapshot was archived"
+    ))
+    #expect(SessionRecoveryPresentation.resolve(.resetAfterQuarantine) == .init(
+        title: "Couldn't reopen your last workspaces",
+        message: "We found a problem with your saved session and set it aside safely. Create a workspace with Control-N to start fresh."
+    ))
+}
+
 @Test func corruptCurrentSnapshotRecoversPreviousAndQuarantines() throws {
     let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
     defer { try? FileManager.default.removeItem(at: root) }

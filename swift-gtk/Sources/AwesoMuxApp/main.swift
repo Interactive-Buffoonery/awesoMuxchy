@@ -203,6 +203,7 @@ private final class ApplicationState: @unchecked Sendable {
     let terminalRuntime: TerminalRuntime
     private(set) var snapshot: SessionSnapshot
     private let store: SessionStore
+    private let startupRecoveryPresentation: SessionRecoveryPresentation?
     private let preferencesStore: AppPreferencesStore
     private var preferences: AppPreferences
     private(set) var isPersistencePaused = false
@@ -326,13 +327,19 @@ private final class ApplicationState: @unchecked Sendable {
     private var commandActions: [CommandID: GIO.SimpleAction] = [:]
     private var menu: GIO.Menu?
 
-    init?(snapshot: SessionSnapshot, store: SessionStore, preferencesStore: AppPreferencesStore) {
+    init?(
+        snapshot: SessionSnapshot,
+        store: SessionStore,
+        preferencesStore: AppPreferencesStore,
+        startupRecoveryPresentation: SessionRecoveryPresentation? = nil
+    ) {
         guard let runtime = TerminalRuntime() else { return nil }
         terminalRuntime = runtime
         self.snapshot = snapshot
         self.snapshot.reconcileAttentionWorkspaceIDs()
         self.snapshot.pruneRecentlyClosedWorkspaces()
         self.store = store
+        self.startupRecoveryPresentation = startupRecoveryPresentation
         self.preferencesStore = preferencesStore
         preferences = preferencesStore.load()
     }
@@ -2879,6 +2886,36 @@ private final class ApplicationState: @unchecked Sendable {
         window.set(child: box); window.present()
     }
 
+    func presentStartupRecoveryIfNeeded() {
+        guard let presentation = startupRecoveryPresentation,
+              activeSheetWindow == nil,
+              let parent = window
+        else { return }
+        let window = WindowRef(); activeSheetWindow = window
+        window.title = presentation.title; window.setDefaultSize(width: 520, height: 230)
+        window.setTransientFor(parent: parent); window.set(modal: true)
+        window.setDestroyWithParent(setting: true); window.set(resizable: false)
+        window.add(cssClass: "aw-sheet"); applyThemeClasses(to: window)
+        let box = BoxRef(orientation: .vertical, spacing: 14)
+        box.add(cssClass: "aw-sheet"); applyThemeClasses(to: box)
+        box.setMarginStart(margin: 20); box.setMarginEnd(margin: 20)
+        box.setMarginTop(margin: 20); box.setMarginBottom(margin: 20)
+        setAccessibleLabel(box, presentation.title)
+        let heading = makeAccessibleLabel(presentation.title, role: GTK_ACCESSIBLE_ROLE_HEADING)
+        heading.add(cssClass: "aw-menu-title"); heading.xalign = 0
+        let message = LabelRef(str: presentation.message); message.add(cssClass: "aw-sheet-body")
+        message.xalign = 0; message.set(wrap: true); message.setVexpand(expand: true)
+        setAccessibleLabel(message, presentation.message)
+        let actions = BoxRef(orientation: .horizontal, spacing: 8); actions.setHalign(align: .end)
+        let done = ButtonRef(label: "Done"); done.add(cssClass: "aw-sheet-primary")
+        done.onClicked { [weak self] _ in self?.dismissActiveSheet() }
+        window.set(defaultWidget: done)
+        installActiveSheetDismissal(on: window)
+        actions.append(child: done)
+        box.append(child: heading); box.append(child: message); box.append(child: actions)
+        window.set(child: box); refreshCommandEnablement(); window.present(); _ = done.grabFocus()
+    }
+
     func showCommandPalette() {
         let window = WindowRef()
         window.title = "Command Palette"
@@ -3630,32 +3667,31 @@ private final class ApplicationState: @unchecked Sendable {
 
 nonisolated(unsafe) private var retainedState: ApplicationState?
 
-private func initialSnapshot(_ directory: String) -> SessionSnapshot {
-    let first = PaneSnapshot(title: "Primary terminal", workingDirectory: directory)
-    let second = PaneSnapshot(title: "Secondary terminal", workingDirectory: directory)
-    let review = PaneSnapshot(title: "Primary terminal", workingDirectory: directory)
-    let development = WorkspaceSnapshot(name: "Development", focusedPaneID: first.id,
-        layout: .split(axis: .horizontal, fraction: 0.5, first: .pane(first), second: .pane(second)))
-    let reviewWorkspace = WorkspaceSnapshot(name: "Review", focusedPaneID: review.id, layout: .pane(review))
-    return SessionSnapshot(selectedWorkspaceID: development.id,
-        groups: [WorkspaceGroupSnapshot(name: "Local", color: .blue, workspaces: [development, reviewWorkspace])])
+private func initialSnapshot() -> SessionSnapshot {
+    return SessionSnapshot(selectedWorkspaceID: nil, groups: [])
 }
 
 private func buildWindow(for application: Gtk.ApplicationRef) {
     _ = BundledFonts.register()
-    let fallback = initialSnapshot(FileManager.default.currentDirectoryPath)
+    let fallback = initialSnapshot()
     let paths: SessionProfilePaths
     do { paths = try SessionProfilePaths(profile: "default") } catch { fatalError("Default profile path is invalid") }
     let store = SessionStore(paths: paths)
     let preferencesStore = AppPreferencesStore(
         url: paths.snapshotURL.deletingLastPathComponent().appendingPathComponent("preferences.json")
     )
+    let loadOutcome = try? store.loadRecovering()
     let snapshot: SessionSnapshot
-    switch try? store.loadRecovering() {
+    switch loadOutcome {
     case let .restored(value), let .recoveredPrevious(value): snapshot = value
     case .missing, .resetAfterQuarantine, .none: snapshot = fallback
     }
-    guard let state = ApplicationState(snapshot: snapshot, store: store, preferencesStore: preferencesStore) else { fatalError("Ghostty runtime initialization failed") }
+    guard let state = ApplicationState(
+        snapshot: snapshot,
+        store: store,
+        preferencesStore: preferencesStore,
+        startupRecoveryPresentation: loadOutcome.flatMap(SessionRecoveryPresentation.resolve)
+    ) else { fatalError("Ghostty runtime initialization failed") }
     retainedState = state; state.installCommands(on: application)
 
     let window = ApplicationWindowRef(application: application); window.title = "awesoMux"
@@ -3883,6 +3919,7 @@ private func buildWindow(for application: Gtk.ApplicationRef) {
     window.set(child: root); window.present()
     state.filter("")
     if let selected = snapshot.selectedWorkspaceID { state.select(selected) }
+    performOnGTKMain { [weak state] in state?.presentStartupRecoveryIfNeeded() }
 }
 
 let status = Application.run(id: "com.interactivebuffoonery.awesomux", arguments: CommandLine.arguments,

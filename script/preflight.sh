@@ -53,6 +53,8 @@ export C_INCLUDE_PATH="$repo_root/.build/sysroot/root/usr/include/atk-1.0${C_INC
 swift test --package-path "$repo_root/swift-gtk"
 swift build --package-path "$repo_root/swift-gtk" -c release
 release_bin=$(swift build --package-path "$repo_root/swift-gtk" -c release --show-bin-path)
+"$repo_root/script/test-forced-termination-persistence.sh" \
+  "$release_bin/awesomux-persistence-probe"
 qa_display=${DISPLAY:-:1}
 env GDK_BACKEND=x11 GDK_DEBUG=gl-glx DISPLAY="$qa_display" \
   GHOSTTY_RESOURCES_DIR="$repo_root/.build/ghostty-prefix/share/ghostty" \

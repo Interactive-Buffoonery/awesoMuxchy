@@ -11,6 +11,7 @@ let package = Package(
         .library(name: "AwesoMuxTerminal", targets: ["AwesoMuxTerminal"]),
         .executable(name: "awesomux-lifecycle-stress", targets: ["AwesoMuxLifecycleStress"]),
         .executable(name: "awesomux-terminal-integration", targets: ["AwesoMuxTerminalIntegration"]),
+        .executable(name: "awesomux-persistence-probe", targets: ["AwesoMuxPersistenceProbe"]),
     ],
     dependencies: [
         .package(url: "https://github.com/rhx/SwiftGtk.git", revision: "ee963714f3e45c3201bf9cd45ae41cc360699304"),
@@ -47,6 +48,10 @@ let package = Package(
                 "AwesoMuxTerminal",
                 .product(name: "Gtk", package: "SwiftGtk"),
             ]
+        ),
+        .executableTarget(
+            name: "AwesoMuxPersistenceProbe",
+            dependencies: ["AwesoMuxCore"]
         ),
         .systemLibrary(
             name: "CAwesoMuxGhostty",

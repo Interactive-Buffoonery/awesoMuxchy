@@ -140,6 +140,14 @@ help, and agent context while preserving the compact reference geometry.
   tests cover burst collapse, bounded delayed durability, lifecycle flush, and
   failure recovery; the existing owner-only atomic `SessionStore` remains the
   sole disk writer.
+- Clean-profile launch now uses the implemented zero-workspace recovery surface
+  instead of synthetic Development/Review fixtures. Invalid saved state
+  presents an owned 520-point recovery sheet with exact baseline wording after
+  quarantine; live AT-SPI verified its frame, heading, message, and `Done`
+  action. The invalid bytes remained archived at `0600`, and clean close wrote
+  a valid empty snapshot at `0600`. A release process probe now SIGKILLs staged
+  persistence both before and after the 500 ms boundary, proving the prior safe
+  snapshot survives the first case and the newest snapshot survives the second.
 - The sidebar host now uses a native GTK horizontal split with the reference
   296-point default, 60-point rail settlement, 250-point mode threshold, and a
   480-point terminal minimum. Width and last-expanded width are defensively
@@ -471,8 +479,10 @@ help, and agent context while preserving the compact reference geometry.
    insertion indicators. Dynamic group menu enablement plus both left/right
    hidden attention reveal paths and timed
    retraction are captured and inspected.
-2. Add truthful recovery UI and a forced-termination persistence test; bounded
-   trailing-edge writes and clean-run flush are implemented and pure-tested.
+2. Continue persistence hardening for path replacement races and explicit
+   recovery-file review/replacement choices; launch quarantine presentation,
+   bounded trailing-edge writes, clean-run flush, and forced-kill durability
+   are implemented and verified.
 3. Continue through the root implementation order, capturing each required
    visual milestone.
 
