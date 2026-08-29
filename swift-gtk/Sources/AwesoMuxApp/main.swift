@@ -712,6 +712,36 @@ private final class ApplicationState: @unchecked Sendable {
         for (id, label) in metadata { applySearchMatch(projectedByID[id]?.locationMatch, to: label) }
         for (id, label) in liftedTitles { applySearchMatch(projectedByID[id]?.titleMatch, to: label) }
         let visibleGroupIDs = Set(projection.groups.map(\.id))
+        for (index, group) in projection.groups.enumerated() {
+            if let disclosure = groupDisclosures[group.id] {
+                setAccessibleSetPosition(disclosure, position: index + 1, count: projection.groups.count)
+                refreshGroupAttention(group.id, projectedPosition: (index + 1, projection.groups.count))
+            }
+            for (rowIndex, projectedRow) in group.rows.enumerated() {
+                if let row = rows[projectedRow.id] {
+                    setAccessibleSetPosition(row, position: rowIndex + 1, count: group.rows.count)
+                    refreshRegularWorkspaceAccessibility(
+                        projectedRow.id, position: (rowIndex + 1, group.rows.count)
+                    )
+                }
+            }
+        }
+        for (index, item) in projection.attention.enumerated() {
+            if let row = attentionRows[item.row.id] {
+                setAccessibleSetPosition(row, position: index + 1, count: projection.attention.count)
+                refreshLiftedWorkspaceAccessibility(
+                    item, attention: true, position: (index + 1, projection.attention.count)
+                )
+            }
+        }
+        for (index, item) in projection.pinned.enumerated() {
+            if let row = pinnedRows[item.row.id] {
+                setAccessibleSetPosition(row, position: index + 1, count: projection.pinned.count)
+                refreshLiftedWorkspaceAccessibility(
+                    item, attention: false, position: (index + 1, projection.pinned.count)
+                )
+            }
+        }
         for group in snapshot.groups {
             for id in workspaceIDsByGroup[group.id] ?? [] {
                 let visible = regularWorkspaceIDs.contains(id)
@@ -748,8 +778,13 @@ private final class ApplicationState: @unchecked Sendable {
         let attention = Set(projection.attention.map { $0.row.id })
         let pinned = Set(projection.pinned.map { $0.row.id })
         var previous: WidgetRef?
-        for id in projection.orderedWorkspaceIDs {
+        for (index, id) in projection.orderedWorkspaceIDs.enumerated() {
             guard let row = railRows[id] else { continue }
+            setAccessibleSetPosition(row, position: index + 1, count: projection.orderedWorkspaceIDs.count)
+            refreshRailWorkspaceAccessibility(
+                id, attention: attention.contains(id), pinned: pinned.contains(id),
+                position: (index + 1, projection.orderedWorkspaceIDs.count)
+            )
             row.set(visible: true)
             row.remove(cssClass: "aw-lifted-attention"); row.remove(cssClass: "aw-lifted-pinned")
             if attention.contains(id) {
@@ -777,8 +812,9 @@ private final class ApplicationState: @unchecked Sendable {
             return
         }
         let lifted = Set(projection.attention.map { $0.row.id } + projection.pinned.map { $0.row.id })
-        for group in snapshot.groups {
+        for (index, group) in snapshot.groups.enumerated() {
             guard let groupRow = railGroupRows[group.id] else { continue }
+            setAccessibleSetPosition(groupRow, position: index + 1, count: snapshot.groups.count)
             groupRow.set(visible: true)
             sidebarRailRows.reorderChildAfter(child: WidgetRef(groupRow), sibling: previous)
             previous = WidgetRef(groupRow)
@@ -1173,7 +1209,9 @@ private final class ApplicationState: @unchecked Sendable {
     }
 
     func makeRow(workspace: WorkspaceSnapshot, groupID: UUID) -> OverlayRef {
-        let row = ToggleButtonRef(); row.add(cssClass: "aw-row"); row.setHalign(align: .fill)
+        let row = makeAccessibleToggleButton(role: GTK_ACCESSIBLE_ROLE_TREE_ITEM)
+        row.add(cssClass: "aw-row"); row.setHalign(align: .fill)
+        setAccessibleLevel(row, 2)
         let groupIndex = snapshot.groups.firstIndex(where: { $0.id == groupID }) ?? 0
         let group = snapshot.groups[groupIndex]
         let groupColor = SidebarTintProjection.resolvedColor(for: group, unfilteredIndex: groupIndex)
@@ -1196,7 +1234,8 @@ private final class ApplicationState: @unchecked Sendable {
         let safeName = SidebarWorkspaceTitle.resolve(workspace: workspace)
         setAccessibleLabel(row, safeName)
         let paneDescription = workspace.layout.paneCount > 1 ? ", \(workspace.layout.paneCount) panes" : ""
-        setAccessibleDescription(row, "Workspace in \(ChromeText.sanitized(group.name, limit: 120)); \(location)\(paneDescription); \(agentTile.accessibilityLabel)")
+        setAccessibleDescription(row, "Workspace in \(ChromeText.sanitized(group.name, limit: 120)); \(location)\(paneDescription); \(agentTile.accessibilityLabel); Actions menu: Shift+F10")
+        setAccessibleHasPopup(row)
         installWorkspaceContextMenu(on: row, workspaceID: workspace.id, groupID: groupID)
         installWorkspacePanePeek(on: row, workspace: workspace)
         rows[workspace.id] = row; metadata[workspace.id] = meta; workspaceTitles[workspace.id] = name
@@ -1208,7 +1247,7 @@ private final class ApplicationState: @unchecked Sendable {
     }
 
     func makeRailRow(workspace: WorkspaceSnapshot) -> ToggleButtonRef {
-        let button = ToggleButtonRef()
+        let button = makeAccessibleToggleButton(role: GTK_ACCESSIBLE_ROLE_LIST_ITEM)
         button.add(cssClass: "aw-rail-row")
         button.setSizeRequest(width: 40, height: 40)
         let agentTile = SidebarAgentTilePresentation.project(workspace: workspace)
@@ -1484,7 +1523,9 @@ private final class ApplicationState: @unchecked Sendable {
         let popover = PopoverRef(); popover.set(child: roster); button.set(popover: popover)
     }
 
-    private func refreshGroupAttention(_ groupID: UUID) {
+    private func refreshGroupAttention(
+        _ groupID: UUID, projectedPosition: (position: Int, count: Int)? = nil
+    ) {
         guard let group = snapshot.groups.first(where: { $0.id == groupID }) else { return }
         let summary = CollapsedGroupAttention.resolve(group: group)
         let visible = group.isCollapsed && summary.primaryState != nil
@@ -1501,17 +1542,66 @@ private final class ApplicationState: @unchecked Sendable {
         railGroupAttentionLabels[groupID]?.set(visible: visible)
         let count = group.workspaces.filter { !$0.isSoftClosed }.count
         let suffix = visible ? "; \(summary.accessibilityPhrase)" : ""
+        let groupIndex = snapshot.groups.firstIndex(where: { $0.id == groupID }) ?? 0
+        let position = projectedPosition ?? (groupIndex + 1, snapshot.groups.count)
+        let positionCopy = SidebarAccessibilityCopy.position(position.position, of: position.count)
+            .map { "; \($0)" } ?? ""
         if let disclosure = groupDisclosures[groupID] {
-            setAccessibleDescription(disclosure, "\(count) workspaces; \(group.isCollapsed ? "Collapsed" : "Expanded")\(suffix)")
+            let color = SidebarTintProjection.resolvedColor(for: group, unfilteredIndex: groupIndex)
+            setAccessibleDescription(disclosure, "\(SidebarAccessibilityCopy.workspaceCount(count)); \(color.rawValue.capitalized) color; \(group.isCollapsed ? "Collapsed" : "Expanded")\(suffix)\(positionCopy)")
         }
         if let rail = railGroupRows[groupID] {
-            setAccessibleDescription(rail, "\(count) workspaces\(suffix). Open roster to choose a workspace")
+            let color = SidebarTintProjection.resolvedColor(for: group, unfilteredIndex: groupIndex)
+            setAccessibleDescription(rail, "\(SidebarAccessibilityCopy.workspaceCount(count)); \(color.rawValue.capitalized) color\(suffix)\(positionCopy). Open roster to choose a workspace")
         }
+    }
+
+    private func refreshRegularWorkspaceAccessibility(
+        _ workspaceID: UUID, position: (position: Int, count: Int)
+    ) {
+        guard let workspace = snapshot.workspace(id: workspaceID),
+              let pane = workspace.layout.pane(id: workspace.focusedPaneID),
+              let group = snapshot.groups.first(where: { $0.workspaces.contains { $0.id == workspaceID } }),
+              let row = rows[workspaceID]
+        else { return }
+        let location = FocusedPaneContext.displayPath(
+            pane.workingDirectory, homeDirectory: NSHomeDirectory()
+        )
+        let panes = workspace.layout.paneCount > 1 ? ", \(workspace.layout.paneCount) panes" : ""
+        let agent = SidebarAgentTilePresentation.project(workspace: workspace).accessibilityLabel
+        let positionCopy = SidebarAccessibilityCopy.position(position.position, of: position.count) ?? ""
+        setAccessibleDescription(row, "Workspace in \(ChromeText.sanitized(group.name, limit: 120)); \(location)\(panes); \(agent); \(positionCopy); Actions menu: Shift+F10")
+    }
+
+    private func refreshLiftedWorkspaceAccessibility(
+        _ item: LiftedSidebarWorkspaceRow, attention: Bool,
+        position: (position: Int, count: Int)
+    ) {
+        guard let workspace = snapshot.workspace(id: item.row.id),
+              let row = attention ? attentionRows[item.row.id] : pinnedRows[item.row.id]
+        else { return }
+        let origin = attention
+            ? "Needs input from \(item.originGroupName)" : "Pinned from \(item.originGroupName)"
+        let agent = SidebarAgentTilePresentation.project(workspace: workspace).accessibilityLabel
+        let positionCopy = SidebarAccessibilityCopy.position(position.position, of: position.count) ?? ""
+        setAccessibleDescription(row, "\(origin); \(agent); \(positionCopy); Actions menu: Shift+F10")
+    }
+
+    private func refreshRailWorkspaceAccessibility(
+        _ workspaceID: UUID, attention: Bool, pinned: Bool,
+        position: (position: Int, count: Int)
+    ) {
+        guard let workspace = snapshot.workspace(id: workspaceID), let row = railRows[workspaceID] else { return }
+        let state = attention ? "Needs Input; " : pinned ? "Pinned; " : ""
+        let agent = SidebarAgentTilePresentation.project(workspace: workspace).accessibilityLabel
+        let positionCopy = SidebarAccessibilityCopy.position(position.position, of: position.count) ?? ""
+        setAccessibleDescription(row, "Workspace; \(state)\(agent); \(positionCopy)")
     }
 
     func makeLiftedRow(_ item: LiftedSidebarWorkspaceRow, attention: Bool) -> OverlayRef? {
         guard let workspace = snapshot.workspace(id: item.row.id) else { return nil }
-        let button = ToggleButtonRef(); button.add(cssClass: "aw-row"); button.setHalign(align: .fill)
+        let button = makeAccessibleToggleButton(role: GTK_ACCESSIBLE_ROLE_LIST_ITEM)
+        button.add(cssClass: "aw-row"); button.setHalign(align: .fill)
         button.add(cssClass: "aw-\((item.originGroupColor ?? .blue).rawValue)")
         let content = BoxRef(orientation: .horizontal, spacing: 10); content.setMarginEnd(margin: 28)
         let agentTile = SidebarAgentTilePresentation.project(workspace: workspace)
@@ -1526,7 +1616,8 @@ private final class ApplicationState: @unchecked Sendable {
         details.append(child: title); details.append(child: origin); content.append(child: details); button.set(child: content)
         button.setTooltip(text: origin.label ?? "")
         setAccessibleLabel(button, item.row.title)
-        setAccessibleDescription(button, "\(origin.label ?? ""); \(agentTile.accessibilityLabel)")
+        setAccessibleDescription(button, "\(origin.label ?? ""); \(agentTile.accessibilityLabel); Actions menu: Shift+F10")
+        setAccessibleHasPopup(button)
         button.onClicked { [weak self] _ in self?.select(workspace.id) }
         installWorkspaceContextMenu(on: button, workspaceID: workspace.id, groupID: item.originGroupID, isLifted: true)
         liftedTitles[workspace.id] = title
@@ -2110,7 +2201,9 @@ private final class ApplicationState: @unchecked Sendable {
     ) -> (root: BoxRef, body: BoxRef) {
         let root = BoxRef(orientation: .vertical, spacing: 3)
         let header = BoxRef(orientation: .horizontal, spacing: 2)
-        let disclosure = ButtonRef(); disclosure.add(cssClass: "aw-group"); disclosure.setHalign(align: .fill)
+        let disclosure = makeAccessibleButton(role: GTK_ACCESSIBLE_ROLE_TREE_ITEM)
+        disclosure.add(cssClass: "aw-group"); disclosure.setHalign(align: .fill)
+        setAccessibleLevel(disclosure, 1)
         disclosure.setHexpand(expand: true); disclosure.setTooltip(text: "Toggle \(group.name) workspace group")
         setAccessibleLabel(disclosure, "\(ChromeText.sanitized(group.name, limit: 120)) workspace group")
         setAccessibleDescription(disclosure, "\(projection.rows.count) workspaces")
@@ -2612,6 +2705,7 @@ private final class ApplicationState: @unchecked Sendable {
         for value in WorkspaceGroupColor.allCases {
             groupColorActions[groupID]?[value]?.label = "●  \(value.rawValue.capitalized)\(color == value ? "  ✓" : "")"
         }
+        refreshGroupAttention(groupID)
         announce(color.map { "Workspace group color set to \($0.rawValue.capitalized)" }
             ?? "Workspace group color cleared")
         persist()
@@ -2625,6 +2719,7 @@ private final class ApplicationState: @unchecked Sendable {
             groupsContainer.reorderChildAfter(child: root, sibling: previous)
             previous = root
         }
+        for group in snapshot.groups { refreshGroupAttention(group.id) }
         refreshGroupActionEnablement()
         announceGroupReorder(groupID)
         persist()

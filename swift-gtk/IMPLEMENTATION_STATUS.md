@@ -1,6 +1,6 @@
 # SwiftGtk4 implementation status
 
-Updated: 2026-08-28
+Updated: 2026-08-29
 
 ## Current phase
 
@@ -172,9 +172,9 @@ geometry and state styling have also passed a real-window visual correction.
   immediate `Acknowledge Workspace` row action and Ctrl-Shift-K route release
   the sticky and reconcile the lifted section and hidden edge cue. Exact
   per-workspace `Mute Notifications`/`Unmute Notifications` overrides persist.
-  Full preflight passes 70 Swift tests after this correction. Unanswered-turn
-  ingestion, injected-clock GTK coverage, and physical AT-SPI announcement
-  inspection remain pending.
+  Full preflight passes 71 Swift tests after the accessibility correction.
+  Unanswered-turn ingestion, injected-clock GTK coverage, and physical AT-SPI
+  announcement inspection remain pending.
 - Non-pinned workspace menus now expose tested, bounded within-group Up/Down
   moves plus named previous/next-group and arbitrary-group alternatives.
   Mutations reuse the authoritative snapshot and existing terminal runtime,
@@ -202,9 +202,17 @@ geometry and state styling have also passed a real-window visual correction.
   creation rows using a pure tested navigation policy. Rows, rail controls,
   groups, edge attention, footer controls, and path/status controls publish
   GTK accessible names and descriptions; selected/expanded state updates with
-  the authoritative model. Compact targets are at least 24 points. Footer
-  state chips are real buttons that open a state-filtered activity panel, and
-  Orca discovers the live app through AT-SPI.
+  the authoritative model. Workspace rows expose list/tree-item roles and
+  group disclosures are level-one tree items. GTK receives native position and
+  set-size relations, while descriptions duplicate `Position N of M` because
+  GTK 4.14's AT-SPI bridge does not export integer relations through
+  `GetRelationSet`. Direct AT-SPI inspection verified roles, group color,
+  expanded/collapsed state, singular/plural counts, lifted/group positions,
+  and the row's explicit Shift+F10 action-menu description. The opened native
+  menu remains the named non-pointer action surface. Compact targets are at
+  least 24 points.
+  Footer state chips are real buttons that open a state-filtered activity
+  panel, and Orca discovers the live app through AT-SPI.
 - Collapsed group attention is projected once from pane agent states and shared
   by expanded-header and rail signals. Needs Input wins over Error, which wins
   over Thinking; Output is intentionally excluded. Each rail group control

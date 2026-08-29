@@ -1,6 +1,6 @@
 # Implementation status
 
-Updated: 2026-08-28
+Updated: 2026-08-29
 
 ## Current phase
 
@@ -245,9 +245,9 @@ help, and agent context while preserving the compact reference geometry.
   explicit-input prompts. Ctrl-Shift-K and the row action deliberately clear
   every waiting pane immediately. Fast selection/focus changes invalidate the
   pending dwell; the sticky is never serialized. Per-workspace notification
-  mute overrides also persist and use exact Mute/Unmute wording. Seventy Swift
-  tests and full preflight cover the transition model; physical dwell timing and
-  spoken return announcements remain real-app QA gaps.
+  mute overrides also persist and use exact Mute/Unmute wording. Seventy-one
+  Swift tests and full preflight cover the transition model; physical dwell
+  timing and spoken return announcements remain real-app QA gaps.
 - Sidebar and adjacent footer styling now live in an owned focused GTK
   stylesheet with Catppuccin Mocha/Latte and high-contrast ramps derived from
   the pinned design tokens. System appearance, explicit Light/Dark,
@@ -257,12 +257,20 @@ help, and agent context while preserving the compact reference geometry.
   were run and inspected.
 - Visible sidebar navigation now has a tested Up/Down/Home/End policy spanning
   lifted rows, group disclosures, ownership rows, and per-group creation rows.
-  GTK controls publish explicit accessible names/descriptions and selected or
-  expanded state at the component seam; compact icon/footer targets are at
-  least 24 points. Agent state chips are buttons that open the panel filtered
-  to the chosen state. Orca enumerates the running app through AT-SPI; full
-  Group disclosure, color, close, workspace/pinned/group reorder, pin/unpin,
-  and Needs Input return transitions now publish GTK accessibility status
+  Workspace rows now construct with list/tree-item roles, and groups construct
+  as level-one tree items. GTK controls publish explicit names/descriptions,
+  selected/expanded state, color, attention, and native position/set-size
+  relations at the component seam. Because GTK 4.14 does not translate its
+  integer set relations into AT-SPI object relations, the live descriptions
+  also publish `Position N of M`; direct bus inspection verified lifted rows
+  and all three fixture groups. Singular/plural group counts are tested. Row
+  descriptions advertise the Shift+F10 action menu, and the opened menu
+  exposes every named action. Compact icon/footer targets are at least 24
+  points. Agent state chips are
+  buttons that open the panel filtered to the chosen state. Orca enumerates
+  the running app through AT-SPI. Group disclosure, color, close,
+  workspace/pinned/group reorder, pin/unpin, and Needs Input return transitions
+  now publish GTK accessibility status
   announcements with tested reference reorder wording. Full spoken navigation
   and Orca announcement verification remains pending.
 - Workspace rows now expose real soft close and permanent clear actions. Soft

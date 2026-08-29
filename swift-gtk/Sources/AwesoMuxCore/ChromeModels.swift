@@ -263,6 +263,17 @@ public enum SidebarAnnouncement {
     }
 }
 
+public enum SidebarAccessibilityCopy {
+    public static func position(_ position: Int, of count: Int) -> String? {
+        guard position > 0, count > 0, position <= count else { return nil }
+        return "Position \(position) of \(count)"
+    }
+
+    public static func workspaceCount(_ count: Int) -> String {
+        "\(count) workspace\(count == 1 ? "" : "s")"
+    }
+}
+
 public struct SidebarGroupSection: Equatable, Sendable {
     public let id: UUID
     public let name: String

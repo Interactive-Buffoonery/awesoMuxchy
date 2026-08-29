@@ -1023,3 +1023,12 @@ private func snapshot(_ workspaces: [WorkspaceSnapshot]) -> SessionSnapshot {
         title: "Review", position: 3, count: 5
     ) == "Moved Review to position 3 of 5 in Pinned")
 }
+
+@Test func sidebarAccessibilityCopyRejectsInvalidPositionsAndUsesSingularCounts() {
+    #expect(SidebarAccessibilityCopy.position(2, of: 3) == "Position 2 of 3")
+    #expect(SidebarAccessibilityCopy.position(0, of: 3) == nil)
+    #expect(SidebarAccessibilityCopy.position(4, of: 3) == nil)
+    #expect(SidebarAccessibilityCopy.workspaceCount(0) == "0 workspaces")
+    #expect(SidebarAccessibilityCopy.workspaceCount(1) == "1 workspace")
+    #expect(SidebarAccessibilityCopy.workspaceCount(2) == "2 workspaces")
+}
