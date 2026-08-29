@@ -1,5 +1,26 @@
 # Visual QA
 
+## 2026-08-29 — SwiftGtk4 background agent outcome
+
+- Linux image: [Codex Error in its origin group](swift-gtk/progress/29-background-agent-outcomes/codex-error-origin-group-x11.png).
+- Reference: background Done/Error status-message behavior and sidebar rollup
+  priority at macOS baseline `fed33ff47c559344fc6db6fa53f16e75fcc4a116`.
+- Behavior: a pane-scoped Codex `stop` event reporting `error` updated Review's
+  owned provider tile and non-color-only error badge while leaving the workspace
+  in Local. Development remained selected and both real terminal panes retained
+  focus/layout; no Needs Input section was manufactured. The paired AT-SPI pass
+  delivered `Codex in Review reported an error.` at medium priority. A preceding
+  Done pass similarly delivered `Codex in Review completed.`
+- Inspection: the 1440×852 X11/GLX surface was inspected at original resolution.
+  The Codex spiral, red × badge, origin row geometry, Local count, selected
+  Development row, neutral one-agent footer, focused path bar, and adjacent Git
+  chips remain aligned and readable.
+- Verification: full preflight passes 86 Swift tests, release terminal
+  integration, and 100 two-surface lifecycle cycles. Transition-only gating
+  keeps repeated outcomes and intermediate Running state silent.
+- Privacy: the event and profile are synthetic and contain no prompt, terminal,
+  command, clipboard, credential, or arbitrary output field.
+
 ## 2026-08-29 — SwiftGtk4 unanswered-turn promotion
 
 - Linux image: [Claude waiting in Needs Input](swift-gtk/progress/28-unanswered-turn/claude-waiting-needs-input-x11.png).
