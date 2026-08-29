@@ -1,5 +1,44 @@
 # Visual QA
 
+## 2026-08-29 — SwiftGtk4 destructive close sheets
+
+- Linux images: [workspace close risk](swift-gtk/progress/32-destructive-close/close-workspace-risk-sheet-x11.png),
+  [clear workspace](swift-gtk/progress/32-destructive-close/clear-workspace-sheet-x11.png),
+  and [workspace-group close risk](swift-gtk/progress/32-destructive-close/close-workspace-group-risk-sheet-x11.png).
+- Reference: `AwesoMuxApp.confirmCloseIfNeeded`,
+  `confirmClearWorkspace`, `confirmCloseGroupIfNeeded`, `QuitRiskPolicy`, and
+  `DestructiveCloseCopy` at macOS baseline
+  `fed33ff47c559344fc6db6fa53f16e75fcc4a116`.
+- Behavior: the Ghostty shim now exposes foreground PID and close-risk state.
+  A pure policy combines bounded `/proc` command/child classification with
+  fresh agent execution. Risky workspace close and aggregate group close show
+  exact interruption copy; safe close skips the prompt. Clear always confirms
+  with risk-sensitive permanent-close copy. One owned modal prevents stacking,
+  makes Cancel the safe default, exposes exact keyboard hints, and disables
+  competing sheet commands until dismissal. Soft close releases its real
+  terminal surfaces and rebuilds fresh ones on reopen.
+- Accessibility and interaction: live AT-SPI verified heading/body/hint roles,
+  Cancel and destructive button names, and the exact destructive-button hint.
+  Cancel preserved both workspaces and restored command enablement. Confirmed
+  close persisted one recoverable workspace, removed its runtime, and a real
+  reopen rebuilt it before draining recovery. Aggregate close reported exactly
+  one risky workspace, removed the group, and left the app alive.
+- Inspection: all three 480×230 X11/GLX Latte surfaces were inspected at
+  original resolution. Bounded bidi-isolated titles, quiet explanatory copy,
+  secondary Cancel, and the high-salience destructive action remain readable
+  without exposing the terminal behind the modal.
+- Verification: full preflight passes the text baseline, 90 Swift tests,
+  production build, terminal integration including foreground PID/close-risk
+  transitions, and 100 two-surface lifecycle cycles.
+- Remaining evidence: Ghostty's raw prompt-away bit is integration-tested but
+  cannot be trusted by the app until the shim also exposes whether an OSC-133
+  prompt marker has been observed; real foreground process and agent evidence
+  are active now. Physical Super-Return/Escape delivery remains pending because
+  no X11 keyboard-injection utility is installed.
+- Privacy: the profile, titles, and agent transition are synthetic; the cropped
+  modal images contain no terminal content, commands, clipboard data,
+  credentials, paths, or arbitrary agent output.
+
 ## 2026-08-29 — SwiftGtk4 workspace-group naming sheets
 
 - Linux images: [new workspace group](swift-gtk/progress/31-group-naming/new-workspace-group-sheet-x11.png)
