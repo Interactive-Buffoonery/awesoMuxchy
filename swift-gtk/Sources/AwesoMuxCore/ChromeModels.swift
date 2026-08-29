@@ -432,6 +432,16 @@ public struct CollapsedGroupAttention: Equatable, Sendable {
     }
 }
 
+public struct WorkspaceCreationContext: Equatable, Sendable {
+    public let groupID: UUID
+    public let workingDirectory: String
+
+    public init(groupID: UUID, workingDirectory: String) {
+        self.groupID = groupID
+        self.workingDirectory = workingDirectory
+    }
+}
+
 public enum WorkspaceCreationTarget {
     public static let defaultGroupName = "awesoMux"
 
@@ -468,6 +478,21 @@ public enum WorkspaceCreationTarget {
         else { return nil }
         let directory = pane.workingDirectory.trimmingCharacters(in: .newlines)
         return directory.isEmpty ? nil : directory
+    }
+
+    public static func workspaceHere(
+        _ workspaceID: UUID,
+        in snapshot: SessionSnapshot
+    ) -> WorkspaceCreationContext? {
+        guard let group = snapshot.groups.first(where: { group in
+            group.workspaces.contains { $0.id == workspaceID && !$0.isSoftClosed }
+        }),
+        let workspace = group.workspaces.first(where: { $0.id == workspaceID }),
+        let pane = workspace.layout.pane(id: workspace.focusedPaneID)
+        else { return nil }
+        let directory = pane.workingDirectory.trimmingCharacters(in: .newlines)
+        guard !directory.isEmpty else { return nil }
+        return WorkspaceCreationContext(groupID: group.id, workingDirectory: directory)
     }
 }
 

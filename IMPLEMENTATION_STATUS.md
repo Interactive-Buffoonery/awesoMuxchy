@@ -258,8 +258,11 @@ help, and agent context while preserving the compact reference geometry.
   combines the selected owner with the focused pane's current directory. That
   command is now disabled without an authoritative selected-pane cwd, updates
   live as selection changes, and preserves a declared remote pane's directory
-  exactly as the macOS route does. A
-  real isolated profile selected a workspace in the second of three groups;
+  exactly as the macOS route does. Row-menu `New Workspace Here` resolves the
+  row's live origin group and focused cwd by stable identity, including lifted
+  rows, and fails closed if that workspace closed or lost valid context before
+  activation. A real isolated profile selected a workspace in the second of
+  three groups;
   activating the primary control left both sibling counts unchanged, appended
   and selected exactly one workspace in that second group, and persisted the
   launch directory.

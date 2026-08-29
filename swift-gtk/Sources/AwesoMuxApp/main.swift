@@ -2108,7 +2108,7 @@ private final class ApplicationState: @unchecked Sendable {
             button.set(sensitive: sensitive)
             button.onClicked { _ in run(); popover.popdown() }; box.append(child: button); return button
         }
-        _ = action("New Workspace Here") { [weak self] in self?.createWorkspace(here: workspaceID, fallbackGroupID: groupID) }
+        _ = action("New Workspace Here") { [weak self] in self?.createWorkspace(here: workspaceID) }
         _ = action("Rename Workspace…") { [weak self] in self?.presentWorkspaceNameDialog(workspaceID) }
         if CommandAvailabilityProjection.canAcknowledgeWorkspace(workspaceID, in: snapshot) {
             _ = action("Acknowledge Workspace") { [weak self] in self?.acknowledgeWorkspace(workspaceID) }
@@ -2259,12 +2259,10 @@ private final class ApplicationState: @unchecked Sendable {
         if shouldRestoreFocus { restoreSidebarFocus(to: workspaceID) }
     }
 
-    private func createWorkspace(here workspaceID: UUID, fallbackGroupID: UUID) {
-        let workspace = snapshot.workspace(id: workspaceID)
-        let directory = workspace.flatMap { $0.layout.pane(id: $0.focusedPaneID)?.workingDirectory }
-            ?? FileManager.default.currentDirectoryPath
-        let owner = snapshot.groups.first(where: { group in group.workspaces.contains { $0.id == workspaceID } })?.id
-        createWorkspace(in: owner ?? fallbackGroupID, directory: directory)
+    private func createWorkspace(here workspaceID: UUID) {
+        guard let context = WorkspaceCreationTarget.workspaceHere(workspaceID, in: snapshot)
+        else { return }
+        createWorkspace(in: context.groupID, directory: context.workingDirectory)
     }
 
     private func togglePinned(_ workspaceID: UUID) {

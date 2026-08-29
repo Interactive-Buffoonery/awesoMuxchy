@@ -888,6 +888,10 @@ private func snapshot(_ workspaces: [WorkspaceSnapshot]) -> SessionSnapshot {
     #expect(WorkspaceCreationTarget.currentContextGroupID(in: selectedSnapshot) == selectedGroup.id)
     #expect(WorkspaceCreationTarget.defaultGroupID(in: selectedSnapshot) == defaultGroup.id)
     #expect(WorkspaceCreationTarget.currentDirectory(in: selectedSnapshot) == "/tmp")
+    #expect(WorkspaceCreationTarget.workspaceHere(first.id, in: selectedSnapshot)
+        == WorkspaceCreationContext(groupID: firstGroup.id, workingDirectory: "/tmp"))
+    #expect(WorkspaceCreationTarget.workspaceHere(selected.id, in: selectedSnapshot)
+        == WorkspaceCreationContext(groupID: selectedGroup.id, workingDirectory: "/tmp"))
 
     let groupless = SessionSnapshot(groups: [firstGroup, defaultGroup])
     #expect(WorkspaceCreationTarget.currentContextGroupID(in: groupless) == defaultGroup.id)
@@ -898,6 +902,7 @@ private func snapshot(_ workspaces: [WorkspaceSnapshot]) -> SessionSnapshot {
         in: SessionSnapshot(groups: [firstGroup])
     ) == nil)
     #expect(WorkspaceCreationTarget.currentDirectory(in: groupless) == nil)
+    #expect(WorkspaceCreationTarget.workspaceHere(UUID(), in: selectedSnapshot) == nil)
 
     let remotePane = PaneSnapshot(
         title: "Remote", workingDirectory: "/srv/project", ownership: .remoteZmx
@@ -920,6 +925,14 @@ private func snapshot(_ workspaces: [WorkspaceSnapshot]) -> SessionSnapshot {
         groups: [WorkspaceGroupSnapshot(name: "Local", workspaces: [missingWorkspace])]
     )
     #expect(WorkspaceCreationTarget.currentDirectory(in: missingSnapshot) == nil)
+    #expect(WorkspaceCreationTarget.workspaceHere(missingWorkspace.id, in: missingSnapshot) == nil)
+
+    var closedWorkspace = first
+    closedWorkspace.isSoftClosed = true
+    let closedSnapshot = SessionSnapshot(groups: [
+        WorkspaceGroupSnapshot(name: "Closed", workspaces: [closedWorkspace]),
+    ])
+    #expect(WorkspaceCreationTarget.workspaceHere(closedWorkspace.id, in: closedSnapshot) == nil)
 }
 
 @Test func workspaceCloseRiskUsesProcessPromptAndFreshAgentEvidence() {
