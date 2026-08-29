@@ -1,5 +1,32 @@
 # Visual QA
 
+## 2026-08-29 — SwiftGtk4 current-context workspace creation
+
+- Linux image: [selected-group new workspace](swift-gtk/progress/35-current-context-creation/selected-group-new-workspace-x11.png).
+- Reference: `NewWorkspaceSplitButton.swift`, `SidebarView.swift`, and the
+  workspace command routes at macOS baseline
+  `fed33ff47c559344fc6db6fa53f16e75fcc4a116`.
+- Behavior: a real isolated profile selected `Collapsed Workspace` in the
+  second of three groups. Activating the expanded `New Workspace` primary
+  control through AT-SPI left the first and empty groups unchanged, appended
+  and selected exactly one workspace in `Selected Group`, and persisted the
+  launch directory. App/menu creation now targets the canonical `awesoMux`
+  default directly; current-directory creation combines selected-owner/default
+  routing with the focused pane cwd. Pure coverage rejects a silent fallback
+  to the first stored group.
+- Inspection: the 296×852 X11/GLX sidebar-only PNG was opened at original
+  resolution. `Context Workspace` is selected beneath the pre-existing row in
+  `Selected Group`; the sibling counts remain `2`, `2`, and `0`, and the fixed
+  header/footer and per-group creation rows remain aligned. The capture fixture
+  uses a synthetic user-edited title after the creation/persistence assertion
+  so live shell metadata cannot leak into visual evidence.
+- Verification: full preflight passes the text baseline, all 95 Swift tests,
+  the production build, real terminal integration, and 100 two-surface
+  lifecycle cycles.
+- Privacy: every visible group, workspace, status, count, and location is
+  synthetic. The strict sidebar crop contains no terminal content, commands,
+  clipboard data, credentials, private paths, or arbitrary agent output.
+
 ## 2026-08-29 — SwiftGtk4 focused-footer command gate
 
 - Linux image: [agent-pane branch footer](swift-gtk/progress/34-footer-command-gate/agent-footer-branch-gate-x11.png).
