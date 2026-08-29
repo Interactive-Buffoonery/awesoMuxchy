@@ -1,5 +1,26 @@
 # Visual QA
 
+## 2026-08-29 — SwiftGtk4 accessible large text
+
+- Linux image: [1.5× accessible text](swift-gtk/progress/21-large-text/large-text-150-x11.png).
+- Reference: typography, truncation, minimum-target, sidebar/footer, and focused
+  path-bar contracts at macOS baseline
+  `fed33ff47c559344fc6db6fa53f16e75fcc4a116`.
+- Behavior: the owned GTK stylesheet now derives a defensive 1–2× text factor
+  from GTK's Xft DPI setting, with the standard `GDK_DPI_SCALE` override as the
+  X11 fallback. Only declared font sizes scale; natural GTK allocation expands
+  controls while reference minimum hit targets and spacing remain intact.
+- Inspection: the release-equivalent real app ran at 1.5× on X11/GLX and the
+  1440×852 PNG was inspected at original resolution. Titlebar, search, lifted
+  rows, group headers, group creation controls, sidebar footer, pane title,
+  terminal footer, and path chip grow without overlap. Long labels truncate,
+  both real Ghostty panes remain visible, and the 296 px sidebar stays fixed.
+- Verification: pure tests cover DPI resolution, invalid/undersized inputs,
+  the 2× cap, and CSS font-size rewriting. Full preflight passes 74 Swift tests,
+  release terminal integration, and 100 two-surface lifecycle cycles.
+- Privacy: the profile and terminal prompts are synthetic; no command history,
+  clipboard content, credentials, or arbitrary agent output is shown.
+
 ## 2026-08-29 — SwiftGtk4 right-to-left layout
 
 - Linux image: [Arabic-locale RTL layout](swift-gtk/progress/20-rtl-layout/rtl-arabic-locale-x11.png).

@@ -203,6 +203,10 @@ geometry and state styling have also passed a real-window visual correction.
   and dark GTK windows were inspected after registration. A real Arabic-locale
   X11 capture verifies direction-sensitive mirroring across the titlebar,
   sidebar header/groups/rows, sidebar footer, focused footer, and pane boundary.
+  Declared chrome font sizes now honor GTK Xft DPI accessibility scaling, with
+  a clamped standard X11 DPI override fallback. A real 1.5× capture verifies
+  natural allocation, long-text truncation, minimum targets, and both footer
+  surfaces; pure tests cover resolution and CSS rewriting.
 - The expanded sidebar now handles Up/Down/Home/End as one logical visible
   sequence across lifted sections, group disclosures, workspace rows, and
   creation rows using a pure tested navigation policy. Rows, rail controls,

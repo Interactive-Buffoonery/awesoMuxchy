@@ -245,7 +245,7 @@ help, and agent context while preserving the compact reference geometry.
   explicit-input prompts. Ctrl-Shift-K and the row action deliberately clear
   every waiting pane immediately. Fast selection/focus changes invalidate the
   pending dwell; the sticky is never serialized. Per-workspace notification
-  mute overrides also persist and use exact Mute/Unmute wording. Seventy-two
+  mute overrides also persist and use exact Mute/Unmute wording. Seventy-four
   Swift tests and full preflight cover the transition model; physical dwell
   timing and spoken return announcements remain real-app QA gaps.
 - Sidebar and adjacent footer styling now live in an owned focused GTK
@@ -256,7 +256,10 @@ help, and agent context while preserving the compact reference geometry.
   and registered process-locally with Fontconfig; real Latte and Mocha windows
   were run and inspected. An Arabic-locale real-app pass verifies GTK's RTL
   mirroring for titlebar/sidebar placement, split-create segments, row/group
-  alignment, both footer surfaces, and the two-pane content boundary.
+  alignment, both footer surfaces, and the two-pane content boundary. Owned CSS
+  font sizes now follow a defensively clamped GTK Xft DPI/accessibility scale;
+  a real 1.5× pass verifies truncation and natural control growth across the
+  sidebar and both footers without changing the 296-point host width.
 - Visible sidebar navigation now has a tested Up/Down/Home/End policy spanning
   lifted rows, group disclosures, ownership rows, and per-group creation rows.
   Workspace rows now construct with list/tree-item roles, and groups construct
