@@ -1,5 +1,37 @@
 # Visual QA
 
+## 2026-08-28 — SwiftGtk4 sidebar layout matrix
+
+- Linux images: [Latte left sidebar with long text](swift-gtk/progress/12-sidebar-layout-matrix/light-left-long-text-x11.png),
+  [Mocha right sidebar with long text](swift-gtk/progress/12-sidebar-layout-matrix/dark-right-long-text-x11.png),
+  [high-contrast long-text state](swift-gtk/progress/12-sidebar-layout-matrix/high-contrast-long-text-x11.png),
+  [hidden attention edge tab](swift-gtk/progress/12-sidebar-layout-matrix/hidden-attention-edge-x11.png),
+  and [Mocha at 2× scale](swift-gtk/progress/12-sidebar-layout-matrix/dark-scale-2x-x11.png).
+- Reference: sidebar host, titlebar, group, row, hidden-discovery, and
+  appearance contracts at macOS baseline
+  `fed33ff47c559344fc6db6fa53f16e75fcc4a116`.
+- Layout verification: the 296-point brand/sidebar column mirrors correctly,
+  long workspace and group names truncate without displacing adjacent chrome,
+  and the window title remains centered over the pane region on either side.
+- Theme verification: the owned Latte, Mocha, and high-contrast styles preserve
+  distinct selected, attention, pinned, divider, text, and focus treatments in
+  the same synthetic session fixture.
+- Hidden discovery: the hidden-sidebar image shows the attention edge tab
+  without resizing either terminal. The persistent hidden state and tab click
+  route are implemented; physical edge-hover reveal remains a QA gap because
+  synthetic X11 pointer motion does not reach this remote application.
+- Scale verification: the 2× capture is 1706 × 852 physical pixels; its
+  296-logical-point sidebar occupies 592 physical pixels, both real Ghostty
+  panes remain visible, and the restored split fraction is computed from the
+  live logical `GtkPaned` allocation rather than a fixed window estimate.
+- Verification: every image was opened and inspected at original resolution.
+  The final local preflight passes 64 Swift tests, release terminal integration
+  (Unicode, focus, resize, clipboard, title/cwd, and pane independence), and
+  100 two-surface lifecycle cycles.
+- Privacy: the fixtures contain synthetic group, workspace, agent, and prompt
+  content only; no terminal history, typed commands, clipboard data,
+  credentials, arbitrary agent output, or private path is shown.
+
 ## 2026-08-28 — SwiftGtk4 multi-pane workspace peek
 
 - Linux image: [Pinned multi-pane workspace peek](swift-gtk/progress/11-multi-pane-peek/pinned-multi-pane-peek-x11.png).
