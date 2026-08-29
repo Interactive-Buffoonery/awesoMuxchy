@@ -94,6 +94,10 @@ help, and agent context while preserving the compact reference geometry.
   tests cover stable ordering, whitespace-only queries, top match, remote/SSH,
   Needs Input, and no-result behavior; the GTK sidebar now renders the exact
   no-matches description and `Clear search` action.
+- Search output now carries Unicode-safe UTF-8 byte ranges for visible
+  title/location matches. GTK applies bold underlined Pango attributes to
+  regular and lifted rows and clears them transactionally with the query;
+  agent/state/group-only matches remain visible without inventing a highlight.
 - Expanded search keyboard routing uses that same projection order: Escape
   clears or restores terminal focus, Up/Down moves a visible current-result
   outline, and Return selects and focuses the routed workspace.

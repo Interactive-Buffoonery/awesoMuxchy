@@ -22,6 +22,22 @@ private func performOnGTKMain(_ action: @escaping () -> Void) {
     }, data: pointer)
 }
 
+private func applySearchMatch(_ range: Swift.Range<Int>?, to label: LabelRef) {
+    guard let range else { label.setAttributes(attrs: nil as Pango.AttrListRef?); return }
+    let attributes = Pango.AttrList()
+    if var weight = Pango.attrWeightNew(weight: PangoWeight(rawValue: 700)) {
+        weight.startIndex = UInt32(range.lowerBound)
+        weight.endIndex = UInt32(range.upperBound)
+        attributes.insert(attr: weight)
+    }
+    if var underline = Pango.attrUnderlineNew(underline: PangoUnderline(rawValue: 1)) {
+        underline.startIndex = UInt32(range.lowerBound)
+        underline.endIndex = UInt32(range.upperBound)
+        attributes.insert(attr: underline)
+    }
+    label.setAttributes(attrs: attributes)
+}
+
 private final class ApplicationState: @unchecked Sendable {
     private final class WorkspaceRuntime {
         var groupID: UUID
@@ -79,6 +95,7 @@ private final class ApplicationState: @unchecked Sendable {
     private var pinnedSectionBody: BoxRef?
     private var attentionRows: [UUID: ToggleButtonRef] = [:]
     private var pinnedRows: [UUID: ToggleButtonRef] = [:]
+    private var liftedTitles: [UUID: LabelRef] = [:]
     private var workspaceContextControllers: [UUID: GestureClick] = [:]
     private var workspaceContextPopovers: [UUID: PopoverRef] = [:]
     private var regularPinActions: [UUID: ButtonRef] = [:]
@@ -434,6 +451,12 @@ private final class ApplicationState: @unchecked Sendable {
         let regularWorkspaceIDs = Set(projection.groups.flatMap { $0.rows.map(\.id) })
         let attentionWorkspaceIDs = Set(projection.attention.map { $0.row.id })
         let pinnedWorkspaceIDs = Set(projection.pinned.map { $0.row.id })
+        let projectedRows = projection.attention.map(\.row) + projection.pinned.map(\.row)
+            + projection.groups.flatMap(\.rows)
+        let projectedByID = Dictionary(uniqueKeysWithValues: projectedRows.map { ($0.id, $0) })
+        for (id, label) in workspaceTitles { applySearchMatch(projectedByID[id]?.titleMatch, to: label) }
+        for (id, label) in metadata { applySearchMatch(projectedByID[id]?.locationMatch, to: label) }
+        for (id, label) in liftedTitles { applySearchMatch(projectedByID[id]?.titleMatch, to: label) }
         let visibleGroupIDs = Set(projection.groups.map(\.id))
         for group in snapshot.groups {
             for id in workspaceIDsByGroup[group.id] ?? [] {
@@ -646,6 +669,7 @@ private final class ApplicationState: @unchecked Sendable {
         let details = BoxRef(orientation: .vertical, spacing: 2); details.setHexpand(expand: true)
         let title = LabelRef(str: item.row.title); title.add(cssClass: "aw-row-title"); title.xalign = 0
         title.setEllipsize(mode: PangoEllipsizeMode(rawValue: 3)); title.setMaxWidthChars(nChars: 13)
+        applySearchMatch(item.row.titleMatch, to: title)
         let origin = LabelRef(str: attention ? "Needs input from \(item.originGroupName)" : "Pinned from \(item.originGroupName)")
         origin.add(cssClass: "aw-lifted-origin"); origin.xalign = 0
         origin.setEllipsize(mode: PangoEllipsizeMode(rawValue: 3)); origin.setMaxWidthChars(nChars: 18)
@@ -655,6 +679,7 @@ private final class ApplicationState: @unchecked Sendable {
         setAccessibleDescription(button, origin.label ?? "")
         button.onClicked { [weak self] _ in self?.select(workspace.id) }
         installWorkspaceContextMenu(on: button, workspaceID: workspace.id, groupID: item.originGroupID, isLifted: true)
+        liftedTitles[workspace.id] = title
         if attention { attentionRows[workspace.id] = button } else { pinnedRows[workspace.id] = button }
         return button
     }
@@ -956,6 +981,7 @@ private final class ApplicationState: @unchecked Sendable {
             liftedContextPopovers[id]?.unparent(); row.unparent()
         }
         attentionRows.removeAll(); pinnedRows.removeAll()
+        liftedTitles.removeAll()
         liftedPinActions.removeAll(); liftedContextControllers.removeAll(); liftedContextPopovers.removeAll()
         let projection = SidebarLiftedProjection.project(snapshot: snapshot, query: sidebarSearchEntry?.text ?? "")
         for item in projection.attention {

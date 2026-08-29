@@ -22,6 +22,28 @@ public struct SidebarWorkspaceRow: Equatable, Sendable {
     public let paneCount: Int
     public let isSelected: Bool
     public let searchHaystack: String
+    public let titleMatch: Range<Int>?
+    public let locationMatch: Range<Int>?
+
+    public init(
+        id: UUID, title: String, location: String, paneCount: Int,
+        isSelected: Bool, searchHaystack: String,
+        titleMatch: Range<Int>? = nil, locationMatch: Range<Int>? = nil
+    ) {
+        self.id = id; self.title = title; self.location = location
+        self.paneCount = paneCount; self.isSelected = isSelected
+        self.searchHaystack = searchHaystack
+        self.titleMatch = titleMatch; self.locationMatch = locationMatch
+    }
+
+    func matching(_ query: String) -> SidebarWorkspaceRow {
+        SidebarWorkspaceRow(
+            id: id, title: title, location: location, paneCount: paneCount,
+            isSelected: isSelected, searchHaystack: searchHaystack,
+            titleMatch: SidebarSearchProjection.matchRange(in: title, query: query),
+            locationMatch: SidebarSearchProjection.matchRange(in: location, query: query)
+        )
+    }
 }
 
 public struct SidebarGroupSection: Equatable, Sendable {
@@ -198,7 +220,7 @@ public enum SidebarSearchProjection {
         }
 
         let groups = source.groups.compactMap { group -> SidebarGroupSection? in
-            let rows = group.rows.filter { $0.searchHaystack.contains(needle) }
+            let rows = group.rows.filter { $0.searchHaystack.contains(needle) }.map { $0.matching(query) }
             guard !rows.isEmpty else { return nil }
             return SidebarGroupSection(
                 id: group.id,
@@ -223,6 +245,20 @@ public enum SidebarSearchProjection {
             .lowercased()
             .split(whereSeparator: \.isWhitespace)
             .joined(separator: " ")
+    }
+
+    public static func matchRange(in value: String, query: String) -> Range<Int>? {
+        let cleanQuery = ChromeText.sanitized(query, limit: 8_192)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !cleanQuery.isEmpty,
+              let range = value.range(
+                of: cleanQuery,
+                options: [.caseInsensitive, .diacriticInsensitive],
+                locale: .current
+              ) else { return nil }
+        let lower = value.utf8.distance(from: value.utf8.startIndex, to: range.lowerBound)
+        let upper = value.utf8.distance(from: value.utf8.startIndex, to: range.upperBound)
+        return lower..<upper
     }
 }
 

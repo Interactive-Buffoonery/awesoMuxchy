@@ -88,8 +88,12 @@ geometry and state styling have also passed a real-window visual correction.
   deterministic render order. The expanded sidebar includes the reference
   no-matches copy and a working `Clear search` action. Escape clears or returns
   focus to the terminal, Up/Down moves a distinct current-result outline, and
-  Return selects that workspace using projection order. Substring highlight
-  ranges remain pending.
+  Return selects that workspace using projection order.
+- Visible title/location search matches now use tested case- and
+  diacritic-insensitive UTF-8 byte ranges, applied as bold underlined Pango
+  attributes to regular and lifted rows. Hidden-token matches remain truthful
+  without falsely highlighting unrelated visible text; multi-token/fuzzy
+  highlight ranges remain pending.
 - Group mutations now cover sanitized unique create/rename, explicit color,
   stable-ID reorder, cross-group workspace insertion, and populated close with
   replacement selection. Native GTK group menus expose only implemented

@@ -422,6 +422,27 @@ private func snapshot(_ workspaces: [WorkspaceSnapshot]) -> SessionSnapshot {
     #expect(missing.topMatchID == nil)
 }
 
+@Test func sidebarSearchPublishesSafeUTF8MatchRangesForVisibleText() {
+    let pane = PaneSnapshot(title: "Shell", workingDirectory: "/work/Café")
+    let workspace = WorkspaceSnapshot(name: "Résumé Review", focusedPaneID: pane.id, layout: .pane(pane))
+    let value = SessionSnapshot(groups: [WorkspaceGroupSnapshot(name: "Product", workspaces: [workspace])])
+
+    let title = SidebarSearchProjection.project(snapshot: value, query: "resume", homeDirectory: "/home/test")
+        .groups.first?.rows.first
+    #expect(title?.titleMatch == 0..<8)
+    #expect(title?.locationMatch == nil)
+
+    let location = SidebarSearchProjection.project(snapshot: value, query: "cafe", homeDirectory: "/home/test")
+        .groups.first?.rows.first
+    #expect(location?.titleMatch == nil)
+    #expect(location?.locationMatch == 6..<11)
+
+    let hiddenToken = SidebarSearchProjection.project(snapshot: value, query: "local", homeDirectory: "/home/test")
+        .groups.first?.rows.first
+    #expect(hiddenToken?.titleMatch == nil)
+    #expect(hiddenToken?.locationMatch == nil)
+}
+
 @Test func liftedSidebarProjectionOrdersAttentionThenPinnedWithoutDuplicatingOrigins() {
     let attentionOnePane = PaneSnapshot(title: "Approve", workingDirectory: "/one", agent: "Codex", agentState: .needsAttention)
     let attentionTwoPane = PaneSnapshot(title: "Review", workingDirectory: "/two", agent: "Claude", agentState: .needsAttention)
