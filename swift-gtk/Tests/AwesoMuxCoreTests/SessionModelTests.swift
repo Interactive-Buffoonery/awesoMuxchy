@@ -349,6 +349,95 @@ private func snapshot(_ workspaces: [WorkspaceSnapshot]) -> SessionSnapshot {
     #expect((attributes[.posixPermissions] as? NSNumber)?.intValue == 0o600)
 }
 
+@Test func persistenceCoordinatorCoalescesBurstAndFlushesLatestSnapshot() throws {
+    let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    defer { try? FileManager.default.removeItem(at: root) }
+    let store = SessionStore(
+        snapshotURL: root.appendingPathComponent("session.json"),
+        previousSnapshotURL: root.appendingPathComponent("session.previous.json"),
+        quarantineDirectoryURL: root.appendingPathComponent("quarantine")
+    )
+    let first = snapshot([workspace(panes: 1)])
+    let second = snapshot([workspace(panes: 2)])
+    let third = snapshot([workspace(panes: 3)])
+    let coordinator = SessionPersistenceCoordinator(
+        store: store,
+        debounceNanoseconds: 60_000_000_000
+    )
+
+    coordinator.schedule(first)
+    coordinator.schedule(second)
+    coordinator.schedule(third)
+
+    #expect(coordinator.flush() == .saved)
+    #expect(try store.load() == third)
+    #expect(!FileManager.default.fileExists(atPath: store.previousSnapshotURL.path))
+}
+
+@Test func persistenceCoordinatorFlushSupersedesPendingSnapshot() throws {
+    let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    defer { try? FileManager.default.removeItem(at: root) }
+    let store = SessionStore(
+        snapshotURL: root.appendingPathComponent("session.json"),
+        quarantineDirectoryURL: root.appendingPathComponent("quarantine")
+    )
+    let pending = snapshot([workspace(panes: 1)])
+    let lifecycleBoundary = snapshot([workspace(panes: 2)])
+    let coordinator = SessionPersistenceCoordinator(
+        store: store,
+        debounceNanoseconds: 60_000_000_000
+    )
+
+    coordinator.schedule(pending)
+
+    #expect(coordinator.flush(lifecycleBoundary) == .saved)
+    #expect(try store.load() == lifecycleBoundary)
+}
+
+@Test func persistenceCoordinatorWritesLatestSnapshotAfterBoundedDelay() throws {
+    let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    defer { try? FileManager.default.removeItem(at: root) }
+    let store = SessionStore(
+        snapshotURL: root.appendingPathComponent("session.json"),
+        quarantineDirectoryURL: root.appendingPathComponent("quarantine")
+    )
+    let first = snapshot([workspace(panes: 1)])
+    let latest = snapshot([workspace(panes: 2)])
+    let completed = DispatchSemaphore(value: 0)
+    let coordinator = SessionPersistenceCoordinator(
+        store: store,
+        debounceNanoseconds: 20_000_000
+    ) { outcome in
+        if outcome == .saved { completed.signal() }
+    }
+
+    coordinator.schedule(first)
+    coordinator.schedule(latest)
+
+    #expect(completed.wait(timeout: .now() + .seconds(2)) == .success)
+    #expect(try store.load() == latest)
+    #expect(!FileManager.default.fileExists(atPath: store.previousSnapshotURL.path))
+}
+
+@Test func persistenceCoordinatorReportsWriteFailureAndCanRetry() throws {
+    let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    defer { try? FileManager.default.removeItem(at: root) }
+    try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+    let blockedParent = root.appendingPathComponent("not-a-directory")
+    try Data("blocked".utf8).write(to: blockedParent)
+    let store = SessionStore(
+        snapshotURL: blockedParent.appendingPathComponent("session.json"),
+        quarantineDirectoryURL: root.appendingPathComponent("quarantine")
+    )
+    let coordinator = SessionPersistenceCoordinator(store: store)
+    let value = snapshot([workspace(panes: 1)])
+
+    #expect(coordinator.flush(value) == .failed)
+    try FileManager.default.removeItem(at: blockedParent)
+    #expect(coordinator.flush() == .saved)
+    #expect(try store.load() == value)
+}
+
 @Test func invalidCurrentAndPreviousResetAfterQuarantine() throws {
     let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
     defer { try? FileManager.default.removeItem(at: root) }

@@ -206,6 +206,9 @@ private final class ApplicationState: @unchecked Sendable {
     private let preferencesStore: AppPreferencesStore
     private var preferences: AppPreferences
     private(set) var isPersistencePaused = false
+    private lazy var persistence = SessionPersistenceCoordinator(store: store) { [weak self] outcome in
+        performOnGTKMain { [weak self] in self?.applyPersistenceOutcome(outcome) }
+    }
     private let styles = ChromeStyles.makeProvider()
     var surfaces: [TerminalSurface] = []
     private(set) var focusedSurface: TerminalSurface?
@@ -2926,7 +2929,22 @@ private final class ApplicationState: @unchecked Sendable {
     }
 
     private func persist() {
-        do { try store.save(snapshot); isPersistencePaused = false } catch { isPersistencePaused = true }
+        persistence.schedule(snapshot)
+    }
+
+    @discardableResult
+    func flushPersistence() -> Bool {
+        let outcome = persistence.flush(snapshot)
+        applyPersistenceOutcome(outcome)
+        return outcome == .saved
+    }
+
+    private func applyPersistenceOutcome(_ outcome: SessionPersistenceWriteOutcome) {
+        let wasPaused = isPersistencePaused
+        isPersistencePaused = outcome == .failed
+        if isPersistencePaused && !wasPaused {
+            announce("Workspace changes are not being saved. Close or simplify workspaces, then retry.")
+        }
     }
 
     private func announce(_ message: String) {
@@ -3869,5 +3887,6 @@ private func buildWindow(for application: Gtk.ApplicationRef) {
 
 let status = Application.run(id: "com.interactivebuffoonery.awesomux", arguments: CommandLine.arguments,
     activationHandler: buildWindow)
+_ = retainedState?.flushPersistence()
 guard let status else { fatalError("Could not create GTK application") }
 exit(Int32(status))

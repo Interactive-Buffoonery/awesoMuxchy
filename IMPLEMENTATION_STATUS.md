@@ -131,6 +131,15 @@ help, and agent context while preserving the compact reference geometry.
   two-branch repository exposed copy-only for Codex, then exposed and invoked
   insertion after only the declared agent was removed; the staged payload did
   not execute and the runtime remained clean.
+- Authoritative session snapshots no longer validate, encode, rotate, and
+  atomically rewrite JSON synchronously for every sidebar mutation on GTK's UI
+  thread. A serial utility coordinator now matches the reference's 500 ms
+  trailing-edge coalescing window, captures only the Sendable snapshot value,
+  preserves the latest failed value for retry, and synchronously supersedes any
+  delayed write with the final snapshot after a clean application run. Focused
+  tests cover burst collapse, bounded delayed durability, lifecycle flush, and
+  failure recovery; the existing owner-only atomic `SessionStore` remains the
+  sole disk writer.
 - The sidebar host now uses a native GTK horizontal split with the reference
   296-point default, 60-point rail settlement, 250-point mode threshold, and a
   480-point terminal minimum. Width and last-expanded width are defensively
@@ -462,7 +471,8 @@ help, and agent context while preserving the compact reference geometry.
    insertion indicators. Dynamic group menu enablement plus both left/right
    hidden attention reveal paths and timed
    retraction are captured and inspected.
-2. Add bounded/coalesced persistence writes, recovery UI, and forced-termination tests.
+2. Add truthful recovery UI and a forced-termination persistence test; bounded
+   trailing-edge writes and clean-run flush are implemented and pure-tested.
 3. Continue through the root implementation order, capturing each required
    visual milestone.
 

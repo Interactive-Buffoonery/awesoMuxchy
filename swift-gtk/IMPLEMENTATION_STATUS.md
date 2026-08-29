@@ -133,6 +133,13 @@ geometry and state styling have also passed a real-window visual correction.
   name` for Codex to `Inserts the checkout command at the prompt` for an
   otherwise identical local shell pane, then staged the no-newline payload
   without executing it or producing runtime diagnostics.
+- Session mutations now schedule one serialized utility write at the
+  reference's 500 ms trailing edge instead of performing validation, JSON
+  encoding, previous-snapshot rotation, and atomic replacement on GTK's UI
+  thread. A clean application-run boundary flushes the newest authoritative
+  snapshot after invalidating delayed work, and a failed write retains that
+  value for the next mutation or explicit flush. Four focused tests cover burst
+  coalescing, bounded automatic durability, latest-state flush, and retry.
 - The fixed 188-point host has been replaced by a native GTK split using the
   reference 296-point expanded default, 60-point collapsed settlement, and
   250-point mode threshold while reserving at least 480 points for terminal
