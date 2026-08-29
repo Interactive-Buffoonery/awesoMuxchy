@@ -14,6 +14,39 @@ public enum SidebarPosition: String, Codable, CaseIterable, Sendable {
 public enum SidebarDensity: String, Codable, CaseIterable, Sendable {
     case standard
     case compact
+
+    public var layout: SidebarDensityLayout {
+        switch self {
+        case .standard:
+            SidebarDensityLayout(
+                groupStackSpacing: 14,
+                groupHeaderBottomPadding: 3,
+                sessionStackSpacing: 5
+            )
+        case .compact:
+            SidebarDensityLayout(
+                groupStackSpacing: 8,
+                groupHeaderBottomPadding: 1,
+                sessionStackSpacing: 3
+            )
+        }
+    }
+}
+
+public struct SidebarDensityLayout: Equatable, Sendable {
+    public let groupStackSpacing: Int
+    public let groupHeaderBottomPadding: Int
+    public let sessionStackSpacing: Int
+
+    public init(
+        groupStackSpacing: Int,
+        groupHeaderBottomPadding: Int,
+        sessionStackSpacing: Int
+    ) {
+        self.groupStackSpacing = groupStackSpacing
+        self.groupHeaderBottomPadding = groupHeaderBottomPadding
+        self.sessionStackSpacing = sessionStackSpacing
+    }
 }
 
 public struct AppPreferences: Codable, Equatable, Sendable {

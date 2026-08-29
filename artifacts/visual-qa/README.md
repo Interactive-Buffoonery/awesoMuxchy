@@ -1,5 +1,34 @@
 # Visual QA
 
+## 2026-08-29 — SwiftGtk4 standard and compact sidebar density
+
+- Linux images: [compact sidebar](swift-gtk/progress/42-compact-density/compact-sidebar-mocha-x11.png)
+  and [standard sidebar](swift-gtk/progress/42-compact-density/standard-sidebar-mocha-x11.png).
+- Reference: `SidebarSupport.swift`, `SidebarGroupView.swift`,
+  `SidebarPinnedSectionView.swift`, and `SidebarAttentionSectionView.swift` at
+  macOS baseline `fed33ff47c559344fc6db6fa53f16e75fcc4a116`.
+- Geometry: the live density preference now changes native GTK container
+  spacing as well as CSS. Standard uses 14-point group, 3-point header/body,
+  and 5-point session spacing; Compact uses 8, 1, and 3 points respectively.
+  GTK row min-heights and padding preserve the corresponding Standard/Compact
+  rhythm, while empty-creation padding matches the reference's 7/5-point
+  values and retains a 24-point minimum target.
+- Creation rows: visible copy is the reference lowercase `new workspace`, the
+  accessible name is `New workspace in <group>`, and the resting surface uses
+  a quiet elevated fill without an invented dashed border. The explicit drop
+  target keeps its separate drag-and-drop outline.
+- Inspection: both 296×852 Mocha crops use the same synthetic fixture and were
+  inspected at original resolution on the verified X11/GLX path. Header and
+  footer stay fixed while the Compact capture visibly tightens group, session,
+  and creation-row rhythm without clipping controls or metadata.
+- Verification: full preflight passes the text baseline, all 111 Swift tests,
+  warnings-as-errors and release builds, the single-window activation probe,
+  both forced-termination persistence cases, real terminal integration, and
+  100 two-surface lifecycle cycles.
+- Privacy: the fixture uses synthetic names and `/tmp`; the images contain no
+  terminal content, commands, credentials, clipboard data, private paths, or
+  arbitrary agent output.
+
 ## 2026-08-29 — SwiftGtk4 activity-panel consistency
 
 - Linux images: [expanded activity panel with live title](swift-gtk/progress/41-activity-panel-consistency/activity-panel-live-title-x11.png)

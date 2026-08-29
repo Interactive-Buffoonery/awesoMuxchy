@@ -1043,9 +1043,13 @@ private final class ApplicationState: @unchecked Sendable {
         if let marker { groupMarkers[group.id] = marker }
         workspaceIDsByGroup[group.id] = group.rows.map(\.id)
         body.set(visible: group.isExpanded)
+        applySidebarDensityGeometry()
     }
 
-    func attachGroupsContainer(_ groups: BoxRef) { groupsContainer = groups }
+    func attachGroupsContainer(_ groups: BoxRef) {
+        groupsContainer = groups
+        applySidebarDensityGeometry()
+    }
 
     func attachEmptyState(
         page: BoxRef, copy: LabelRef, reopen: ButtonRef, collapsedAction: ButtonRef
@@ -1081,6 +1085,7 @@ private final class ApplicationState: @unchecked Sendable {
         pinnedSectionRoot = pinned.0
         pinnedSectionContent = pinned.1
         pinnedSectionBody = pinned.2
+        applySidebarDensityGeometry()
     }
 
     private func updateLiftedSectionVisibility(
@@ -2886,8 +2891,8 @@ private final class ApplicationState: @unchecked Sendable {
         header.append(child: options); root.append(child: header)
 
         let body = BoxRef(orientation: .vertical, spacing: 5); root.append(child: body)
-        let create = ButtonRef(label: "+  New Workspace in Group"); create.add(cssClass: "aw-new-in-group")
-        setAccessibleLabel(create, "New Workspace in \(ChromeText.sanitized(group.name, limit: 120))")
+        let create = ButtonRef(label: "+  new workspace"); create.add(cssClass: "aw-new-in-group")
+        setAccessibleLabel(create, "New workspace in \(ChromeText.sanitized(group.name, limit: 120))")
         create.setHalign(align: .fill); create.onClicked { [weak self] _ in self?.createWorkspace(in: group.id) }
         body.append(child: create)
         groupCreateRows[group.id] = create
@@ -2999,6 +3004,21 @@ private final class ApplicationState: @unchecked Sendable {
         if appearance.reducesMotion { widget.add(cssClass: "reduced-motion") }
         for density in SidebarDensity.allCases { widget.remove(cssClass: "density-\(density.rawValue)") }
         widget.add(cssClass: "density-\(preferences.sidebarDensity.rawValue)")
+        applySidebarDensityGeometry()
+    }
+
+    private func applySidebarDensityGeometry() {
+        let layout = preferences.sidebarDensity.layout
+        groupsContainer?.set(spacing: layout.groupStackSpacing)
+
+        let headerToBodySpacing = layout.sessionStackSpacing + layout.groupHeaderBottomPadding
+        for root in groupRoots.values { root.set(spacing: headerToBodySpacing) }
+        for body in groupBodies.values { body.set(spacing: layout.sessionStackSpacing) }
+
+        attentionSectionContent?.set(spacing: headerToBodySpacing)
+        attentionSectionBody?.set(spacing: layout.sessionStackSpacing)
+        pinnedSectionContent?.set(spacing: headerToBodySpacing)
+        pinnedSectionBody?.set(spacing: layout.sessionStackSpacing)
     }
 
     private func openFeedback() {

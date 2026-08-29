@@ -219,7 +219,13 @@ help, and agent context while preserving the compact reference geometry.
   control, and the collapsed rail uses a 40-point menu. The default and
   current-directory commands now have distinct group/directory semantics and
   all pointer creation routes share a 400 ms duplicate guard. Standard and
-  compact sidebar density is selectable, persisted, and applied live.
+  compact sidebar density is selectable, persisted, and applied live. Native
+  group/header/session spacing now matches the reference's 14/3/5-point
+  Standard and 8/1/3-point Compact geometry, with GTK-specific row sizing and
+  exact 7/5-point creation-row padding. Paired real-app captures verify the
+  same fixture at both densities.
+  Creation rows now use the reference lowercase label and exact accessible
+  name, a quiet elevated resting fill, and reserve the outline for drag/drop.
 - Workspace creation targeting now matches the reference routes instead of
   silently using the first stored group. The expanded primary segment resolves
   the selected workspace's owning group at activation, with the canonical

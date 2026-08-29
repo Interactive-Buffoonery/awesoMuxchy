@@ -218,7 +218,13 @@ geometry and state styling have also passed a real-window visual correction.
   segments; the collapsed rail uses a 40-point creation menu. Default versus
   current-directory creation resolve different directory/group contexts at
   activation and share a 400 ms duplicate guard. Quick Settings now applies
-  persisted Standard/Compact sidebar density live.
+  persisted Standard/Compact sidebar density live. The preference also updates
+  native GTK geometry: Standard uses 14/3/5-point group/header/session spacing
+  and Compact uses 8/1/3 points, with GTK-specific row sizing and exact
+  7/5-point creation-row padding. Paired 296×852 real-app captures verify both
+  densities against the same fixture.
+  Creation rows now use the reference lowercase label and exact accessible
+  name, a quiet elevated resting fill, and no resting dashed border.
 - Creation no longer treats storage order as the default-group contract. The
   expanded primary action resolves the selected workspace's owning group at
   activation, falling back to the canonical `awesoMux` group; app/menu New
