@@ -133,6 +133,13 @@ help, and agent context while preserving the compact reference geometry.
   through a tested pure policy. The four pinned OFL Geist faces are packaged
   and registered process-locally with Fontconfig; real Latte and Mocha windows
   were run and inspected.
+- Visible sidebar navigation now has a tested Up/Down/Home/End policy spanning
+  lifted rows, group disclosures, ownership rows, and per-group creation rows.
+  GTK controls publish explicit accessible names/descriptions and selected or
+  expanded state at the component seam; compact icon/footer targets are at
+  least 24 points. Agent state chips are buttons that open the panel filtered
+  to the chosen state. Orca enumerates the running app through AT-SPI; full
+  spoken navigation and announcement verification remains pending.
 - Workspace rows now expose real soft close and permanent clear actions. Soft
   close records a bounded, 24-hour recovery snapshot, removes the row from all
   projections, selects the next live workspace, and powers Ctrl-Shift-T

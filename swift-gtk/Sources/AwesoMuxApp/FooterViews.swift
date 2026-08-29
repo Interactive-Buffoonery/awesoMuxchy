@@ -26,6 +26,7 @@ private func menuButton(_ title: String, icon: String? = nil, action: @escaping 
     label.setHexpand(expand: true)
     content.append(child: label)
     button.set(child: content)
+    setAccessibleLabel(button, title)
     button.onClicked { _ in action() }
     return button
 }
@@ -149,6 +150,8 @@ final class FocusedPanePathBar: @unchecked Sendable {
         project.label = value.project
         path.label = value.path
         pathMenu.setTooltip(text: isRemote ? "Workspace options are unavailable for remote panes." : "Open workspace options.")
+        setAccessibleLabel(pathMenu, "\(value.project), \(value.path)")
+        setAccessibleDescription(pathMenu, isRemote ? "Workspace options are unavailable for remote panes" : "Open workspace options")
         remote.set(visible: isRemote)
         branchMenu.set(visible: false)
         dirty.set(visible: false)
@@ -176,6 +179,8 @@ final class FocusedPanePathBar: @unchecked Sendable {
             branchHint.label = arrows
             branchHint.set(visible: !arrows.isEmpty)
             branchMenu.setTooltip(text: "Branch \(branch). Open branch options.")
+            setAccessibleLabel(branchMenu, "Branch \(branch)")
+            setAccessibleDescription(branchMenu, "Open branch options")
             branchMenu.set(popover: branchPopover(current: branch, branches: details.branches))
             branchMenu.set(visible: true)
         } else {
@@ -184,6 +189,7 @@ final class FocusedPanePathBar: @unchecked Sendable {
         if let count = details.git?.dirtyCount, count > 0 {
             dirty.label = "+\(capped(count))"
             dirty.setTooltip(text: "\(count) changed working-copy entries")
+            setAccessibleLabel(dirty, "\(count) changed working-copy entries")
             dirty.set(visible: true)
         } else {
             dirty.set(visible: false)
@@ -195,6 +201,8 @@ final class FocusedPanePathBar: @unchecked Sendable {
             pullRequestMenu.remove(cssClass: "aw-chip-pr-review")
             pullRequestMenu.add(cssClass: pr.state == .draft ? "aw-chip-pr-draft" : pr.state == .inReview ? "aw-chip-pr-review" : "aw-chip-pr-open")
             pullRequestMenu.setTooltip(text: "Pull request #\(pr.number), \(pr.state == .draft ? "draft" : pr.state == .inReview ? "in review" : "open")")
+            setAccessibleLabel(pullRequestMenu, "Pull request #\(pr.number)")
+            setAccessibleDescription(pullRequestMenu, pr.state == .draft ? "Draft" : pr.state == .inReview ? "In review" : "Open")
             pullRequestMenu.set(popover: pullRequestPopover(pr))
             pullRequestMenu.set(visible: true)
         } else {
@@ -205,6 +213,8 @@ final class FocusedPanePathBar: @unchecked Sendable {
             ciMenu.remove(cssClass: "aw-chip-ci-failing")
             if ci.state == .failing { ciMenu.add(cssClass: "aw-chip-ci-failing") }
             ciMenu.setTooltip(text: [ci.workflowName, ci.state == .failing ? "failing" : "running"].compactMap { $0 }.joined(separator: ": "))
+            setAccessibleLabel(ciMenu, ci.state == .failing ? "CI failing" : "CI running")
+            setAccessibleDescription(ciMenu, ci.workflowName ?? "Continuous integration")
             ciMenu.set(popover: ciPopover(ci))
             ciMenu.set(visible: true)
         } else {
@@ -298,9 +308,12 @@ final class SidebarStatusFooter {
     let collapsedRoot = BoxRef(orientation: .horizontal, spacing: 2)
     private let activityPanel = BoxRef(orientation: .vertical, spacing: 4)
     private let activityRows = BoxRef(orientation: .vertical, spacing: 2)
-    private let thinking = LabelRef(str: "")
-    private let output = LabelRef(str: "")
-    private let attention = LabelRef(str: "")
+    private let thinking = ButtonRef()
+    private let thinkingLabel = LabelRef(str: "")
+    private let output = ButtonRef()
+    private let outputLabel = LabelRef(str: "")
+    private let attention = ButtonRef()
+    private let attentionLabel = LabelRef(str: "")
     private let total = ButtonRef()
     private let totalLabel = LabelRef(str: "0 agents  ⌃")
     private let quickSettings = MenuButtonRef()
@@ -311,6 +324,7 @@ final class SidebarStatusFooter {
     private var isExpanded = false
     private var latestSummary = AgentFooterSummary(snapshot: SessionSnapshot())
     private var collapsedSelectionIndex = 0
+    private var activityFilter: AgentState?
 
     init(preferences: AppPreferences, actions: Actions) {
         self.preferences = preferences
@@ -328,6 +342,7 @@ final class SidebarStatusFooter {
         let close = ButtonRef(label: "×")
         close.add(cssClass: "aw-icon-button")
         close.setTooltip(text: "Hide agent activity")
+        setAccessibleLabel(close, "Hide agent activity")
         close.onClicked { [weak self] _ in self?.setExpanded(false) }
         panelHeader.append(child: heading)
         panelHeader.append(child: close)
@@ -350,6 +365,7 @@ final class SidebarStatusFooter {
         quickSettings.set(alwaysShowArrow: false)
         quickSettings.set(iconName: "emblem-system-symbolic")
         quickSettings.setTooltip(text: "Quick Settings")
+        setAccessibleLabel(quickSettings, "Quick Settings")
         quickSettings.set(popover: quickSettingsPopover())
         bar.append(child: quickSettings)
 
@@ -359,6 +375,7 @@ final class SidebarStatusFooter {
         help.set(alwaysShowArrow: false)
         help.set(iconName: "help-about-symbolic")
         help.setTooltip(text: "Help & Feedback")
+        setAccessibleLabel(help, "Help & Feedback")
         let helpBox = BoxRef(orientation: .vertical, spacing: 2)
         helpBox.append(child: menuButton("Show Welcome Tour") { [actions] in actions.showWelcome() })
         helpBox.append(child: menuButton("Report a bug…") { [actions] in actions.reportBug() })
@@ -366,11 +383,17 @@ final class SidebarStatusFooter {
         help.set(popover: menuPopover(helpBox))
         bar.append(child: help)
 
-        for (label, css) in [(thinking, "aw-agent-thinking"), (output, "aw-agent-output"), (attention, "aw-agent-attention")] {
-            label.add(cssClass: "aw-agent-state")
-            label.add(cssClass: css)
-            label.set(visible: false)
-            bar.append(child: label)
+        for (button, label, css, state) in [
+            (thinking, thinkingLabel, "aw-agent-thinking", AgentState.thinking),
+            (output, outputLabel, "aw-agent-output", AgentState.output),
+            (attention, attentionLabel, "aw-agent-attention", AgentState.needsAttention),
+        ] {
+            button.add(cssClass: "aw-agent-state")
+            button.add(cssClass: css)
+            button.set(child: label)
+            button.set(visible: false)
+            button.onClicked { [weak self] _ in self?.showActivity(state: state) }
+            bar.append(child: button)
         }
         let spacer = BoxRef(orientation: .horizontal, spacing: 0)
         spacer.setHexpand(expand: true)
@@ -378,6 +401,7 @@ final class SidebarStatusFooter {
         total.add(cssClass: "aw-agent-total")
         total.set(child: totalLabel)
         total.setTooltip(text: "Show agent activity")
+        setAccessibleLabel(total, "Show agent activity")
         total.onClicked { [weak self] _ in self?.setExpanded(!(self?.isExpanded ?? false)) }
         bar.append(child: total)
         root.append(child: bar)
@@ -391,41 +415,52 @@ final class SidebarStatusFooter {
         collapsedSettings.set(alwaysShowArrow: false)
         collapsedSettings.set(iconName: "emblem-system-symbolic")
         collapsedSettings.setTooltip(text: "Quick Settings")
+        setAccessibleLabel(collapsedSettings, "Quick Settings")
         collapsedSettings.set(popover: quickSettingsPopover())
         collapsedRoot.append(child: collapsedSettings)
         collapsedTotal.add(cssClass: "aw-agent-total")
         collapsedTotal.set(child: collapsedTotalLabel)
         collapsedTotal.setTooltip(text: "No agents running")
+        setAccessibleLabel(collapsedTotal, "No agents running")
         collapsedTotal.onClicked { [weak self] _ in self?.selectNextCollapsedAgent() }
         collapsedRoot.append(child: collapsedTotal)
     }
 
     func update(_ summary: AgentFooterSummary) {
         latestSummary = summary
-        stateLabel(thinking, count: summary.thinkingCount, symbol: "●", name: "thinking")
-        stateLabel(output, count: summary.outputCount, symbol: "●", name: "output ready")
-        stateLabel(attention, count: summary.needsAttentionCount, symbol: "●", name: "needs attention")
+        stateButton(thinking, label: thinkingLabel, count: summary.thinkingCount, symbol: "●", name: "thinking")
+        stateButton(output, label: outputLabel, count: summary.outputCount, symbol: "●", name: "output ready")
+        stateButton(attention, label: attentionLabel, count: summary.needsAttentionCount, symbol: "●", name: "needs attention")
         totalLabel.label = "\(summary.totalCount) \(summary.totalCount == 1 ? "agent" : "agents")  \(isExpanded ? "⌄" : "⌃")"
         collapsedTotalLabel.label = summary.totalCount > 99 ? "99+" : String(summary.totalCount)
         collapsedTotal.setTooltip(text: summary.rows.isEmpty ? "No agents running" : "Jump to next agent pane")
+        setAccessibleLabel(collapsedTotal, summary.rows.isEmpty ? "No agents running" : "Jump to next agent pane, \(summary.totalCount) agents")
         collapsedTotal.set(sensitive: !summary.rows.isEmpty)
+
+        rebuildActivityRows()
+    }
+
+    private func rebuildActivityRows() {
+        let rows = activityFilter.map { state in latestSummary.rows.filter { $0.state == state } } ?? latestSummary.rows
 
         var child = activityRows.getFirstChild()
         while let current = child {
             child = current.getNextSibling()
             activityRows.remove(child: current)
         }
-        if summary.rows.isEmpty {
-            let empty = LabelRef(str: "No agents running")
+        if rows.isEmpty {
+            let empty = LabelRef(str: activityFilter == nil ? "No agents running" : "No agents in this state")
             empty.add(cssClass: "aw-menu-disabled")
             empty.setMarginTop(margin: 8)
             empty.setMarginBottom(margin: 8)
             activityRows.append(child: empty)
         } else {
-            for row in summary.rows {
+            for row in rows {
                 let title = "\(row.agent)  ·  \(row.workspace)"
                 let button = menuButton(title) { [actions] in actions.selectPane(row.workspaceID, row.paneID) }
                 button.setTooltip(text: "\(row.pane), \(row.state.rawValue)")
+                setAccessibleLabel(button, title)
+                setAccessibleDescription(button, "\(row.pane), \(row.state.rawValue)")
                 activityRows.append(child: button)
             }
         }
@@ -439,17 +474,27 @@ final class SidebarStatusFooter {
         actions.selectPane(row.workspaceID, row.paneID)
     }
 
-    private func stateLabel(_ label: LabelRef, count: Int, symbol: String, name: String) {
+    private func stateButton(_ button: ButtonRef, label: LabelRef, count: Int, symbol: String, name: String) {
         label.label = "\(symbol) \(count)"
-        label.setTooltip(text: "\(count) \(name)")
-        label.set(visible: count > 0)
+        button.setTooltip(text: "\(count) \(name)")
+        setAccessibleLabel(button, "\(count) \(name)")
+        button.set(visible: count > 0)
+    }
+
+    private func showActivity(state: AgentState) {
+        activityFilter = state
+        rebuildActivityRows()
+        setExpanded(true)
     }
 
     private func setExpanded(_ expanded: Bool) {
         isExpanded = expanded
+        if !expanded { activityFilter = nil; rebuildActivityRows() }
         activityPanel.set(visible: expanded)
         totalLabel.label = totalLabel.label.replacingOccurrences(of: expanded ? "⌃" : "⌄", with: expanded ? "⌄" : "⌃")
         total.setTooltip(text: expanded ? "Hide agent activity" : "Show agent activity")
+        setAccessibleLabel(total, expanded ? "Hide agent activity" : "Show agent activity")
+        setAccessibleExpanded(total, expanded)
     }
 
     private func quickSettingsPopover() -> PopoverRef {

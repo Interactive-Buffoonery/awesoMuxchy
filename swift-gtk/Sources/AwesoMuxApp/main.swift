@@ -22,12 +22,6 @@ private func performOnGTKMain(_ action: @escaping () -> Void) {
     }, data: pointer)
 }
 
-private func setAccessibleLabel<T: Gtk.AccessibleProtocol>(_ accessible: T, _ label: String) {
-    var property = GTK_ACCESSIBLE_PROPERTY_LABEL
-    let value = GLibObject.Value(label)
-    accessible.updatePropertyValue(nProperties: 1, properties: &property, values: value.value_ptr)
-}
-
 private final class ApplicationState: @unchecked Sendable {
     private final class WorkspaceRuntime {
         var groupID: UUID
@@ -71,6 +65,7 @@ private final class ApplicationState: @unchecked Sendable {
     private var groupNames: [UUID: LabelRef] = [:]
     private var groupMarkers: [UUID: LabelRef] = [:]
     private var groupCreateRows: [UUID: ButtonRef] = [:]
+    private var groupDisclosures: [UUID: ButtonRef] = [:]
     private var groupMoveUpActions: [UUID: ButtonRef] = [:]
     private var groupMoveDownActions: [UUID: ButtonRef] = [:]
     private var groupCloseActions: [UUID: ButtonRef] = [:]
@@ -116,6 +111,7 @@ private final class ApplicationState: @unchecked Sendable {
     private var attentionAcknowledgementGeneration = 0
     private var sidebarMotionController: EventControllerMotion?
     private var searchKeyController: EventControllerKey?
+    private var sidebarNavigationKeyController: EventControllerKey?
     private var lastWorkspaceCreateAt: ContinuousClock.Instant?
     private var context = FocusedPaneContextCoordinator()
     private var actions: [GIO.SimpleAction] = []
@@ -425,6 +421,7 @@ private final class ApplicationState: @unchecked Sendable {
               let group = snapshot.groups.first(where: { $0.id == groupID }) else { return }
         groupBodies[groupID]?.set(visible: !group.isCollapsed)
         groupChevrons[groupID]?.label = group.isCollapsed ? "›" : "⌄"
+        if let disclosure = groupDisclosures[groupID] { setAccessibleExpanded(disclosure, !group.isCollapsed) }
         persist()
     }
 
@@ -502,6 +499,48 @@ private final class ApplicationState: @unchecked Sendable {
         searchKeyController = controller
     }
 
+    func retainSidebarNavigationController(_ controller: EventControllerKey) {
+        sidebarNavigationKeyController = controller
+    }
+
+    private func sidebarNavigationWidgets() -> [WidgetRef] {
+        var result: [WidgetRef] = []
+        for id in snapshot.attentionWorkspaceIDs {
+            if let row = attentionRows[id], row.getVisible() { result.append(WidgetRef(row)) }
+        }
+        for id in snapshot.pinnedWorkspaceIDs where attentionRows[id] == nil {
+            if let row = pinnedRows[id], row.getVisible() { result.append(WidgetRef(row)) }
+        }
+        for group in snapshot.groups {
+            guard groupRoots[group.id]?.getVisible() == true else { continue }
+            if let disclosure = groupDisclosures[group.id] { result.append(WidgetRef(disclosure)) }
+            guard groupBodies[group.id]?.getVisible() == true else { continue }
+            for id in workspaceIDsByGroup[group.id] ?? [] {
+                if let row = rows[id], row.getVisible() { result.append(WidgetRef(row)) }
+            }
+            if let create = groupCreateRows[group.id], create.getVisible() { result.append(WidgetRef(create)) }
+        }
+        return result
+    }
+
+    func handleSidebarNavigationKey(_ keyval: UInt) -> Bool {
+        let key: SidebarNavigationKey
+        switch keyval {
+        case UInt(GDK_KEY_Up): key = .previous
+        case UInt(GDK_KEY_Down): key = .next
+        case UInt(GDK_KEY_Home): key = .first
+        case UInt(GDK_KEY_End): key = .last
+        default: return false
+        }
+        let widgets = sidebarNavigationWidgets()
+        let current = widgets.firstIndex { gtk_widget_has_focus($0.widget_ptr) != 0 }
+        guard let destination = SidebarKeyboardNavigationPolicy.destination(
+            current: current, count: widgets.count, key: key
+        ) else { return true }
+        _ = widgets[destination].grabFocus()
+        return true
+    }
+
     func retainSidebarMotionController(_ controller: EventControllerMotion) {
         sidebarMotionController = controller
     }
@@ -572,6 +611,10 @@ private final class ApplicationState: @unchecked Sendable {
         meta.setMaxWidthChars(nChars: 13)
         details.append(child: name); details.append(child: meta); content.append(child: details); row.set(child: content)
         row.onClicked { [weak self] _ in self?.select(workspace.id) }
+        let safeName = ChromeText.sanitized(workspace.name, limit: 120)
+        setAccessibleLabel(row, safeName)
+        let paneDescription = workspace.layout.paneCount > 1 ? ", \(workspace.layout.paneCount) panes" : ""
+        setAccessibleDescription(row, "Workspace in \(ChromeText.sanitized(group.name, limit: 120)); \(location)\(paneDescription)")
         installWorkspaceContextMenu(on: row, workspaceID: workspace.id, groupID: groupID)
         rows[workspace.id] = row; metadata[workspace.id] = meta; workspaceTitles[workspace.id] = name
         if !(workspaceIDsByGroup[groupID] ?? []).contains(workspace.id) { workspaceIDsByGroup[groupID, default: []].append(workspace.id) }
@@ -584,6 +627,8 @@ private final class ApplicationState: @unchecked Sendable {
         button.add(cssClass: "aw-rail-row")
         button.setSizeRequest(width: 40, height: 40)
         button.setTooltip(text: ChromeText.sanitized(workspace.name, limit: 120))
+        setAccessibleLabel(button, ChromeText.sanitized(workspace.name, limit: 120))
+        setAccessibleDescription(button, "Workspace")
         button.onClicked { [weak self] _ in self?.select(workspace.id) }
         railRows[workspace.id] = button
         return button
@@ -606,6 +651,8 @@ private final class ApplicationState: @unchecked Sendable {
         origin.setEllipsize(mode: PangoEllipsizeMode(rawValue: 3)); origin.setMaxWidthChars(nChars: 18)
         details.append(child: title); details.append(child: origin); content.append(child: details); button.set(child: content)
         button.setTooltip(text: origin.label ?? "")
+        setAccessibleLabel(button, item.row.title)
+        setAccessibleDescription(button, origin.label ?? "")
         button.onClicked { [weak self] _ in self?.select(workspace.id) }
         installWorkspaceContextMenu(on: button, workspaceID: workspace.id, groupID: item.originGroupID, isLifted: true)
         if attention { attentionRows[workspace.id] = button } else { pinnedRows[workspace.id] = button }
@@ -621,7 +668,7 @@ private final class ApplicationState: @unchecked Sendable {
             button.onClicked { _ in run(); popover.popdown() }; box.append(child: button); return button
         }
         _ = action("New Workspace Here") { [weak self] in self?.createWorkspace(here: workspaceID, fallbackGroupID: groupID) }
-        _ = action("Rename Workspace...") { [weak self] in self?.presentWorkspaceNameDialog(workspaceID) }
+        _ = action("Rename Workspace…") { [weak self] in self?.presentWorkspaceNameDialog(workspaceID) }
         if let workspace = snapshot.workspace(id: workspaceID),
            workspace.layout.panes.contains(where: {
                $0.agentState == .needsAttention && !workspace.acknowledgedAttentionPaneIDs.contains($0.id)
@@ -762,6 +809,8 @@ private final class ApplicationState: @unchecked Sendable {
         let safeName = ChromeText.sanitized(workspace.name, limit: 120)
         workspaceTitles[workspaceID]?.label = safeName
         railRows[workspaceID]?.setTooltip(text: safeName)
+        if let row = rows[workspaceID] { setAccessibleLabel(row, safeName) }
+        if let row = railRows[workspaceID] { setAccessibleLabel(row, safeName) }
         refreshLiftedRows(); persist()
         return true
     }
@@ -960,6 +1009,9 @@ private final class ApplicationState: @unchecked Sendable {
         let header = BoxRef(orientation: .horizontal, spacing: 2)
         let disclosure = ButtonRef(); disclosure.add(cssClass: "aw-group"); disclosure.setHalign(align: .fill)
         disclosure.setHexpand(expand: true); disclosure.setTooltip(text: "Toggle \(group.name) workspace group")
+        setAccessibleLabel(disclosure, "\(ChromeText.sanitized(group.name, limit: 120)) workspace group")
+        setAccessibleDescription(disclosure, "\(projection.rows.count) workspaces")
+        setAccessibleExpanded(disclosure, projection.isExpanded)
         let content = BoxRef(orientation: .horizontal, spacing: 8)
         let chevron = LabelRef(str: projection.isExpanded ? "⌄" : "›")
         let marker = LabelRef(str: "●"); marker.add(cssClass: "aw-marker")
@@ -1001,9 +1053,11 @@ private final class ApplicationState: @unchecked Sendable {
 
         let body = BoxRef(orientation: .vertical, spacing: 5); root.append(child: body)
         let create = ButtonRef(label: "+  New Workspace in Group"); create.add(cssClass: "aw-new-in-group")
+        setAccessibleLabel(create, "New Workspace in \(ChromeText.sanitized(group.name, limit: 120))")
         create.setHalign(align: .fill); create.onClicked { [weak self] _ in self?.createWorkspace(in: group.id) }
         body.append(child: create)
         groupCreateRows[group.id] = create
+        groupDisclosures[group.id] = disclosure
         registerGroup(projection, root: root, body: body, chevron: chevron, count: count, name: name, marker: marker)
         refreshGroupActionEnablement()
         return (root, body)
@@ -1024,6 +1078,10 @@ private final class ApplicationState: @unchecked Sendable {
         for (id, row) in railRows { row.setActive(isActive: id == workspaceID) }
         for (id, row) in attentionRows { row.setActive(isActive: id == workspaceID) }
         for (id, row) in pinnedRows { row.setActive(isActive: id == workspaceID) }
+        for (id, row) in rows { setAccessibleSelected(row, id == workspaceID) }
+        for (id, row) in railRows { setAccessibleSelected(row, id == workspaceID) }
+        for (id, row) in attentionRows { setAccessibleSelected(row, id == workspaceID) }
+        for (id, row) in pinnedRows { setAccessibleSelected(row, id == workspaceID) }
         title?.label = ChromeText.sanitized(snapshot.workspace(id: workspaceID)?.name ?? "", limit: 120)
         updateChrome(workspaceID); focus(runtime.focusedPaneID); persist()
     }
@@ -1431,6 +1489,7 @@ private final class ApplicationState: @unchecked Sendable {
         }
         if let root = groupRoots.removeValue(forKey: groupID) { groupsContainer?.remove(child: root) }
         groupBodies.removeValue(forKey: groupID); groupChevrons.removeValue(forKey: groupID)
+        groupDisclosures.removeValue(forKey: groupID)
         groupCounts.removeValue(forKey: groupID); groupNames.removeValue(forKey: groupID); groupMarkers.removeValue(forKey: groupID)
         groupCreateRows.removeValue(forKey: groupID)
         groupMoveUpActions.removeValue(forKey: groupID); groupMoveDownActions.removeValue(forKey: groupID)
@@ -1515,12 +1574,14 @@ private func buildWindow(for application: Gtk.ApplicationRef) {
     let header = BoxRef(orientation: .horizontal, spacing: 6)
     header.setMarginStart(margin: 10); header.setMarginEnd(margin: 10); header.setMarginTop(margin: 10); header.setMarginBottom(margin: 8)
     let search = SearchEntryRef(); search.add(cssClass: "aw-search"); search.setHexpand(expand: true)
+    setAccessibleLabel(search, "Search sessions")
     search.getFirstChild()?.add(cssClass: "aw-search-text")
     search.setPlaceholder(text: "Search sessions"); search.setSizeRequest(width: 108, height: 30)
     search.setWidthChars(nChars: 8); search.setMaxWidthChars(nChars: 8)
     search.onSearchChanged { [weak state] entry in state?.filter(entry.text ?? "") }
     let createSplit = BoxRef(orientation: .horizontal, spacing: 0); createSplit.add(cssClass: "aw-create-split")
     let createPrimary = ButtonRef(label: "+"); createPrimary.add(cssClass: "aw-create-primary")
+    setAccessibleLabel(createPrimary, "New Workspace")
     createPrimary.setTooltip(text: "New Workspace")
     createPrimary.onClicked { [weak state] _ in state?.createDefaultWorkspace() }
     let createOptions = state.makeWorkspaceOptionsButton(includePrimaryAction: false)
@@ -1548,6 +1609,7 @@ private func buildWindow(for application: Gtk.ApplicationRef) {
     let noMatchesDescription = LabelRef(str: ""); noMatchesDescription.add(cssClass: "aw-no-matches-copy")
     noMatchesDescription.xalign = 0; noMatchesDescription.set(wrap: true)
     let clearSearch = ButtonRef(label: "Clear search"); clearSearch.add(cssClass: "aw-clear-search"); clearSearch.setHalign(align: .start)
+    setAccessibleLabel(clearSearch, "Clear search")
     clearSearch.onClicked { [weak state] _ in state?.clearSidebarSearch() }
     noMatches.append(child: noMatchesTitle); noMatches.append(child: noMatchesDescription); noMatches.append(child: clearSearch)
     noMatches.set(visible: false); groups.append(child: noMatches)
@@ -1560,6 +1622,13 @@ private func buildWindow(for application: Gtk.ApplicationRef) {
     _ = searchKeys.ref()
     state.retainSearchController(searchKeys)
     gtk_widget_add_controller(search.widget_ptr, searchKeys.event_controller_ptr)
+    let navigationKeys = EventControllerKey()
+    navigationKeys.onKeyPressed { [weak state] _, keyval, _, _ in
+        state?.handleSidebarNavigationKey(keyval) ?? false
+    }
+    _ = navigationKeys.ref()
+    state.retainSidebarNavigationController(navigationKeys)
+    gtk_widget_add_controller(expandedSidebar.widget_ptr, navigationKeys.event_controller_ptr)
     scroller.setVexpand(expand: true); scroller.set(child: groups); expandedSidebar.append(child: scroller)
     let sidebarFooter = state.makeSidebarFooter()
     expandedSidebar.append(child: sidebarFooter.root)
@@ -1570,6 +1639,7 @@ private func buildWindow(for application: Gtk.ApplicationRef) {
     let railSearch = ButtonRef(); railSearch.set(iconName: "system-search-symbolic")
     railSearch.add(cssClass: "aw-rail-control")
     railSearch.setTooltip(text: "Search workspaces and actions")
+    setAccessibleLabel(railSearch, "Search workspaces and actions")
     railSearch.onClicked { [weak state] _ in state?.showCommandPalette() }
     let railAdd = state.makeWorkspaceOptionsButton(includePrimaryAction: true)
     railAdd.add(cssClass: "aw-rail-control")
@@ -1623,6 +1693,8 @@ private func buildWindow(for application: Gtk.ApplicationRef) {
     sidebarHost.setHexpand(expand: true); sidebarHost.setVexpand(expand: true)
     let edgeTab = ButtonRef(); edgeTab.add(cssClass: "aw-sidebar-edge-attention")
     edgeTab.setTooltip(text: "Show Sidebar — workspace needs input")
+    setAccessibleLabel(edgeTab, "Show Sidebar")
+    setAccessibleDescription(edgeTab, "A workspace needs input")
     edgeTab.setHalign(align: state.configuredSidebarPosition == .left ? .start : .end)
     edgeTab.setValign(align: .center)
     if state.configuredSidebarPosition == .right { edgeTab.add(cssClass: "aw-right") }

@@ -129,6 +129,14 @@ geometry and state styling have also passed a real-window visual correction.
   overrides in tests. Four exact pinned Geist weights and their OFL license are
   SwiftPM resources registered process-locally through Fontconfig; real light
   and dark GTK windows were inspected after registration.
+- The expanded sidebar now handles Up/Down/Home/End as one logical visible
+  sequence across lifted sections, group disclosures, workspace rows, and
+  creation rows using a pure tested navigation policy. Rows, rail controls,
+  groups, edge attention, footer controls, and path/status controls publish
+  GTK accessible names and descriptions; selected/expanded state updates with
+  the authoritative model. Compact targets are at least 24 points. Footer
+  state chips are real buttons that open a state-filtered activity panel, and
+  Orca discovers the live app through AT-SPI.
 
 ## Remaining vertical-slice hardening
 
