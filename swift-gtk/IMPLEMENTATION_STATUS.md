@@ -124,6 +124,10 @@ geometry and state styling have also passed a real-window visual correction.
   authoritative session state, and its footer cycles through live agent panes.
   The expanded search text node has an owned theme style and the exact
   `Search sessions` placeholder. Full visual acceptance remains pending.
+- The first expanded group's real GTK action popover was opened through AT-SPI
+  and captured independently. It exposes exact create/rename/color/move/close
+  routes, marks the current Blue tint, omits unavailable SSH, disables Move
+  Group Up at the first boundary, and keeps Move Group Down sensitive.
 - Search visibility is now driven by a pure `SidebarSearchProjection` that
   normalizes whitespace/diacritics and searches group/workspace/pane titles,
   paths, local/remote identity, agent/provider names, and state vocabulary in

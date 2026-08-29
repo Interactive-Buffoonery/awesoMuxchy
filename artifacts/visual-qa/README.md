@@ -1,5 +1,24 @@
 # Visual QA
 
+## 2026-08-29 — SwiftGtk4 group action menu
+
+- Linux image: [first-group action menu](swift-gtk/progress/22-group-menu/first-group-actions-x11.png).
+- Reference: `SidebarGroupView.swift`, `SidebarGroupHeaderView.swift`, and the
+  shared group color/action wording at macOS baseline
+  `fed33ff47c559344fc6db6fa53f16e75fcc4a116`.
+- Behavior: AT-SPI activated the real options control for the first expanded
+  group. The native GTK popover exposes exact creation, rename, color, move,
+  and close routes; the current Blue tint is marked, Move Group Up is disabled
+  at the first boundary, and Move Group Down remains sensitive. No unavailable
+  SSH action is shown.
+- Inspection: the dedicated 276×838 popover surface was inspected at original
+  resolution. Labels, selection marker, color order, padding, dividers, and
+  dynamic boundary state are visible without terminal content in the capture.
+- Accessibility: direct AT-SPI inspection verifies the named options toggle and
+  each visible action; `Move Group Up` reports insensitive while the adjacent
+  movement and other truthful actions report sensitive.
+- Privacy: the menu contains product-owned static wording only.
+
 ## 2026-08-29 — SwiftGtk4 accessible large text
 
 - Linux image: [1.5× accessible text](swift-gtk/progress/21-large-text/large-text-150-x11.png).
