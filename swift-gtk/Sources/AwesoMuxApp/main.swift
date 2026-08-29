@@ -2976,6 +2976,22 @@ private final class ApplicationState: @unchecked Sendable {
         return outcome == .saved
     }
 
+    func prepareForWindowClose() {
+        for workspaceID in Array(workspacePanePeekPopovers.keys) {
+            removeWorkspacePanePeek(workspaceID)
+        }
+        for popover in workspaceContextPopovers.values {
+            popover.popdown()
+            popover.unparent()
+        }
+        workspaceContextPopovers.removeAll()
+        for popover in liftedContextPopovers.values {
+            popover.popdown()
+            popover.unparent()
+        }
+        liftedContextPopovers.removeAll()
+    }
+
     private func applyPersistenceOutcome(_ outcome: SessionPersistenceWriteOutcome) {
         let wasPaused = isPersistencePaused
         isPersistencePaused = outcome == .failed
@@ -3915,6 +3931,10 @@ private func buildWindow(for application: Gtk.ApplicationRef) {
     _ = modifierKeys.ref()
     state.retainGlobalModifierController(modifierKeys)
     gtk_widget_add_controller(window.widget_ptr, modifierKeys.event_controller_ptr)
+    window.onCloseRequest { [weak state] _ in
+        state?.prepareForWindowClose()
+        return false
+    }
     main.append(child: sidebarHost); root.append(child: main)
     window.set(child: root); window.present()
     state.filter("")

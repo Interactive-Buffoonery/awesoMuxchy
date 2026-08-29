@@ -1,5 +1,29 @@
 # Visual QA
 
+## 2026-08-29 — SwiftGtk4 chrome contrast audit
+
+- Linux image: [Latte agent-state sidebar](swift-gtk/progress/38-contrast-audit/latte-agent-state-contrast-x11.png).
+- Audit: a pure WCAG 2.2 contrast model now asserts 37 named Mocha, Latte,
+  and high-contrast pairings for text, focus, control boundaries, semantic
+  agent states, and all six provider/shell glyph treatments. Text requires
+  4.5:1, non-text controls and glyphs require 3:1, and enhanced
+  high-contrast text requires 7:1.
+- Correction: Latte compact metadata and agent-state colors were darkened,
+  selected blue actions were strengthened, and low-contrast Mocha/Latte
+  control boundaries were raised to the audited token. Status continues to
+  use symbols, labels, and counts in addition to color.
+- Verification: full preflight passes the text baseline, all 106 Swift tests,
+  the release build, both forced-termination persistence cases, terminal
+  integration, and 100 two-surface lifecycle cycles. A real window close also
+  completed without GTK diagnostics after explicitly detaching row popovers.
+- Inspection: the 296×852 strict sidebar crop was opened at original
+  resolution. The selected row, focus outline, dividers, compact metadata,
+  Needs Input treatment, provider tiles, and thinking/output/attention footer
+  indicators are distinct and unclipped.
+- Privacy: the isolated fixture uses only synthetic names and `/tmp`; the crop
+  contains no terminal content, commands, credentials, clipboard data,
+  private paths, or arbitrary agent output.
+
 ## 2026-08-29 — SwiftGtk4 session recovery
 
 - Linux image: [quarantined-session recovery sheet](swift-gtk/progress/37-session-recovery/quarantined-session-sheet-x11.png).

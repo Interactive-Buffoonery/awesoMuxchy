@@ -40,8 +40,8 @@ static unsigned char component(unsigned long pixel, unsigned long mask) {
 }
 
 int main(int argc, char **argv) {
-  if (argc != 3) {
-    fprintf(stderr, "usage: capture-x11-window WINDOW_NAME OUTPUT.png\n");
+  if (argc != 3 && argc != 7) {
+    fprintf(stderr, "usage: capture-x11-window WINDOW_NAME OUTPUT.png [X Y WIDTH HEIGHT]\n");
     return 2;
   }
   Display *display = XOpenDisplay(NULL);
@@ -54,20 +54,27 @@ int main(int argc, char **argv) {
 
   XWindowAttributes attributes;
   if (XGetWindowAttributes(display, window, &attributes) == 0) return 5;
-  XImage *image = XGetImage(display, window, 0, 0,
-                           (unsigned int)attributes.width,
-                           (unsigned int)attributes.height,
+  const int crop_x = argc == 7 ? atoi(argv[3]) : 0;
+  const int crop_y = argc == 7 ? atoi(argv[4]) : 0;
+  const int crop_width = argc == 7 ? atoi(argv[5]) : attributes.width;
+  const int crop_height = argc == 7 ? atoi(argv[6]) : attributes.height;
+  if (crop_x < 0 || crop_y < 0 || crop_width <= 0 || crop_height <= 0 ||
+      crop_x + crop_width > attributes.width ||
+      crop_y + crop_height > attributes.height) return 9;
+  XImage *image = XGetImage(display, window, crop_x, crop_y,
+                           (unsigned int)crop_width,
+                           (unsigned int)crop_height,
                            AllPlanes, ZPixmap);
   if (image == NULL) return 6;
 
   GdkPixbuf *pixbuf = gdk_pixbuf_new(GDK_COLORSPACE_RGB, TRUE, 8,
-                                     attributes.width, attributes.height);
+                                     crop_width, crop_height);
   if (pixbuf == NULL) return 7;
   guchar *pixels = gdk_pixbuf_get_pixels(pixbuf);
   const int stride = gdk_pixbuf_get_rowstride(pixbuf);
-  for (int y = 0; y < attributes.height; y++) {
+  for (int y = 0; y < crop_height; y++) {
     guchar *row = pixels + (y * stride);
-    for (int x = 0; x < attributes.width; x++) {
+    for (int x = 0; x < crop_width; x++) {
       const unsigned long pixel = XGetPixel(image, x, y);
       row[(x * 4) + 0] = component(pixel, image->red_mask);
       row[(x * 4) + 1] = component(pixel, image->green_mask);

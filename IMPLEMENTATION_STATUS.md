@@ -405,6 +405,14 @@ help, and agent context while preserving the compact reference geometry.
   font sizes now follow a defensively clamped GTK Xft DPI/accessibility scale;
   a real 1.5× pass verifies truncation and natural control growth across the
   sidebar and both footers without changing the 296-point host width.
+- A pure WCAG 2.2 audit now covers 37 named Mocha, Latte, and high-contrast
+  combinations across chrome text, focus, control boundaries, agent states,
+  and all provider/shell glyphs. Failing compact metadata, Latte semantic
+  state colors, selected action blue, and control borders were corrected to
+  meet their 4.5:1 text, 3:1 non-text, or 7:1 enhanced-text thresholds. A real
+  synthetic Latte sidebar was inspected at 296×852; row popovers are now
+  explicitly detached on window close, which also leaves the runtime clean.
+  Full preflight passes 106 Swift tests and all process-level harnesses.
 - Visible sidebar navigation now has a tested Up/Down/Home/End policy spanning
   lifted rows, group disclosures, ownership rows, and per-group creation rows.
   Workspace rows now construct with list/tree-item roles, and groups construct

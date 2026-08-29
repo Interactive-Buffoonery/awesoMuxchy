@@ -337,6 +337,14 @@ geometry and state styling have also passed a real-window visual correction.
   a clamped standard X11 DPI override fallback. A real 1.5× capture verifies
   natural allocation, long-text truncation, minimum targets, and both footer
   surfaces; pure tests cover resolution and CSS rewriting.
+- `ChromeContrastAudit` now verifies 37 named WCAG 2.2 pairings for Mocha,
+  Latte, and high contrast: primary/compact text, focus, control boundaries,
+  semantic agent states, and every provider/shell glyph. Corrections strengthen
+  Latte compact text and selected actions plus both themes' low-contrast
+  boundaries while preserving non-color labels, symbols, and counts. The real
+  296×852 Latte sidebar crop is inspected, window-close teardown explicitly
+  detaches row-owned popovers, and full preflight passes 106 tests plus every
+  process-level harness without runtime diagnostics.
 - The expanded sidebar now handles Up/Down/Home/End as one logical visible
   sequence across lifted sections, group disclosures, workspace rows, and
   creation rows using a pure tested navigation policy. Rows, rail controls,
