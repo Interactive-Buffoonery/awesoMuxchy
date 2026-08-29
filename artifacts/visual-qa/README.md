@@ -1,5 +1,35 @@
 # Visual QA
 
+## 2026-08-29 — SwiftGtk4 split and close-pane commands
+
+- Linux images: [Split Right pane count](swift-gtk/progress/36-pane-commands/split-right-pane-count-x11.png)
+  and [close-pane risk sheet](swift-gtk/progress/36-pane-commands/close-pane-risk-sheet-x11.png).
+- Reference: `PaneLayoutReducer.splitActivePane`,
+  `PaneLayoutReducer.closePane`, `DestructivePaneActionConfirmationPolicy`,
+  and the Pane command routes at macOS baseline
+  `fed33ff47c559344fc6db6fa53f16e75fcc4a116`.
+- Behavior: exported GTK actions drove Split Right → confirmed Close Pane →
+  Split Down → confirmed Close Pane in a real isolated profile. Each split
+  persisted the expected axis, inherited the focused cwd, focused exactly one
+  new pane, and preserved the original pane identity. Each close used the real
+  live risk gate, was confirmed through the named AT-SPI action, returned focus
+  to the original pane, and retired the detached Ghostty surface only after
+  process exit. The final repeated sequence produced no GTK or runtime
+  diagnostics.
+- Inspection: the 296×852 sidebar-only Latte capture was opened at original
+  resolution and shows the selected `Pane Commands` row with the two-pane
+  indicator/count while fixed header/footer geometry remains stable. The
+  480×230 owned sheet was recaptured after rejecting an X11 partial-damage
+  frame, then inspected at original resolution for exact heading, body, hint,
+  safe-default Cancel, and destructive action treatment.
+- Verification: full preflight passes the text baseline, all 96 Swift tests,
+  the production build, real terminal integration, and 100 two-surface
+  lifecycle cycles.
+- Privacy: the profile, workspace, pane title, cwd, counts, and status are
+  synthetic. The strict sidebar and sheet crops contain no terminal content,
+  commands, clipboard data, credentials, private paths, or arbitrary agent
+  output.
+
 ## 2026-08-29 — SwiftGtk4 current-context workspace creation
 
 - Linux image: [selected-group new workspace](swift-gtk/progress/35-current-context-creation/selected-group-new-workspace-x11.png).
