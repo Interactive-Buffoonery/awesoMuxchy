@@ -607,8 +607,16 @@ private final class ApplicationState: @unchecked Sendable {
         case let .split(axis, fraction, first, second):
             guard let one = buildLayout(first, workspace: workspace), let two = buildLayout(second, workspace: workspace) else { return nil }
             let paned = PanedRef(orientation: axis == .horizontal ? .horizontal : .vertical)
-            paned.set(position: Int((axis == .horizontal ? 1240.0 : 820.0) * min(max(fraction, 0.1), 0.9)))
             paned.setWideHandle(wide: true); paned.setStart(child: one.0); paned.setEnd(child: two.0)
+            let boundedFraction = min(max(fraction, 0.1), 0.9)
+            var appliedInitialPosition = false
+            _ = paned.onNotifyMaxPosition { paned, _ in
+                guard !appliedInitialPosition else { return }
+                let extent = axis == .horizontal ? paned.getWidth() : paned.getHeight()
+                guard extent > 1 else { return }
+                paned.set(position: Int((Double(extent) * boundedFraction).rounded()))
+                appliedInitialPosition = true
+            }
             return (WidgetRef(paned), one.1 + two.1)
         }
     }
@@ -2077,6 +2085,7 @@ private final class ApplicationState: @unchecked Sendable {
         let marker = LabelRef(str: "●"); marker.add(cssClass: "aw-marker")
         marker.add(cssClass: "aw-\((projection.color ?? .blue).rawValue)")
         let name = LabelRef(str: projection.name.uppercased()); name.xalign = 0; name.setHexpand(expand: true)
+        name.setEllipsize(mode: PangoEllipsizeMode(rawValue: 3)); name.setMaxWidthChars(nChars: 16)
         let count = LabelRef(str: "\(projection.rows.count)"); count.add(cssClass: "aw-count")
         let attention = LabelRef(str: ""); attention.add(cssClass: "aw-group-attention")
         content.append(child: chevron); content.append(child: marker); content.append(child: name)
@@ -2732,13 +2741,20 @@ private func buildWindow(for application: Gtk.ApplicationRef) {
     let root = BoxRef(orientation: .vertical, spacing: 0); root.add(cssClass: "aw-root")
     state.installStyles(on: WidgetRef(root))
     let titlebar = BoxRef(orientation: .horizontal, spacing: 0); titlebar.add(cssClass: "aw-titlebar")
+    titlebar.setHexpand(expand: true)
     let brand = LabelRef(str: ">_  awesoMux"); brand.add(cssClass: "aw-brand")
+    brand.setHalign(align: .fill); brand.setValign(align: .fill)
     brand.setSizeRequest(width: SidebarChromeProjection.width, height: 38)
-    let title = LabelRef(str: ""); title.add(cssClass: "aw-window-title"); title.setHexpand(expand: true)
+    let titleHost = CenterBoxRef(); titleHost.setHexpand(expand: true)
+    titleHost.setHalign(align: .fill)
+    let title = LabelRef(str: ""); title.add(cssClass: "aw-window-title")
+    title.setHexpand(expand: state.configuredSidebarPosition == .right)
+    title.setEllipsize(mode: PangoEllipsizeMode(rawValue: 3)); title.setMaxWidthChars(nChars: 64)
+    title.setHalign(align: .center); titleHost.setCenterWidget(child: title)
     if state.configuredSidebarPosition == .left {
-        titlebar.append(child: brand); titlebar.append(child: title)
+        titlebar.append(child: brand); titlebar.append(child: titleHost)
     } else {
-        titlebar.append(child: title); titlebar.append(child: brand)
+        titlebar.append(child: titleHost); titlebar.append(child: brand)
     }
     root.append(child: titlebar)
 

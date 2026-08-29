@@ -147,6 +147,15 @@ help, and agent context while preserving the compact reference geometry.
   Dark, Latte, and high-contrast insertion styles are present. The app launches
   cleanly with all controllers attached; physical drag execution remains an
   explicit QA gap because XTest pointer events do not reach this remote app.
+- Long group labels now ellipsize inside their assigned column instead of
+  displacing the complete sidebar. The titlebar gives its fixed 296-point brand
+  column and remaining pane-title region independent allocation, preserving the
+  reference alignment for both left and right sidebar placement with long
+  workspace titles. Both mirrored layouts were inspected in the real app.
+- Initial split positions now derive from the `GtkPaned` logical allocation
+  rather than a hard-coded 1440×900 estimate. A real `GDK_SCALE=2` run keeps
+  both Ghostty panes visible and scales the 296-point sidebar to 592 physical
+  pixels without clipping long sidebar text.
 - Collapsed group headers now preserve hidden agent visibility with a tested
   Needs Input/Error/Thinking rollup (in that priority order, excluding passive
   Output). The 60-point rail includes group buttons whose native popovers list

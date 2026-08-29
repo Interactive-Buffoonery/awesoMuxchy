@@ -190,6 +190,11 @@ geometry and state styling have also passed a real-window visual correction.
 - The full local preflight passes 64 Swift tests after the native DnD and
   announcement milestone, followed by the release build, real two-terminal
   title/cwd integration, and 100 two-surface lifecycle cycles.
+- Long group text is now width-bounded and ellipsized, titlebar brand/title
+  allocation remains stable for mirrored left/right sidebars, and split
+  fractions are applied from the live logical `GtkPaned` extent. Real dark
+  long-text captures cover both sidebar positions; a real 2× run preserves two
+  visible terminal panes and the expected 592-physical-pixel sidebar width.
 
 ## Remaining vertical-slice hardening
 
