@@ -120,17 +120,6 @@ private extension AgentState {
 public enum SidebarAgentKind: String, Equatable, Sendable {
     case claude, codex, openCode, pi, grok, shell
 
-    public var symbol: String {
-        switch self {
-        case .claude: "✳"
-        case .codex: "↻"
-        case .openCode: "[ ]"
-        case .pi: "π"
-        case .grok: "◉"
-        case .shell: ">_"
-        }
-    }
-
     static func resolve(_ agent: String?) -> SidebarAgentKind {
         let normalized = agent.map { ChromeText.sanitized($0, limit: 80).lowercased() } ?? ""
         if normalized.contains("claude") { return .claude }
@@ -147,7 +136,6 @@ public struct SidebarAgentTilePresentation: Equatable, Sendable {
     public let name: String
     public let state: AgentState
 
-    public var symbol: String { kind.symbol }
     public var showsBadge: Bool { state != .idle }
     public var stateToken: String { state == .needsAttention ? "needs" : state.rawValue }
 

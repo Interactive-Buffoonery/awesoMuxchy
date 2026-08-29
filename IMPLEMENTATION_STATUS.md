@@ -235,13 +235,16 @@ help, and agent context while preserving the compact reference geometry.
   physical-pointer and Orca action invocation remain pending.
 - Workspace rows, lifted Needs Input/Pinned rows, collapsed-rail controls, and
   multi-pane peek cards now share one provider-aware tile projection. Claude,
-  Codex, OpenCode, Pi, Grok, and shell retain distinct portable shapes and
+  Codex, OpenCode, Pi, Grok, and shell retain distinct owned scalable marks and
   reference tint families; non-idle states add a second shape/glyph signal, and
   collapsed tiles reduce quiet states to dots while preserving explicit Needs
   Input/Error marks. Workspace rollup selects the highest-priority pane state,
-  and accessible descriptions state provider plus status. Expanded, peek, and
-  collapsed real-app renders were inspected. Runtime agent-event ingestion and
-  the complete grayscale/high-contrast state matrix remain pending.
+  and accessible descriptions state provider plus status. Owned Cairo paths
+  independently reproduce the pinned burst, open spiral, bracket,
+  interlocking-ring, and shell geometries; Pi uses the owned mono stack. Glyph
+  children are hidden from AT-SPI while the tile publishes the complete label.
+  Expanded real-app matrices were inspected at 1440×852 in Latte, Mocha, and
+  HighContrast, and live runtime-event ingestion is now verified separately.
 - Expanded regular and lifted rows now reserve a stable trailing slot for a
   24-point sibling close button that reveals on pointer or keyboard focus;
   its click route cannot fall through to workspace selection. Group headers

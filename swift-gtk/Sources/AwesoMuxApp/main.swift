@@ -1385,12 +1385,15 @@ private final class ApplicationState: @unchecked Sendable {
     ) -> OverlayRef {
         let tile = OverlayRef(); tile.add(cssClass: "aw-agent-tile")
         tile.setSizeRequest(width: collapsed ? size : size + 5, height: collapsed ? size : size + 5)
-        let symbol = LabelRef(str: presentation.symbol); symbol.add(cssClass: "aw-agent-symbol")
-        symbol.add(cssClass: "aw-agent-\(presentation.kind.rawValue.lowercased())")
+        let symbol = LabelRef(str: ""); symbol.add(cssClass: "aw-agent-symbol")
         symbol.setSizeRequest(width: size, height: size)
         symbol.setHalign(align: collapsed ? .center : .start)
         symbol.setValign(align: collapsed ? .center : .start)
         tile.set(child: symbol)
+        let glyph = AgentGlyphDrawing.make(kind: presentation.kind, tileSize: size)
+        glyph.setHalign(align: collapsed ? .center : .start)
+        glyph.setValign(align: collapsed ? .center : .start)
+        tile.addOverlay(widget: glyph)
         if presentation.showsBadge {
             let loudGlyph = [.needsAttention, .error].contains(presentation.state)
             let badgeText = collapsed && !loudGlyph ? "" : presentation.badgeSymbol

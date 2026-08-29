@@ -79,6 +79,12 @@ func setAccessibleExpanded<T: Gtk.AccessibleProtocol>(_ accessible: T, _ expande
     accessible.updateStateValue(nStates: 1, states: &state, values: value.value_ptr)
 }
 
+func setAccessibleHidden<T: Gtk.AccessibleProtocol>(_ accessible: T, _ hidden: Bool) {
+    var state = GTK_ACCESSIBLE_STATE_HIDDEN
+    let value = GLibObject.Value(hidden)
+    accessible.updateStateValue(nStates: 1, states: &state, values: value.value_ptr)
+}
+
 func announceAccessibilityStatus<T: Gtk.AccessibleProtocol>(
     from accessible: T, _ message: String,
     priority: GtkAccessibleAnnouncementPriority = GTK_ACCESSIBLE_ANNOUNCEMENT_PRIORITY_MEDIUM

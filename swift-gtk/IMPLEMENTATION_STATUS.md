@@ -260,11 +260,14 @@ geometry and state styling have also passed a real-window visual correction.
   actions and refreshed accessible state text.
 - Workspace, lifted, collapsed-rail, and pane-peek surfaces now share a pure
   provider-tile projection. Claude, Codex, OpenCode, Pi, Grok, and shell use
-  distinct portable shapes and reference tint families, while every non-idle
+  distinct owned scalable marks and reference tint families, while every non-idle
   state adds a shape/glyph badge and accessible provider/status wording.
-  Workspace rollup is pane-aware and priority-tested; expanded, peek, and rail
-  variants were inspected in the real app. Exact owned vector outlines and the
-  full grayscale/high-contrast matrix remain pending.
+  Workspace rollup is pane-aware and priority-tested. A focused GTK drawing
+  component independently implements the pinned Claude burst, Codex spiral,
+  OpenCode brackets, Grok rings, and shell path; Pi stays in the owned mono
+  stack. Decorative children are hidden from AT-SPI. Expanded real-app matrices
+  were inspected in Latte, Mocha, and HighContrast; peek/rail behavior retains
+  the same scalable component and provider/state parent label.
 - Expanded regular/lifted rows now use sibling overlays for hover/focus-revealed
   24-point close controls, preserving the row's selection hit target. Group
   headers replace their count with a separately focusable close action under a
