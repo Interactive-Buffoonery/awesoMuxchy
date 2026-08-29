@@ -203,9 +203,10 @@ geometry and state styling have also passed a real-window visual correction.
   Pinned precedence, retract only on prompt submission/session end or explicit
   acknowledgement, and publish the exact `is still waiting for a reply, moved
   to Needs Input` GTK status announcement. Blocking prompts keep their distinct
-  background-agent announcement. Full preflight passes 86 Swift tests.
-  Injected-clock GTK coverage and physical AT-SPI announcement inspection remain
-  pending.
+  background-agent announcement. A real waiting notification was directly
+  observed as the exact medium-priority `Object.Announcement` on the AT-SPI bus
+  without a focus transition. Full preflight passes 86 Swift tests.
+  Injected-clock GTK coverage and audible Orca output inspection remain pending.
 - Non-pinned workspace menus now expose tested, bounded within-group Up/Down
   moves plus named previous/next-group and arbitrary-group alternatives.
   Mutations reuse the authoritative snapshot and existing terminal runtime,
