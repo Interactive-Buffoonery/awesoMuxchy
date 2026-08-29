@@ -203,9 +203,11 @@ geometry and state styling have also passed a real-window visual correction.
   surfaces and reconstructs them on reopen. Live AT-SPI verified exact
   headings, bodies, hints, safe-default Cancel, destructive actions, command
   gating, persisted recovery, aggregate group count, teardown, and app
-  survival. The three 480×230 Latte sheets were inspected under X11/GLX. Raw
-  prompt state is integration-tested but not used as app evidence until an
-  observed-marker bit can prevent Ghostty's startup default from false prompts.
+  survival. The three 480×230 Latte sheets were inspected under X11/GLX. The
+  staged canonical runtime now installs Ghostty's own shell integration and
+  exports a locked prompt-observed bit; app risk uses prompt-away only after
+  observation. The real harness proves an observed idle prompt is safe and a
+  subsequent foreground command is risky without startup false positives.
 - `SidebarLiftedProjection` now composes search, sticky Needs Input arrival
   order, and explicit Pinned order without duplicating origin rows. The schema
   additions decode absent legacy fields safely and validate every ordered ID.

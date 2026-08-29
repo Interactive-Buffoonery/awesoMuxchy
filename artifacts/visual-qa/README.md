@@ -9,9 +9,12 @@
   `confirmClearWorkspace`, `confirmCloseGroupIfNeeded`, `QuitRiskPolicy`, and
   `DestructiveCloseCopy` at macOS baseline
   `fed33ff47c559344fc6db6fa53f16e75fcc4a116`.
-- Behavior: the Ghostty shim now exposes foreground PID and close-risk state.
-  A pure policy combines bounded `/proc` command/child classification with
-  fresh agent execution. Risky workspace close and aggregate group close show
+- Behavior: the Ghostty shim now exposes foreground PID, close-risk state, and
+  whether a semantic prompt marker has been observed. The staged canonical
+  runtime installs Ghostty's own shell-integration resources. A pure policy
+  combines bounded `/proc` command/child classification with trustworthy
+  observed prompt-away state and fresh agent execution. Risky workspace close
+  and aggregate group close show
   exact interruption copy; safe close skips the prompt. Clear always confirms
   with risk-sensitive permanent-close copy. One owned modal prevents stacking,
   makes Cancel the safe default, exposes exact keyboard hints, and disables
@@ -30,11 +33,10 @@
 - Verification: full preflight passes the text baseline, 90 Swift tests,
   production build, terminal integration including foreground PID/close-risk
   transitions, and 100 two-surface lifecycle cycles.
-- Remaining evidence: Ghostty's raw prompt-away bit is integration-tested but
-  cannot be trusted by the app until the shim also exposes whether an OSC-133
-  prompt marker has been observed; real foreground process and agent evidence
-  are active now. Physical Super-Return/Escape delivery remains pending because
-  no X11 keyboard-injection utility is installed.
+- Remaining evidence: physical Super-Return/Escape delivery remains pending
+  because no X11 keyboard-injection utility is installed. The real terminal
+  harness now proves observed idle-prompt safety and subsequent prompt-away
+  command risk.
 - Privacy: the profile, titles, and agent transition are synthetic; the cropped
   modal images contain no terminal content, commands, clipboard data,
   credentials, paths, or arbitrary agent output.

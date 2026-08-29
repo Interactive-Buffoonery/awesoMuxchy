@@ -63,6 +63,8 @@ AMX_GHOSTTY_API void amx_ghostty_surface_focus(amx_ghostty_surface *surface);
 AMX_GHOSTTY_API bool amx_ghostty_surface_is_ready(amx_ghostty_surface *surface);
 AMX_GHOSTTY_API bool amx_ghostty_surface_process_exited(
     amx_ghostty_surface *surface);
+AMX_GHOSTTY_API bool amx_ghostty_surface_has_seen_prompt(
+    amx_ghostty_surface *surface);
 AMX_GHOSTTY_API bool amx_ghostty_surface_needs_confirm_quit(
     amx_ghostty_surface *surface);
 AMX_GHOSTTY_API uint64_t amx_ghostty_surface_foreground_process_id(

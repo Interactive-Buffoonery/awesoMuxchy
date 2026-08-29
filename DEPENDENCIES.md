@@ -33,7 +33,12 @@ machine-readable immutable lock for every transitive branch tip listed above.
 
 Ghostty is staged into a disposable build directory before applying the patches
 in `patches/ghostty/`; `vendor/ghostty` must remain clean. The shim is
-awesoMux-owned and exposes no GTK or Zig implementation details to Swift.
+awesoMux-owned and exposes no GTK or Zig implementation details to Swift. The
+second patch exports only Ghostty's existing semantic-prompt-observed bit so
+the host can distinguish startup state from trustworthy close-risk evidence.
+The third patch installs Ghostty's canonical terminfo and shell-integration
+resources beside the embedded library; local launch wrappers pass that staged
+resource location explicitly.
 
 No GPL, AGPL, or unlicensed source may be copied into this repository. System
 GTK libraries remain dynamically linked under their own distribution terms.

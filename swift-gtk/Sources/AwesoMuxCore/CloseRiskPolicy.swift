@@ -41,6 +41,7 @@ public struct PaneCloseRiskInput: Equatable, Sendable {
     public let agentName: String?
     public let agentState: AgentState
     public let lastAgentStateChangeAt: Date?
+    public let terminalPromptObserved: Bool
     public let terminalAwayFromPrompt: Bool
     public let liveness: ForegroundProcessLiveness
 
@@ -48,12 +49,14 @@ public struct PaneCloseRiskInput: Equatable, Sendable {
         agentName: String?,
         agentState: AgentState,
         lastAgentStateChangeAt: Date?,
+        terminalPromptObserved: Bool,
         terminalAwayFromPrompt: Bool,
         liveness: ForegroundProcessLiveness
     ) {
         self.agentName = agentName
         self.agentState = agentState
         self.lastAgentStateChangeAt = lastAgentStateChangeAt
+        self.terminalPromptObserved = terminalPromptObserved
         self.terminalAwayFromPrompt = terminalAwayFromPrompt
         self.liveness = liveness
     }
@@ -89,7 +92,7 @@ public enum WorkspaceCloseRiskPolicy {
         if input.liveness == .exited {
             return .init(isRisk: false, reason: .processExited)
         }
-        if input.terminalAwayFromPrompt {
+        if input.terminalPromptObserved && input.terminalAwayFromPrompt {
             return .init(isRisk: true, reason: .terminalAwayFromPrompt)
         }
         switch input.liveness {

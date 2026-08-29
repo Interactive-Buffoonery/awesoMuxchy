@@ -2290,16 +2290,15 @@ private final class ApplicationState: @unchecked Sendable {
                 return PaneCloseRiskInput(
                     agentName: pane.agent, agentState: pane.agentState,
                     lastAgentStateChangeAt: lastAgentStateChangeAt[pane.id],
+                    terminalPromptObserved: false,
                     terminalAwayFromPrompt: false, liveness: .indeterminate
                 )
             }
             return PaneCloseRiskInput(
                 agentName: pane.agent, agentState: pane.agentState,
                 lastAgentStateChangeAt: lastAgentStateChangeAt[pane.id],
-                // Ghostty's value is also true before the first trustworthy
-                // OSC-133 marker. Until the shim exposes that observed bit,
-                // process liveness is the authoritative app-side signal.
-                terminalAwayFromPrompt: false,
+                terminalPromptObserved: surface.hasSeenPrompt,
+                terminalAwayFromPrompt: surface.needsConfirmQuit,
                 liveness: LinuxForegroundProcessProbe.liveness(for: surface)
             )
         }

@@ -1,0 +1,25 @@
+From f3c8d572f5ecb3f92bc27f7df579d03912ddf31f Mon Sep 17 00:00:00 2001
+From: awesoMux Linux <noreply@awesomux.local>
+Date: Sat, 29 Aug 2026 00:00:00 -0400
+Subject: [PATCH] build: install resources with embedded libghostty
+
+The embedded runtime needs the canonical terminfo and shell-integration assets
+for prompt semantics and terminal identity. Install the same resources as the
+Ghostty executable when building the full library-only runtime.
+---
+ build.zig | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/build.zig b/build.zig
+index 4af4c8ae7..e68dbfb18 100644
+--- a/build.zig
++++ b/build.zig
+@@ -205,6 +205,7 @@ pub fn build(b: *std.Build) !void {
+                 lib_static.install("ghostty-internal.a");
+             }
+         }
++        resources.install();
+     }
+-
++
+     // macOS only artifacts. These will error if they're initialized for

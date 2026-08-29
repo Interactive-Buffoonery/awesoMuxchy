@@ -115,6 +115,14 @@ private final class IntegrationState {
             fail(reason: "foreground shell process unavailable")
             return false
         }
+        guard second.hasSeenPrompt else {
+            fail(reason: "semantic prompt marker was not observed")
+            return false
+        }
+        guard !second.needsConfirmQuit else {
+            fail(reason: "observed idle prompt unexpectedly requires confirmation")
+            return false
+        }
         second.send(text: "sleep 2")
         second.sendEnter()
         timeout(add: 250) { [weak self] in
@@ -133,6 +141,10 @@ private final class IntegrationState {
         }
         guard second.needsConfirmQuit else {
             fail(reason: "running command did not require close confirmation")
+            return
+        }
+        guard second.hasSeenPrompt else {
+            fail(reason: "semantic prompt observation was lost")
             return
         }
         timeout(add: 2_100) { [weak self] in
@@ -263,4 +275,4 @@ guard status != nil, !failed else {
     print("terminal integration: failed (\(failureReason))")
     exit(1)
 }
-print("terminal integration: passed input, Unicode, focus, resize, clipboard, environment, title/cwd callbacks, close-risk signals, and pane independence")
+print("terminal integration: passed input, Unicode, focus, resize, clipboard, environment, title/cwd callbacks, observed-prompt close-risk signals, and pane independence")

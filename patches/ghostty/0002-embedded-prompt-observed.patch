@@ -1,0 +1,72 @@
+From 8fc6e2b7f6322acb7072081ad7a23090e60baf48 Mon Sep 17 00:00:00 2001
+From: awesoMux Linux <noreply@awesomux.local>
+Date: Sat, 29 Aug 2026 00:00:00 -0400
+Subject: [PATCH] embedded: expose semantic prompt observation
+
+Expose whether a surface has ever received a semantic prompt marker. Embedders
+need this bit to distinguish Ghostty's startup `not at prompt` default from a
+trustworthy prompt-away close-risk signal. The query uses the same renderer
+state lock as `needsConfirmQuit` and does not expose terminal internals.
+---
+ include/ghostty.h      |  1 +
+ src/Surface.zig        | 16 ++++++++++++++++
+ src/apprt/embedded.zig |  5 +++++
+ 3 files changed, 22 insertions(+)
+
+diff --git a/include/ghostty.h b/include/ghostty.h
+index 8e6da7e4d..177f2cc8c 100644
+--- a/include/ghostty.h
++++ b/include/ghostty.h
+@@ -1175,6 +1175,7 @@ GHOSTTY_API void* ghostty_surface_userdata(ghostty_surface_t);
+ GHOSTTY_API ghostty_app_t ghostty_surface_app(ghostty_surface_t);
+ GHOSTTY_API ghostty_surface_config_s ghostty_surface_inherited_config(ghostty_surface_t, ghostty_surface_context_e);
+ GHOSTTY_API void ghostty_surface_update_config(ghostty_surface_t, ghostty_config_t);
++GHOSTTY_API bool ghostty_surface_has_seen_prompt(ghostty_surface_t);
+ GHOSTTY_API bool ghostty_surface_needs_confirm_quit(ghostty_surface_t);
+ GHOSTTY_API bool ghostty_surface_process_exited(ghostty_surface_t);
+ GHOSTTY_API void ghostty_surface_refresh(ghostty_surface_t);
+diff --git a/src/Surface.zig b/src/Surface.zig
+index 44d76112f..0ce9d8c12 100644
+--- a/src/Surface.zig
++++ b/src/Surface.zig
+@@ -946,6 +946,22 @@ pub fn deactivateInspector(self: *Surface) void {
+     self.inspector = null;
+ }
+-
++
++/// True after the surface has received any trustworthy semantic prompt marker.
++/// This distinguishes the startup `not at prompt` default from real prompt-away
++/// state for embedders that implement close confirmation.
++pub fn hasSeenPrompt(self: *Surface) bool {
++    self.renderer_state.mutex.lockUncancelable(global.io());
++    defer self.renderer_state.mutex.unlock(global.io());
++    const screens = &self.io.terminal.screens;
++    if (screens.get(.primary)) |screen| {
++        if (screen.semantic_prompt.seen) return true;
++    }
++    if (screens.get(.alternate)) |screen| {
++        return screen.semantic_prompt.seen;
++    }
++    return false;
++}
++
+ /// True if the surface requires confirmation to quit. This should be called
+ /// by apprt to determine if the surface should confirm before quitting.
+ pub fn needsConfirmQuit(self: *Surface) bool {
+diff --git a/src/apprt/embedded.zig b/src/apprt/embedded.zig
+index 9c078ca15..b16d76fb5 100644
+--- a/src/apprt/embedded.zig
++++ b/src/apprt/embedded.zig
+@@ -1848,6 +1848,11 @@ pub const CAPI = struct {
+         };
+     }
+-
++
++    /// Returns true after any semantic prompt marker has been observed.
++    export fn ghostty_surface_has_seen_prompt(surface: *Surface) bool {
++        return surface.core_surface.hasSeenPrompt();
++    }
++
+     /// Returns true if the surface needs to confirm quitting.
+     export fn ghostty_surface_needs_confirm_quit(surface: *Surface) bool {
+         return surface.core_surface.needsConfirmQuit();

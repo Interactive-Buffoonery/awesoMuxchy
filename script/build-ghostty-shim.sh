@@ -9,7 +9,8 @@ if ! pkg-config --exists gtk4; then
   echo "GTK4 development files are required (pkg-config gtk4 failed)." >&2
   exit 1
 fi
-if [[ ! -f "$prefix/include/ghostty.h" ]]; then
+if [[ ! -f "$prefix/include/ghostty.h" || \
+      ! -f "$prefix/share/ghostty/shell-integration/zsh/ghostty-integration" ]]; then
   "$repo_root/script/build-ghostty.sh"
 fi
 

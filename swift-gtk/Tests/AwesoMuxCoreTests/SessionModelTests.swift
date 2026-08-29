@@ -615,18 +615,23 @@ private func snapshot(_ workspaces: [WorkspaceSnapshot]) -> SessionSnapshot {
         agent: String? = nil,
         state: AgentState = .idle,
         changedAt: Date? = nil,
+        observed: Bool = true,
         away: Bool = false,
         liveness: ForegroundProcessLiveness
     ) -> PaneCloseRiskInput {
         PaneCloseRiskInput(
             agentName: agent, agentState: state,
             lastAgentStateChangeAt: changedAt,
+            terminalPromptObserved: observed,
             terminalAwayFromPrompt: away, liveness: liveness
         )
     }
 
     #expect(!WorkspaceCloseRiskPolicy.decision(input(liveness: .exited), at: now).isRisk)
     #expect(!WorkspaceCloseRiskPolicy.decision(input(liveness: .idleShell), at: now).isRisk)
+    #expect(!WorkspaceCloseRiskPolicy.decision(
+        input(observed: false, away: true, liveness: .idleShell), at: now
+    ).isRisk)
     #expect(WorkspaceCloseRiskPolicy.decision(input(away: true, liveness: .idleShell), at: now).reason == .terminalAwayFromPrompt)
     #expect(WorkspaceCloseRiskPolicy.decision(input(liveness: .busyShell), at: now).reason == .backgroundJob)
     #expect(WorkspaceCloseRiskPolicy.decision(input(liveness: .liveCommand), at: now).reason == .liveForegroundProcess)

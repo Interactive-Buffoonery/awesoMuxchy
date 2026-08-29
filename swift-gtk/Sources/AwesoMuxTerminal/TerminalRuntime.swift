@@ -171,6 +171,10 @@ public final class TerminalSurface {
         amx_ghostty_surface_needs_confirm_quit(handle)
     }
 
+    public var hasSeenPrompt: Bool {
+        amx_ghostty_surface_has_seen_prompt(handle)
+    }
+
     public var foregroundProcessID: UInt64? {
         let value = amx_ghostty_surface_foreground_process_id(handle)
         return value == 0 ? nil : value

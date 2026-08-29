@@ -597,6 +597,11 @@ bool amx_ghostty_surface_process_exited(amx_ghostty_surface *surface) {
       ghostty_surface_process_exited(surface->core);
 }
 
+bool amx_ghostty_surface_has_seen_prompt(amx_ghostty_surface *surface) {
+  return surface != NULL && surface->core != NULL &&
+      ghostty_surface_has_seen_prompt(surface->core);
+}
+
 bool amx_ghostty_surface_needs_confirm_quit(amx_ghostty_surface *surface) {
   return surface != NULL && surface->core != NULL &&
       ghostty_surface_needs_confirm_quit(surface->core);

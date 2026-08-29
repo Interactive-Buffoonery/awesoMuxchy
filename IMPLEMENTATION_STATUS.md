@@ -210,8 +210,11 @@ help, and agent context while preserving the compact reference geometry.
   reopen reconstructs fresh surfaces instead of retaining hidden processes.
   Live QA verified Cancel, persisted close/recovery, fresh reconstruction,
   permanent group teardown, and app survival; all three final Latte sheets
-  were inspected. Ghostty's raw prompt state remains excluded until the shim
-  can pair it with the reference's required prompt-observed bit.
+  were inspected. The staged canonical Ghostty build now installs its own
+  shell-integration resources and exposes the reference-required observed bit;
+  prompt-away evidence is trusted only after that bit is true, preventing the
+  startup default from causing false destructive prompts. The real terminal
+  harness proves observed idle-prompt safety and subsequent command risk.
 - Regular and Needs Input row menus now provide non-pointer workspace ordering:
   bounded `Move Workspace Up`/`Move Workspace Down`, named previous/next-group
   alternatives, and arbitrary destination groups. A tested availability model

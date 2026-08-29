@@ -9,6 +9,14 @@ if [[ ! -d "$stage_root" ]]; then
   "$repo_root/script/stage-ghostty.sh" >/dev/null
 fi
 
+for patch in "$repo_root"/patches/ghostty/*.patch; do
+  if ! git -C "$stage_root" apply --reverse --check "$patch" 2>/dev/null; then
+    echo "Staged Ghostty is missing the current patch: $(basename "$patch")" >&2
+    echo "Move or remove only the disposable stage at $stage_root, then rebuild." >&2
+    exit 1
+  fi
+done
+
 if ! command -v "$zig_bin" >/dev/null 2>&1; then
   echo "Zig 0.16.0 is required; set AWESOMUX_ZIG or install the approved toolchain." >&2
   exit 1

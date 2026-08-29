@@ -28,8 +28,9 @@ pkg-config --exists gtk4 || fail "gtk4 development metadata is missing"
   fail "zmx submodule pin mismatch"
 [[ -z "$(git -C "$repo_root/vendor/zmx" status --short)" ]] ||
   fail "zmx submodule is dirty"
-git -C "$repo_root/vendor/ghostty" apply --check \
-  "$repo_root/patches/ghostty/0001-embedded-linux-opengl-host.patch"
+for patch in "$repo_root"/patches/ghostty/*.patch; do
+  git -C "$repo_root/vendor/ghostty" apply --check "$patch"
+done
 
 "$repo_root/script/check-text-baseline.py"
 "$swiftc_bin" -warnings-as-errors -typecheck \
@@ -54,8 +55,10 @@ swift build --package-path "$repo_root/swift-gtk" -c release
 release_bin=$(swift build --package-path "$repo_root/swift-gtk" -c release --show-bin-path)
 qa_display=${DISPLAY:-:1}
 env GDK_BACKEND=x11 GDK_DEBUG=gl-glx DISPLAY="$qa_display" \
+  GHOSTTY_RESOURCES_DIR="$repo_root/.build/ghostty-prefix/share/ghostty" \
   "$release_bin/awesomux-terminal-integration"
 env GDK_BACKEND=x11 GDK_DEBUG=gl-glx DISPLAY="$qa_display" \
+  GHOSTTY_RESOURCES_DIR="$repo_root/.build/ghostty-prefix/share/ghostty" \
   "$release_bin/awesomux-lifecycle-stress"
 
 git -C "$repo_root" diff --check
