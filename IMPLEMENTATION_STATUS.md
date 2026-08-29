@@ -331,8 +331,10 @@ help, and agent context while preserving the compact reference geometry.
   Needs Input or Pinned, card handoff receives the reference 220 ms grace, and
   transient popup content does not steal keyboard focus. The row context
   surface exposes the same panes as explicit `Jump to pane N` actions for the
-  keyboard/screen-reader path. A real Pinned-row capture was inspected; full
-  physical-pointer and Orca action invocation remain pending.
+  keyboard/screen-reader path. A real release-app AT-SPI pass used app-owned
+  mode/focus recovery to expose the card, invoked pane 1's Click action, and
+  persisted the exact first pane identity. A real Pinned-row capture was
+  inspected; physical-pointer and audible Orca evidence remain pending.
 - `Split Right`, `Split Down`, and the primary `Close Pane` route are now real
   GTK application actions and command-palette entries. Both split directions
   inherit the focused local pane cwd, mint and focus exactly one Ghostty

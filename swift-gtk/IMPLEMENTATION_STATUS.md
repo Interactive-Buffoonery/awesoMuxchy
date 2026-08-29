@@ -61,8 +61,11 @@ geometry and state styling have also passed a real-window visual correction.
   same exact focus route. Workspace selection now refreshes pane-command
   enablement immediately: a release-process probe proves `Focus Pane 2`
   disables on one pane, enables on two, tracks one/two-pane workspace switches,
-  and routes to the second pane's exact tree-order identity. A real Pinned-row
-  X11/GLX capture was inspected.
+  and routes to the second pane's exact tree-order identity. A fresh release
+  app used app-owned collapsed/expanded focus recovery to expose the peek card;
+  AT-SPI invoked pane 1's explicit Click action and the owner-only snapshot
+  persisted the exact first pane identity. A real Pinned-row X11/GLX capture
+  was inspected; audible Orca and physical-pointer evidence remain pending.
 - Thirty-three state tests cover grouped snapshots, defensive limits, selection,
   ordering, split/focus/close mutations, command chords, round trips,
   profile-scoped paths, owner-only persistence, quarantine, and recovery.

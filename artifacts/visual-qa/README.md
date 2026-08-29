@@ -932,7 +932,10 @@
   does not take keyboard focus. A later release-process probe found and fixed
   stale pane-command enablement after workspace switches; `Focus Pane 2` now
   disables on one pane, enables on two, follows one/two-pane selection changes,
-  and routes to the second pane's exact tree-order identity.
+  and routes to the second pane's exact tree-order identity. A fresh release
+  app then used the app-owned collapsed/expanded focus-recovery path to expose
+  the card to AT-SPI; pane 1's explicit Click action returned true and the
+  owner-only snapshot persisted the exact first pane identity.
 - Capture note: GTK maps the popover as a separate native X11 surface. The app
   client and popup were captured from the same live state and composited at
   their recorded root-window coordinates; no UI pixels were otherwise edited.
@@ -942,7 +945,7 @@
   release probe, release integration (including OSC title/cwd callbacks), and
   100 two-surface lifecycle cycles.
 - Remaining interaction evidence: physical pointer card invocation and audible
-  Orca action inspection. Hover/focus close controls, jump-number overlays, and
+  Orca output inspection. Hover/focus close controls, jump-number overlays, and
   native pointer drag insertion are implemented; held-key/drag evidence still
   needs an input-capable display.
 
