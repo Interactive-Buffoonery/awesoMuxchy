@@ -55,6 +55,8 @@ swift build --package-path "$repo_root/swift-gtk" -c release
 release_bin=$(swift build --package-path "$repo_root/swift-gtk" -c release --show-bin-path)
 DISPLAY="${DISPLAY:-:1}" "$repo_root/script/test-single-window-activation.sh" \
   "$release_bin/awesomux"
+DISPLAY="${DISPLAY:-:1}" "$repo_root/script/test-dynamic-command-enablement.sh" \
+  "$release_bin/awesomux"
 "$repo_root/script/test-forced-termination-persistence.sh" \
   "$release_bin/awesomux-persistence-probe"
 qa_display=${DISPLAY:-:1}

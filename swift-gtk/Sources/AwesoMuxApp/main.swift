@@ -2950,7 +2950,9 @@ private final class ApplicationState: @unchecked Sendable {
         for (id, row) in attentionRows { setAccessibleSelected(row, id == workspaceID) }
         for (id, row) in pinnedRows { setAccessibleSelected(row, id == workspaceID) }
         title?.label = snapshot.workspace(id: workspaceID).map(SidebarWorkspaceTitle.resolve) ?? ""
-        updateChrome(workspaceID); focus(runtime.focusedPaneID); persist()
+        updateChrome(workspaceID); focus(runtime.focusedPaneID)
+        refreshCommandEnablement()
+        persist()
         if let previousSticky, previousSticky != snapshot.attentionStickyWorkspaceID {
             announceAttentionReturnIfNeeded(previousSticky, wasAttention: true)
         }

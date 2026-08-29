@@ -929,18 +929,22 @@
 - Keyboard/screen-reader path: the row context surface exposes the same pane
   order as explicit `Jump to pane N` actions, including provider, state,
   remote identity, and active-pane wording. The transient pointer card itself
-  does not take keyboard focus.
+  does not take keyboard focus. A later release-process probe found and fixed
+  stale pane-command enablement after workspace switches; `Focus Pane 2` now
+  disables on one pane, enables on two, follows one/two-pane selection changes,
+  and routes to the second pane's exact tree-order identity.
 - Capture note: GTK maps the popover as a separate native X11 surface. The app
   client and popup were captured from the same live state and composited at
   their recorded root-window coordinates; no UI pixels were otherwise edited.
 - Verification: the inspected image shows the 296-point sidebar, lifted row,
-  real split terminals, and continuous footer without a GL-context error. Full
-  preflight passed 59 Swift tests, release integration (including OSC title/cwd
-  callbacks), and 100 two-surface lifecycle cycles.
-- Remaining row work: exact owned provider vector glyphs and full
-  physical-pointer/Orca action inspection. Hover/focus close controls,
-  jump-number overlays, and native pointer drag insertion are implemented;
-  the latter two still need trustworthy physical held-key/drag evidence.
+  real split terminals, and continuous footer without a GL-context error. The
+  current full preflight passes 113 Swift tests, the dynamic command-enablement
+  release probe, release integration (including OSC title/cwd callbacks), and
+  100 two-surface lifecycle cycles.
+- Remaining interaction evidence: physical pointer card invocation and audible
+  Orca action inspection. Hover/focus close controls, jump-number overlays, and
+  native pointer drag insertion are implemented; held-key/drag evidence still
+  needs an input-capable display.
 
 ## 2026-08-28 — SwiftGtk4 live sidebar chrome and rail
 
