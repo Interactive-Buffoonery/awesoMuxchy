@@ -205,7 +205,8 @@ geometry and state styling have also passed a real-window visual correction.
   to Needs Input` GTK status announcement. Blocking prompts keep their distinct
   background-agent announcement. A real waiting notification was directly
   observed as the exact medium-priority `Object.Announcement` on the AT-SPI bus
-  without a focus transition. Full preflight passes 86 Swift tests.
+  without a focus transition; its paired prompt submission emitted the exact
+  return-to-Local announcement at the same priority. Full preflight passes 86 Swift tests.
   Injected-clock GTK coverage and audible Orca output inspection remain pending.
 - Non-pinned workspace menus now expose tested, bounded within-group Up/Down
   moves plus named previous/next-group and arbitrary-group alternatives.

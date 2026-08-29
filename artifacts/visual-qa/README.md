@@ -20,7 +20,9 @@
   exclusion, Pinned precedence, acknowledgement, prompt/session retraction, and
   omission of both the runtime pane mark and derived lift from persisted JSON.
   A separate live pass observed the exact sentence as a medium-priority AT-SPI
-  `Object.Announcement` with no terminal-focus transition.
+  `Object.Announcement` with no terminal-focus transition; a following synthetic
+  `promptSubmit` emitted `Review left Needs Input, returned to Local` through the
+  same event channel and priority.
   Full preflight passes 86 Swift tests, the release terminal integration, and
   100 two-surface lifecycle cycles.
 - Privacy: the event and profile are synthetic and contain no prompt, terminal,
