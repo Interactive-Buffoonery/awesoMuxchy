@@ -786,20 +786,15 @@ private final class ApplicationState: @unchecked Sendable {
             guard let one = buildLayout(first, workspace: workspace), let two = buildLayout(second, workspace: workspace) else { return nil }
             let paned = PanedRef(orientation: axis == .horizontal ? .horizontal : .vertical)
             paned.setWideHandle(wide: true); paned.setStart(child: one.0); paned.setEnd(child: two.0)
-            let boundedFraction = min(max(fraction, 0.1), 0.9)
-            var appliedInitialPosition = false
-            _ = paned.onNotifyMaxPosition { paned, _ in
-                guard !appliedInitialPosition else { return }
-                let extent = axis == .horizontal ? paned.getWidth() : paned.getHeight()
-                guard extent > 1 else { return }
-                paned.set(position: Int((Double(extent) * boundedFraction).rounded()))
-                appliedInitialPosition = true
-            }
+            configurePaneDivider(
+                paned, axis: axis, fraction: fraction,
+                workspaceID: workspace.id, splitPaneIDs: layout.paneIDs
+            )
             return (WidgetRef(paned), one.1 + two.1)
         }
     }
 
-    private func buildMountedLayout(_ layout: PaneLayout) -> WidgetRef? {
+    private func buildMountedLayout(_ layout: PaneLayout, workspaceID: UUID) -> WidgetRef? {
         switch layout {
         case let .pane(pane):
             guard let surface = surfacesByPane[pane.id] else { return nil }
@@ -807,24 +802,78 @@ private final class ApplicationState: @unchecked Sendable {
             surface.widget.setVexpand(expand: true)
             return surface.widget
         case let .split(axis, fraction, first, second):
-            guard let one = buildMountedLayout(first), let two = buildMountedLayout(second) else {
+            guard let one = buildMountedLayout(first, workspaceID: workspaceID),
+                  let two = buildMountedLayout(second, workspaceID: workspaceID) else {
                 return nil
             }
             let paned = PanedRef(orientation: axis == .horizontal ? .horizontal : .vertical)
             paned.setWideHandle(wide: true)
             paned.setStart(child: one)
             paned.setEnd(child: two)
-            let boundedFraction = min(max(fraction, 0.1), 0.9)
-            var appliedInitialPosition = false
-            _ = paned.onNotifyMaxPosition { paned, _ in
-                guard !appliedInitialPosition else { return }
-                let extent = axis == .horizontal ? paned.getWidth() : paned.getHeight()
-                guard extent > 1 else { return }
-                paned.set(position: Int((Double(extent) * boundedFraction).rounded()))
-                appliedInitialPosition = true
-            }
+            configurePaneDivider(
+                paned, axis: axis, fraction: fraction,
+                workspaceID: workspaceID, splitPaneIDs: layout.paneIDs
+            )
             return WidgetRef(paned)
         }
+    }
+
+    private func configurePaneDivider(
+        _ paned: PanedRef,
+        axis: SplitAxis,
+        fraction: Double,
+        workspaceID: UUID,
+        splitPaneIDs: [UUID]
+    ) {
+        let boundedFraction = min(max(fraction, 0.1), 0.9)
+        var appliedInitialPosition = false
+        var isApplyingPosition = false
+        let releaseController = EventControllerLegacy()
+        releaseController.setPropagation(phase: .capture)
+        _ = releaseController.onEvent { [weak self] _, event in
+            guard event.getEventType() == .buttonRelease,
+                  gdk_button_event_get_button(event.event_ptr) == 1,
+                  appliedInitialPosition,
+                  !isApplyingPosition
+            else { return false }
+            let extent = axis == .horizontal ? paned.getWidth() : paned.getHeight()
+            guard extent > 1 else { return false }
+            let proposed = Double(paned.getPosition()) / Double(extent)
+            let bounded = min(max(proposed, 0.1), 0.9)
+            if bounded != proposed {
+                isApplyingPosition = true
+                paned.set(position: Int((Double(extent) * bounded).rounded()))
+                isApplyingPosition = false
+            }
+            self?.paneDividerMoved(
+                workspaceID: workspaceID,
+                splitPaneIDs: splitPaneIDs,
+                fraction: bounded
+            )
+            return false
+        }
+        _ = releaseController.ref()
+        gtk_widget_add_controller(paned.widget_ptr, releaseController.event_controller_ptr)
+        _ = paned.onNotifyMaxPosition { paned, _ in
+            guard !appliedInitialPosition else { return }
+            let extent = axis == .horizontal ? paned.getWidth() : paned.getHeight()
+            guard extent > 1 else { return }
+            isApplyingPosition = true
+            paned.set(position: Int((Double(extent) * boundedFraction).rounded()))
+            isApplyingPosition = false
+            appliedInitialPosition = true
+        }
+    }
+
+    private func paneDividerMoved(
+        workspaceID: UUID,
+        splitPaneIDs: [UUID],
+        fraction: Double
+    ) {
+        guard (try? snapshot.setSplitFraction(
+            in: workspaceID, splitPaneIDs: splitPaneIDs, to: fraction
+        )) == true else { return }
+        persist()
     }
 
     private func remountWorkspaceLayout(_ workspaceID: UUID) -> Bool {
@@ -852,7 +901,7 @@ private final class ApplicationState: @unchecked Sendable {
         for widget in mountedWidgets where widget.getParent() != nil {
             widget.unparent()
         }
-        guard let root = buildMountedLayout(workspace.layout) else {
+        guard let root = buildMountedLayout(workspace.layout, workspaceID: workspaceID) else {
             for widget in mountedWidgets { widget.unref() }
             return false
         }

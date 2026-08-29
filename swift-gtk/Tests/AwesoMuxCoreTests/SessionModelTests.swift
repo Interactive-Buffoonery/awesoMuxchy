@@ -154,6 +154,48 @@ private func snapshot(_ workspaces: [WorkspaceSnapshot]) -> SessionSnapshot {
     #expect(!(try value.resizeFocusedSplit(in: workspace.id, by: 1)))
 }
 
+@Test func settingDividerFractionTargetsExactNestedSplitAndClamps() throws {
+    let first = PaneSnapshot(title: "first", workingDirectory: "/tmp")
+    let second = PaneSnapshot(title: "second", workingDirectory: "/tmp")
+    let third = PaneSnapshot(title: "third", workingDirectory: "/tmp")
+    let nested = PaneLayout.split(
+        axis: .vertical, fraction: 0.5,
+        first: .pane(second), second: .pane(third)
+    )
+    let workspace = WorkspaceSnapshot(
+        name: "Nested", focusedPaneID: first.id,
+        layout: .split(
+            axis: .horizontal, fraction: 0.4,
+            first: .pane(first), second: nested
+        )
+    )
+    var value = snapshot([workspace])
+
+    #expect(try value.setSplitFraction(
+        in: workspace.id, splitPaneIDs: nested.paneIDs, to: 0.82
+    ))
+    guard case let .split(_, rootFraction, _, right) = value.workspaces[0].layout,
+          case let .split(_, nestedFraction, _, _) = right else {
+        Issue.record("Expected the nested split layout")
+        return
+    }
+    #expect(rootFraction == 0.4)
+    #expect(nestedFraction == 0.82)
+
+    #expect(try value.setSplitFraction(
+        in: workspace.id, splitPaneIDs: nested.paneIDs, to: 1
+    ))
+    guard case let .split(_, _, _, clampedRight) = value.workspaces[0].layout,
+          case let .split(_, clampedFraction, _, _) = clampedRight else {
+        Issue.record("Expected the clamped nested split layout")
+        return
+    }
+    #expect(clampedFraction == 0.9)
+    #expect(!(try value.setSplitFraction(
+        in: workspace.id, splitPaneIDs: [UUID()], to: 0.5
+    )))
+}
+
 @Test func selectingWorkspaceRejectsSoftClosedTarget() {
     var closed = workspace(panes: 1)
     closed.isSoftClosed = true

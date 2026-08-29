@@ -19,14 +19,18 @@
   persisted 0.50 → 0.45 → 0.50 → 0.10 fractions and a non-mutating extra clamp
   activation while retaining the same live pane identities; proportions are
   behavioral evidence only because the strict crop intentionally excludes
-  terminal content.
+  terminal content. GtkPaned release now persists the exact nested split once
+  per primary-button interaction and ignores allocation-time position noise;
+  an isolated real launch preserved an exact 0.500 fraction without
+  diagnostics. The Smithay display does not route XTest input, so no physical
+  held-pointer claim is made.
 - Inspection: the 296×852 sidebar-only Latte capture was opened at original
   resolution and shows the selected `Pane Commands` row with the two-pane
   indicator/count while fixed header/footer geometry remains stable. The
   480×230 owned sheet was recaptured after rejecting an X11 partial-damage
   frame, then inspected at original resolution for exact heading, body, hint,
   safe-default Cancel, and destructive action treatment.
-- Verification: full local preflight passes the text baseline, all 97 Swift
+- Verification: full local preflight passes the text baseline, all 98 Swift
   tests, the production build, real terminal integration, and 100 two-surface
   lifecycle cycles.
 - Privacy: the profile, workspace, pane title, cwd, counts, and status are

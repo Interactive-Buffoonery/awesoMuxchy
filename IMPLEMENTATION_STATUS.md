@@ -311,6 +311,13 @@ help, and agent context while preserving the compact reference geometry.
   split containers, preserves/focuses both live Ghostty surfaces, and persists
   the fraction. Real app actions drove 0.50 → 0.45 → 0.50 → 0.10 with an extra
   clamped activation and no GTK/runtime diagnostics.
+- Native GTK divider release now writes the exact nested split identified by
+  its ordered pane identities, clamps a pointer move to the same 10–90% range,
+  and persists once at release rather than on every allocation or motion
+  notification. A real isolated-profile launch verified that GTK's one-pixel
+  allocation adjustment does not mutate a stored 0.500 fraction and produced
+  no diagnostics. The Smithay-backed QA display does not route XTest pointer
+  input, so a trustworthy physical held-pointer drag remains pending.
 - Workspace rows, lifted Needs Input/Pinned rows, collapsed-rail controls, and
   multi-pane peek cards now share one provider-aware tile projection. Claude,
   Codex, OpenCode, Pi, Grok, and shell retain distinct owned scalable marks and
@@ -433,8 +440,8 @@ help, and agent context while preserving the compact reference geometry.
 
 1. Add the foreground-shell capability signal needed to gate inserted Git/gh
    commands as precisely as macOS does.
-2. Implement split resize/reflow and direct pane-index focus commands on the
-   now-live split/close lifecycle.
+2. Implement direct pane-index focus commands and rapid Unicode split-reflow
+   stress coverage on the now-live split/close/resize lifecycle.
 3. Physically verify pointer reorder and insertion indicators. Dynamic group
    menu enablement plus both left/right hidden attention reveal paths and timed
    retraction are captured and inspected.

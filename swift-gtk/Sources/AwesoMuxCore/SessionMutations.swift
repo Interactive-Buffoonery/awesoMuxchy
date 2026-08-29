@@ -97,6 +97,43 @@ public extension PaneLayout {
             return .split(axis: axis, fraction: bounded, first: first, second: second)
         }
     }
+
+    func replacingSplitFraction(
+        withPaneIDs splitPaneIDs: [UUID],
+        fraction proposedFraction: Double
+    ) -> PaneLayout? {
+        guard proposedFraction.isFinite else { return nil }
+        switch self {
+        case .pane:
+            return nil
+        case let .split(axis, fraction, first, second):
+            if paneIDs == splitPaneIDs {
+                return .split(
+                    axis: axis,
+                    fraction: min(max(proposedFraction, 0.1), 0.9),
+                    first: first,
+                    second: second
+                )
+            }
+            if let updatedFirst = first.replacingSplitFraction(
+                withPaneIDs: splitPaneIDs, fraction: proposedFraction
+            ) {
+                return .split(
+                    axis: axis, fraction: fraction,
+                    first: updatedFirst, second: second
+                )
+            }
+            if let updatedSecond = second.replacingSplitFraction(
+                withPaneIDs: splitPaneIDs, fraction: proposedFraction
+            ) {
+                return .split(
+                    axis: axis, fraction: fraction,
+                    first: first, second: updatedSecond
+                )
+            }
+            return nil
+        }
+    }
 }
 
 public extension SessionSnapshot {
@@ -575,6 +612,23 @@ public extension SessionSnapshot {
         try updateWorkspace(id: workspaceID) { workspace in
             guard let updated = workspace.layout.resizingNearestSplit(
                 containing: workspace.focusedPaneID, by: delta
+            ), updated != workspace.layout else { return }
+            workspace.layout = updated
+            changed = true
+        }
+        return changed
+    }
+
+    @discardableResult
+    mutating func setSplitFraction(
+        in workspaceID: UUID,
+        splitPaneIDs: [UUID],
+        to fraction: Double
+    ) throws -> Bool {
+        var changed = false
+        try updateWorkspace(id: workspaceID) { workspace in
+            guard let updated = workspace.layout.replacingSplitFraction(
+                withPaneIDs: splitPaneIDs, fraction: fraction
             ), updated != workspace.layout else { return }
             workspace.layout = updated
             changed = true

@@ -283,6 +283,12 @@ geometry and state styling have also passed a real-window visual correction.
   around the same live surfaces. Real GTK actions verified
   0.50 → 0.45 → 0.50 → 0.10 and a non-mutating extra boundary activation with
   a clean runtime log.
+- GtkPaned primary-button release now updates the exact nested model split,
+  snaps pointer movement to 10–90%, and writes once per completed interaction.
+  The route deliberately ignores allocation-time position notifications: a
+  clean isolated-profile launch left an exact stored 0.500 fraction unchanged.
+  Exact nested replacement/clamp tests pass; physical held-pointer evidence is
+  still pending because XTest is not routed by the Smithay QA display.
 - `Close Workspace`, `Reopen Closed Workspace`, and `Clear Workspace` now have
   persistent model semantics and awesoMux-owned Ctrl-Shift-W, Ctrl-Shift-T,
   and Ctrl-Alt-Shift-W routing. Recovery is capped at 20 entries/24 hours,
