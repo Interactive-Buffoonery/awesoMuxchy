@@ -1,5 +1,33 @@
 # Visual QA
 
+## 2026-08-29 — SwiftGtk4 sidebar keyboard-focus handoff
+
+- Linux images: [expanded search focus](swift-gtk/progress/17-sidebar-keyboard-focus/expanded-search-focus-x11.png)
+  and [collapsed selected-row focus](swift-gtk/progress/17-sidebar-keyboard-focus/collapsed-row-focus-x11.png).
+- Reference: `KeyboardShortcutCatalog.focusSidebar`,
+  `SidebarFocusRequest.swift`, `SidebarPresentationCommand.swift`, and
+  `SidebarView.swift` at macOS baseline
+  `fed33ff47c559344fc6db6fa53f16e75fcc4a116`.
+- Behavior: the exported native `Focus Sidebar` action maps the reference
+  Command-Control-S chord to Linux Control-Super-S. Expanded mode moves focus
+  from the active terminal to `Search sessions`; collapsed mode focuses the
+  selected rail row (or its stable fallback). A hidden sidebar is persistently
+  shown before the focus handoff.
+- Verification: the action was invoked through `org.gtk.Actions` in the real
+  app. The expanded image shows the search field's keyboard-only blue focus
+  ring; the collapsed image shows the selected Needs Input rail row's distinct
+  focus outline. A hide/focus round trip changed the profile-scoped synthetic
+  fixture from hidden `true` to `false`. Both images contain two live Ghostty
+  panes and were inspected at original resolution. Full preflight passes 71
+  Swift tests, release terminal integration, and 100 two-surface lifecycle
+  cycles.
+- Accessibility note: GTK 4.14's AT-SPI bridge still omits its focused state
+  bit for these widgets, so the visible native focus ring and direct action
+  route are the authoritative evidence; full Orca spoken inspection remains.
+- Privacy: the profile and terminal prompts are synthetic. No terminal history,
+  typed commands, clipboard data, credentials, arbitrary agent output, or
+  private path is present.
+
 ## 2026-08-29 — SwiftGtk4 sidebar search states
 
 - Linux images: [active title highlight](swift-gtk/progress/16-sidebar-search/active-highlight-x11.png)

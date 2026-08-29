@@ -266,7 +266,11 @@ help, and agent context while preserving the compact reference geometry.
   and all three fixture groups. Singular/plural group counts are tested. Row
   descriptions advertise the Shift+F10 action menu, and the opened menu
   exposes every named action. Compact icon/footer targets are at least 24
-  points. Agent state chips are
+  points. The exact `Focus Sidebar` command now maps Command-Control-S to Linux
+  Control-Super-S, unhides the sidebar, and hands terminal focus to the
+  expanded search field or the selected collapsed-rail row. Both visible focus
+  states were exercised through the exported GTK action and inspected at
+  original resolution. Agent state chips are
   buttons that open the panel filtered to the chosen state. Orca enumerates
   the running app through AT-SPI. Group disclosure, color, close,
   workspace/pinned/group reorder, pin/unpin, and Needs Input return transitions

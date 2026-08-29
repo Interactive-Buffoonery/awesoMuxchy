@@ -210,7 +210,11 @@ geometry and state styling have also passed a real-window visual correction.
   expanded/collapsed state, singular/plural counts, lifted/group positions,
   and the row's explicit Shift+F10 action-menu description. The opened native
   menu remains the named non-pointer action surface. Compact targets are at
-  least 24 points.
+  least 24 points. The reference `Focus Sidebar` command is now exported with
+  the Linux Control-Super-S mapping. It persistently unhides the sidebar, then
+  focuses `Search sessions` in expanded mode or the selected/fallback rail row
+  in collapsed mode. Direct GTK-action QA and inspected real-app captures cover
+  both focus rings plus the hidden-to-visible preference transition.
   Footer state chips are real buttons that open a state-filtered activity
   panel, and Orca discovers the live app through AT-SPI.
 - Collapsed group attention is projected once from pane agent states and shared
