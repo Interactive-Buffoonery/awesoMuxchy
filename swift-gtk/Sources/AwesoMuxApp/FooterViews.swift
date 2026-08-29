@@ -348,7 +348,8 @@ final class SidebarStatusFooter {
         heading.add(cssClass: "aw-menu-heading")
         heading.xalign = 0
         heading.setHexpand(expand: true)
-        let close = ButtonRef(label: "×")
+        let close = ButtonRef()
+        setDecorativeButtonGlyph(close, "×")
         close.add(cssClass: "aw-icon-button")
         close.setTooltip(text: "Hide agent activity")
         setAccessibleLabel(close, "Hide agent activity")

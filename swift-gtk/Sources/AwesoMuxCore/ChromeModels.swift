@@ -268,6 +268,14 @@ public enum SidebarAnnouncement {
 }
 
 public enum SidebarAccessibilityCopy {
+    public static let newWorkspaceHint = "Creates a new workspace in the current group."
+    public static let newWorkspaceOptionsHint =
+        "Opens a menu to create a new workspace group or a workspace in a specific group."
+    public static let newWorkspaceMenuHint =
+        "Opens a menu with New Workspace, New Workspace in a chosen group, and New Workspace Group"
+    public static let collapsedSearchHint =
+        "Opens the command palette to search workspaces and actions."
+
     public static func position(_ position: Int, of count: Int) -> String? {
         guard position > 0, count > 0, position <= count else { return nil }
         return "Position \(position) of \(count)"

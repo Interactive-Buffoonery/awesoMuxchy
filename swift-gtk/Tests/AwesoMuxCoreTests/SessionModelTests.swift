@@ -1045,4 +1045,12 @@ private func snapshot(_ workspaces: [WorkspaceSnapshot]) -> SessionSnapshot {
     #expect(SidebarAccessibilityCopy.workspaceCount(0) == "0 workspaces")
     #expect(SidebarAccessibilityCopy.workspaceCount(1) == "1 workspace")
     #expect(SidebarAccessibilityCopy.workspaceCount(2) == "2 workspaces")
+    #expect(SidebarAccessibilityCopy.newWorkspaceHint
+        == "Creates a new workspace in the current group.")
+    #expect(SidebarAccessibilityCopy.newWorkspaceOptionsHint
+        == "Opens a menu to create a new workspace group or a workspace in a specific group.")
+    #expect(SidebarAccessibilityCopy.newWorkspaceMenuHint
+        == "Opens a menu with New Workspace, New Workspace in a chosen group, and New Workspace Group")
+    #expect(SidebarAccessibilityCopy.collapsedSearchHint
+        == "Opens the command palette to search workspaces and actions.")
 }

@@ -76,7 +76,8 @@ private final class ApplicationState: @unchecked Sendable {
             self.row = row
             root = OverlayRef(); root.add(cssClass: "aw-workspace-row")
             root.setHalign(align: .fill); root.set(child: row)
-            close = ButtonRef(label: "×"); close.add(cssClass: "aw-row-close")
+            close = ButtonRef(); setDecorativeButtonGlyph(close, "×")
+            close.add(cssClass: "aw-row-close")
             close.setSizeRequest(width: 24, height: 24)
             close.setHalign(align: .end); close.setValign(align: .center)
             close.setMarginEnd(margin: 8); close.set(visible: false)
@@ -123,7 +124,8 @@ private final class ApplicationState: @unchecked Sendable {
             self.count = count; self.isEmpty = isEmpty; self.isCollapsed = isCollapsed
             root = OverlayRef(); root.add(cssClass: "aw-group-header")
             root.setHalign(align: .fill); root.setHexpand(expand: true); root.set(child: disclosure)
-            close = ButtonRef(label: "×"); close.add(cssClass: "aw-group-close")
+            close = ButtonRef(); setDecorativeButtonGlyph(close, "×")
+            close.add(cssClass: "aw-group-close")
             close.setSizeRequest(width: 24, height: 24)
             close.setHalign(align: .end); close.setValign(align: .center)
             close.setMarginEnd(margin: 2); close.setTooltip(text: "Close Group")
@@ -2308,6 +2310,9 @@ private final class ApplicationState: @unchecked Sendable {
         menu.set(iconName: includePrimaryAction ? "list-add-symbolic" : "pan-down-symbolic")
         menu.setTooltip(text: includePrimaryAction ? "New Workspace menu" : "New Workspace Options")
         setAccessibleLabel(menu, includePrimaryAction ? "New Workspace menu" : "New Workspace Options")
+        setAccessibleDescription(menu, includePrimaryAction
+            ? SidebarAccessibilityCopy.newWorkspaceMenuHint
+            : SidebarAccessibilityCopy.newWorkspaceOptionsHint)
         workspaceOptionMenus.append((menu, includePrimaryAction))
         configureWorkspaceOptionsButton(menu, includePrimaryAction: includePrimaryAction)
         return menu
@@ -3084,8 +3089,10 @@ private func buildWindow(for application: Gtk.ApplicationRef) {
     search.setWidthChars(nChars: 8); search.setMaxWidthChars(nChars: 8)
     search.onSearchChanged { [weak state] entry in state?.filter(entry.text ?? "") }
     let createSplit = BoxRef(orientation: .horizontal, spacing: 0); createSplit.add(cssClass: "aw-create-split")
-    let createPrimary = ButtonRef(label: "+"); createPrimary.add(cssClass: "aw-create-primary")
+    let createPrimary = ButtonRef(); setDecorativeButtonGlyph(createPrimary, "+")
+    createPrimary.add(cssClass: "aw-create-primary")
     setAccessibleLabel(createPrimary, "New Workspace")
+    setAccessibleDescription(createPrimary, SidebarAccessibilityCopy.newWorkspaceHint)
     createPrimary.setTooltip(text: "New Workspace")
     createPrimary.onClicked { [weak state] _ in state?.createDefaultWorkspace() }
     let createOptions = state.makeWorkspaceOptionsButton(includePrimaryAction: false)
@@ -3143,7 +3150,8 @@ private func buildWindow(for application: Gtk.ApplicationRef) {
     let railSearch = ButtonRef(); railSearch.set(iconName: "system-search-symbolic")
     railSearch.add(cssClass: "aw-rail-control")
     railSearch.setTooltip(text: "Search workspaces and actions")
-    setAccessibleLabel(railSearch, "Search workspaces and actions")
+    setAccessibleLabel(railSearch, "Search")
+    setAccessibleDescription(railSearch, SidebarAccessibilityCopy.collapsedSearchHint)
     railSearch.onClicked { [weak state] _ in state?.showCommandPalette() }
     let railAdd = state.makeWorkspaceOptionsButton(includePrimaryAction: true)
     railAdd.add(cssClass: "aw-rail-control")

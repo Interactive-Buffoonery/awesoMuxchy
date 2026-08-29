@@ -320,6 +320,14 @@ help, and agent context while preserving the compact reference geometry.
   by the same exact return event, proving the two promotion semantics remain
   distinct through delivery. Full spoken navigation and audible Orca output
   verification remain pending.
+- Expanded and collapsed creation/search controls now publish the exact
+  reference action hints, not label-only approximations. Live AT-SPI inspection
+  verifies `New Workspace` plus its current-group hint, `New Workspace Options`
+  plus its group/specific-workspace menu hint, collapsed `Search` plus its
+  command-palette hint, and the collapsed `New Workspace menu` contents hint.
+  Visible `+`/`×` children on primary-create, row-close, group-close, and
+  activity-close buttons are explicitly decorative so GTK cannot replace the
+  parent action name with the glyph.
 - Background live-agent outcome crossings now publish the reference accessibility
   status copy without changing sidebar ownership. Real Codex `done` and `error`
   events on Review emitted `Codex in Review completed.` and `Codex in Review

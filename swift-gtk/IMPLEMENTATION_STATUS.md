@@ -267,6 +267,12 @@ geometry and state styling have also passed a real-window visual correction.
   built-in key handling cannot intercept Menu or Shift+F10 first.
   Footer state chips are real buttons that open a state-filtered activity
   panel, and Orca discovers the live app through AT-SPI.
+- Header icon controls now use tested reference copy for AT-SPI hints. Direct
+  bus traversal verifies expanded `New Workspace` and `New Workspace Options`
+  name/description pairs plus collapsed `Search` and `New Workspace menu`
+  pairs. Text-glyph children used by primary-create and close affordances are
+  hidden as decorative, preventing GTK child-name fallback from exposing `+`
+  or `×` instead of the action name.
 - Collapsed group attention is projected once from pane agent states and shared
   by expanded-header and rail signals. Needs Input wins over Error, which wins
   over Thinking; Output is intentionally excluded. Each rail group control
