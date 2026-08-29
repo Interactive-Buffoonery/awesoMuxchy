@@ -1,5 +1,27 @@
 # Visual QA
 
+## 2026-08-29 — SwiftGtk4 sidebar interaction states
+
+- Linux images: [alternate workspace selected](swift-gtk/progress/18-sidebar-interaction-states/alternate-workspace-selected-x11.png),
+  [unselected Needs Input row hover](swift-gtk/progress/18-sidebar-interaction-states/row-hover-x11.png),
+  and [expanded group hover](swift-gtk/progress/18-sidebar-interaction-states/group-hover-x11.png).
+- Reference: `SidebarSessionTile.swift`, `SidebarGroupHeaderView.swift`, and
+  `SidebarView.swift` at macOS baseline
+  `fed33ff47c559344fc6db6fa53f16e75fcc4a116`.
+- Display and geometry: release SwiftGtk4 app on the verified X11/GLX path;
+  1440×852 content with the 296 px expanded sidebar.
+- Behavior: the exported second-workspace action selected the Pinned workspace
+  and moved terminal ownership to it. Pointer hover on the unselected Needs
+  Input row reveals its sibling close control without shifting row content;
+  group hover replaces the count with the close affordance in place.
+- Inspection: all three PNGs were inspected at original resolution. Selection,
+  hover fill, tint/attention marks, close affordances, fixed footer alignment,
+  and real Ghostty rendering remain visually distinct. Physical DnD insertion
+  and full Orca spoken navigation remain open interaction checks.
+- Privacy: the profile, workspace names, locations, and terminal prompt are
+  synthetic; no command history, clipboard content, credentials, or arbitrary
+  agent output is shown.
+
 ## 2026-08-29 — SwiftGtk4 sidebar keyboard-focus handoff
 
 - Linux images: [expanded search focus](swift-gtk/progress/17-sidebar-keyboard-focus/expanded-search-focus-x11.png),
