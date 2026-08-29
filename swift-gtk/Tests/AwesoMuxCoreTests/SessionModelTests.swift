@@ -461,6 +461,29 @@ private func snapshot(_ workspaces: [WorkspaceSnapshot]) -> SessionSnapshot {
     #expect(reopen.visibleCopy.contains("reopen the last one you closed"))
 }
 
+@Test func workspaceMoveAvailabilityNamesAdjacentGroupsAndBoundsActions() {
+    let first = workspace(panes: 1)
+    let second = workspace(panes: 1)
+    let third = workspace(panes: 1)
+    let value = SessionSnapshot(groups: [
+        WorkspaceGroupSnapshot(name: "Alpha", workspaces: [first, second]),
+        WorkspaceGroupSnapshot(name: "Beta", workspaces: [third]),
+    ])
+
+    let top = WorkspaceMoveAvailability.resolve(snapshot: value, workspaceID: first.id)
+    #expect(top?.canMoveUp == false)
+    #expect(top?.canMoveDown == true)
+    #expect(top?.previousGroup == nil)
+    #expect(top?.nextGroup?.name == "Beta")
+
+    let destination = WorkspaceMoveAvailability.resolve(snapshot: value, workspaceID: third.id)
+    #expect(destination?.canMoveUp == false)
+    #expect(destination?.canMoveDown == false)
+    #expect(destination?.previousGroup?.name == "Alpha")
+    #expect(destination?.nextGroup == nil)
+    #expect(WorkspaceMoveAvailability.resolve(snapshot: value, workspaceID: UUID()) == nil)
+}
+
 @Test func liftedSidebarProjectionOrdersAttentionThenPinnedWithoutDuplicatingOrigins() {
     let attentionOnePane = PaneSnapshot(title: "Approve", workingDirectory: "/one", agent: "Codex", agentState: .needsAttention)
     let attentionTwoPane = PaneSnapshot(title: "Review", workingDirectory: "/two", agent: "Claude", agentState: .needsAttention)

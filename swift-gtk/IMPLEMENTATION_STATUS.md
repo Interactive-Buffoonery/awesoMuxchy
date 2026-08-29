@@ -126,6 +126,12 @@ geometry and state styling have also passed a real-window visual correction.
   per-workspace `Mute Notifications`/`Unmute Notifications` overrides persist.
   Unanswered-turn ingestion, reorder DnD, injected-clock UI coverage, and
   AT-SPI announcements remain pending.
+- Non-pinned workspace menus now expose tested, bounded within-group Up/Down
+  moves plus named previous/next-group and arbitrary-group alternatives.
+  Mutations reuse the authoritative snapshot and existing terminal runtime,
+  reorder regular/lifted/rail projections, and asynchronously rebuild affected
+  menus so boundary enablement remains truthful after every move. Pointer DnD,
+  insertion indicators, shortcuts, and announcements remain pending.
 - `Close Workspace`, `Reopen Closed Workspace`, and `Clear Workspace` now have
   persistent model semantics and awesoMux-owned Ctrl-Shift-W, Ctrl-Shift-T,
   and Ctrl-Alt-Shift-W routing. Recovery is capped at 20 entries/24 hours,

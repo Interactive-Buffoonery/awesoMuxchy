@@ -718,8 +718,9 @@ private final class ApplicationState: @unchecked Sendable {
         on row: ToggleButtonRef, workspaceID: UUID, groupID: UUID, isLifted: Bool = false
     ) {
         let popover = PopoverRef(); let box = BoxRef(orientation: .vertical, spacing: 2); box.add(cssClass: "aw-popover")
-        func action(_ label: String, run: @escaping () -> Void) -> ButtonRef {
+        func action(_ label: String, sensitive: Bool = true, run: @escaping () -> Void) -> ButtonRef {
             let button = ButtonRef(label: label); button.add(cssClass: "aw-menu-row"); button.setHalign(align: .fill)
+            button.set(sensitive: sensitive)
             button.onClicked { _ in run(); popover.popdown() }; box.append(child: button); return button
         }
         _ = action("New Workspace Here") { [weak self] in self?.createWorkspace(here: workspaceID, fallbackGroupID: groupID) }
@@ -742,6 +743,23 @@ private final class ApplicationState: @unchecked Sendable {
             }
             if pinnedIndex < snapshot.pinnedWorkspaceIDs.count - 1 {
                 _ = action("Move Workspace Down") { [weak self] in self?.movePinned(workspaceID, offset: 1) }
+            }
+        } else if let availability = WorkspaceMoveAvailability.resolve(snapshot: snapshot, workspaceID: workspaceID) {
+            _ = action("Move Workspace Up", sensitive: availability.canMoveUp) { [weak self] in
+                self?.moveWorkspaceWithinGroup(workspaceID, offset: -1)
+            }
+            _ = action("Move Workspace Down", sensitive: availability.canMoveDown) { [weak self] in
+                self?.moveWorkspaceWithinGroup(workspaceID, offset: 1)
+            }
+            if let previous = availability.previousGroup {
+                _ = action("Move to Previous Group (\(previous.name))") { [weak self] in
+                    self?.moveWorkspace(workspaceID, to: previous.id)
+                }
+            }
+            if let next = availability.nextGroup {
+                _ = action("Move to Next Group (\(next.name))") { [weak self] in
+                    self?.moveWorkspace(workspaceID, to: next.id)
+                }
             }
         }
         let otherGroups = snapshot.groups.filter { $0.id != groupID }
@@ -835,6 +853,18 @@ private final class ApplicationState: @unchecked Sendable {
         persist()
     }
 
+    private func moveWorkspaceWithinGroup(_ workspaceID: UUID, offset: Int) {
+        guard let groupID = snapshot.groups.first(where: { group in
+            group.workspaces.contains(where: { $0.id == workspaceID })
+        })?.id, (try? snapshot.moveWorkspace(workspaceID, offset: offset)) != nil else { return }
+        workspaceIDsByGroup[groupID] = snapshot.groups.first(where: { $0.id == groupID })?.workspaces.map(\.id) ?? []
+        reorderGroupRows(groupID)
+        let affected = workspaceIDsByGroup[groupID] ?? []
+        refreshLiftedRows()
+        performOnGTKMain { [weak self] in for id in affected { self?.rebuildWorkspaceContextMenu(id) } }
+        persist()
+    }
+
     func presentWorkspaceNameDialog(_ workspaceID: UUID) {
         guard let workspace = snapshot.workspace(id: workspaceID) else { return }
         let window = WindowRef(); window.title = "Rename Workspace"; window.setDefaultSize(width: 420, height: 170)
@@ -895,7 +925,10 @@ private final class ApplicationState: @unchecked Sendable {
         runtimes[workspaceID]?.groupID = groupID
         groupCounts[sourceID]?.label = "\(snapshot.groups.first(where: { $0.id == sourceID })?.workspaces.filter { !$0.isSoftClosed }.count ?? 0)"
         groupCounts[groupID]?.label = "\(snapshot.groups.first(where: { $0.id == groupID })?.workspaces.filter { !$0.isSoftClosed }.count ?? 0)"
-        refreshLiftedRows(); persist()
+        let affected = (workspaceIDsByGroup[sourceID] ?? []) + (workspaceIDsByGroup[groupID] ?? [])
+        refreshLiftedRows()
+        performOnGTKMain { [weak self] in for id in affected { self?.rebuildWorkspaceContextMenu(id) } }
+        persist()
     }
 
     private func softCloseWorkspace(_ workspaceID: UUID) {

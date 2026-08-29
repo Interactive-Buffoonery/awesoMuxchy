@@ -132,6 +132,12 @@ help, and agent context while preserving the compact reference geometry.
   bounded Pinned ordering. Rename refreshes regular, lifted, rail, search, and
   persisted representations; moving preserves terminal/pane identity and
   rebinds the row menu to its destination group.
+- Regular and Needs Input row menus now provide non-pointer workspace ordering:
+  bounded `Move Workspace Up`/`Move Workspace Down`, named previous/next-group
+  alternatives, and arbitrary destination groups. A tested availability model
+  drives edge enablement. GTK reorders the existing row and collapsed rail
+  projections while retaining terminal runtimes, then refreshes affected menus
+  after each identity-based mutation.
 - Needs Input acknowledgement is pane-scoped and persistent: a focused waiting
   pane acknowledges only after a guarded 500 ms dwell, while Ctrl-Shift-K and
   the row action acknowledge every waiting pane in that workspace immediately.

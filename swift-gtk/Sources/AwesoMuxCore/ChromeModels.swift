@@ -143,6 +143,34 @@ public struct EmptyWorkspacePresentation: Equatable, Sendable {
     }
 }
 
+public struct WorkspaceMoveAvailability: Equatable, Sendable {
+    public let canMoveUp: Bool
+    public let canMoveDown: Bool
+    public let previousGroup: (id: UUID, name: String)?
+    public let nextGroup: (id: UUID, name: String)?
+
+    public static func resolve(snapshot: SessionSnapshot, workspaceID: UUID) -> WorkspaceMoveAvailability? {
+        guard let groupIndex = snapshot.groups.firstIndex(where: { group in
+            group.workspaces.contains(where: { $0.id == workspaceID })
+        }), let workspaceIndex = snapshot.groups[groupIndex].workspaces.firstIndex(where: { $0.id == workspaceID })
+        else { return nil }
+        let previous = groupIndex > 0 ? snapshot.groups[groupIndex - 1] : nil
+        let next = groupIndex < snapshot.groups.count - 1 ? snapshot.groups[groupIndex + 1] : nil
+        return WorkspaceMoveAvailability(
+            canMoveUp: workspaceIndex > 0,
+            canMoveDown: workspaceIndex < snapshot.groups[groupIndex].workspaces.count - 1,
+            previousGroup: previous.map { ($0.id, ChromeText.sanitized($0.name, limit: 80)) },
+            nextGroup: next.map { ($0.id, ChromeText.sanitized($0.name, limit: 80)) }
+        )
+    }
+
+    public static func == (lhs: WorkspaceMoveAvailability, rhs: WorkspaceMoveAvailability) -> Bool {
+        lhs.canMoveUp == rhs.canMoveUp && lhs.canMoveDown == rhs.canMoveDown
+            && lhs.previousGroup?.id == rhs.previousGroup?.id && lhs.previousGroup?.name == rhs.previousGroup?.name
+            && lhs.nextGroup?.id == rhs.nextGroup?.id && lhs.nextGroup?.name == rhs.nextGroup?.name
+    }
+}
+
 public struct LiftedSidebarWorkspaceRow: Equatable, Sendable {
     public let row: SidebarWorkspaceRow
     public let originGroupID: UUID
