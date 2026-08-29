@@ -315,8 +315,11 @@ help, and agent context while preserving the compact reference geometry.
   observed on the AT-SPI bus as an `Object.Announcement` carrying the exact
   unanswered-turn sentence at medium priority while terminal focus remained
   unchanged. A paired `promptSubmit` then emitted the exact `Review left Needs
-  Input, returned to Local` event at the same priority. Full spoken navigation
-  and audible Orca output verification remain pending.
+  Input, returned to Local` event at the same priority. A separate blocking
+  `userInputRequired` pass emitted `Claude Code in Review needs input.` followed
+  by the same exact return event, proving the two promotion semantics remain
+  distinct through delivery. Full spoken navigation and audible Orca output
+  verification remain pending.
 - Workspace rows now expose real soft close and permanent clear actions. Soft
   close records a bounded, 24-hour recovery snapshot, removes the row from all
   projections, selects the next live workspace, and powers Ctrl-Shift-T
