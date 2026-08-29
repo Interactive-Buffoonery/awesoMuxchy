@@ -85,6 +85,13 @@ help, and agent context while preserving the compact reference geometry.
   roots display the exact `repo root` wording and nested paths become
   repo-relative; a real 1440 × 860 X11 capture was inspected and pushed in the
   focused visual-QA commit `9a092c9`.
+- Long repository/path text and branch chips now converge on the reference
+  truncation policy: project text ends cleanly, paths and the 240-point-capped
+  branch label middle-truncate, ahead/behind hints remain whole, and every GTK
+  status menu can shrink without moving or clipping its neighbors. Branch-list
+  menu labels are bounded, and draft/review PR chips include the exact
+  `· draft`/`· review` suffixes. A synthetic long-path/branch/dirty real-app
+  capture was inspected with both Ghostty panes visible.
 - The sidebar host now uses a native GTK horizontal split with the reference
   296-point default, 60-point rail settlement, 250-point mode threshold, and a
   480-point terminal minimum. Width and last-expanded width are defensively

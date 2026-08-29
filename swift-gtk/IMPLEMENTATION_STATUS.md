@@ -94,6 +94,13 @@ geometry and state styling have also passed a real-window visual correction.
   spacing, radii, opacity, tone-specific borders, and 10/11-point monospaced
   hierarchy. Repository roots render as `repo root`; nested directories render
   repo-relative, and disappearing Git/PR/CI state clears stale chips.
+- The path/project priority and branch chip now handle pathological footer text
+  without displacing adjacent controls. The branch label follows the reference
+  240-point cap and middle truncation while the short ahead/behind hint remains
+  whole; GTK status menus and long branch-list entries are shrinkable/bounded.
+  Draft and review PR chips now show the exact reference suffixes. A 1440 × 852
+  synthetic long-repository/branch/dirty capture was inspected with two live
+  Ghostty panes and no overlap or clipping.
 - The fixed 188-point host has been replaced by a native GTK split using the
   reference 296-point expanded default, 60-point collapsed settlement, and
   250-point mode threshold while reserving at least 480 points for terminal

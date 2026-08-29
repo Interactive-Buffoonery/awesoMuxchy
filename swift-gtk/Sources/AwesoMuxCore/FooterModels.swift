@@ -168,6 +168,22 @@ public struct PullRequestStatus: Equatable, Sendable {
     public let url: URL
     public let state: State
 
+    public var chipLabel: String {
+        switch state {
+        case .open: "PR #\(number)"
+        case .draft: "PR #\(number) · draft"
+        case .inReview: "PR #\(number) · review"
+        }
+    }
+
+    public var stateDescription: String {
+        switch state {
+        case .open: "open"
+        case .draft: "draft"
+        case .inReview: "in review"
+        }
+    }
+
     public init?(ghJSON: Data) {
         struct Payload: Decodable {
             let number: Int

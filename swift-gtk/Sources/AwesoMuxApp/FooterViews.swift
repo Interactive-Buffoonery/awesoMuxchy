@@ -24,6 +24,8 @@ private func menuButton(_ title: String, icon: String? = nil, action: @escaping 
     let label = LabelRef(str: title)
     label.xalign = 0
     label.setHexpand(expand: true)
+    label.setEllipsize(mode: PangoEllipsizeMode(rawValue: 2))
+    label.setMaxWidthChars(nChars: 42)
     content.append(child: label)
     button.set(child: content)
     setAccessibleLabel(button, title)
@@ -115,6 +117,8 @@ final class FocusedPanePathBar: @unchecked Sendable {
         let icon = LabelRef(str: "⎇")
         icon.add(cssClass: "aw-chip-icon")
         content.append(child: icon)
+        branchName.setEllipsize(mode: PangoEllipsizeMode(rawValue: 2))
+        branchName.setMaxWidthChars(nChars: 30)
         content.append(child: branchName)
         branchHint.add(cssClass: "aw-chip-hint")
         content.append(child: branchHint)
@@ -126,6 +130,8 @@ final class FocusedPanePathBar: @unchecked Sendable {
         let icon = LabelRef(str: "↟")
         icon.add(cssClass: "aw-chip-icon")
         content.append(child: icon)
+        pullRequestLabel.setEllipsize(mode: PangoEllipsizeMode(rawValue: 2))
+        pullRequestLabel.setMaxWidthChars(nChars: 24)
         content.append(child: pullRequestLabel)
         configureChip(pullRequestMenu, child: content, css: "aw-chip-pr")
     }
@@ -139,6 +145,7 @@ final class FocusedPanePathBar: @unchecked Sendable {
         button.add(cssClass: css)
         button.set(hasFrame: false)
         button.set(alwaysShowArrow: false)
+        button.set(canShrink: true)
         button.valign = .center
         button.set(child: child)
         button.set(visible: false)
@@ -195,14 +202,14 @@ final class FocusedPanePathBar: @unchecked Sendable {
             dirty.set(visible: false)
         }
         if let pr = details.pullRequest {
-            pullRequestLabel.label = "PR #\(pr.number)"
+            pullRequestLabel.label = pr.chipLabel
             pullRequestMenu.remove(cssClass: "aw-chip-pr-open")
             pullRequestMenu.remove(cssClass: "aw-chip-pr-draft")
             pullRequestMenu.remove(cssClass: "aw-chip-pr-review")
             pullRequestMenu.add(cssClass: pr.state == .draft ? "aw-chip-pr-draft" : pr.state == .inReview ? "aw-chip-pr-review" : "aw-chip-pr-open")
-            pullRequestMenu.setTooltip(text: "Pull request #\(pr.number), \(pr.state == .draft ? "draft" : pr.state == .inReview ? "in review" : "open")")
+            pullRequestMenu.setTooltip(text: "Pull request #\(pr.number), \(pr.stateDescription)")
             setAccessibleLabel(pullRequestMenu, "Pull request #\(pr.number)")
-            setAccessibleDescription(pullRequestMenu, pr.state == .draft ? "Draft" : pr.state == .inReview ? "In review" : "Open")
+            setAccessibleDescription(pullRequestMenu, pr.stateDescription.capitalized)
             pullRequestMenu.set(popover: pullRequestPopover(pr))
             pullRequestMenu.set(visible: true)
         } else {

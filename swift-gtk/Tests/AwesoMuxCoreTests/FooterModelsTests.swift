@@ -83,6 +83,8 @@ import Testing
     let unsafe = Data(#"{"number":42,"url":"file:///tmp/trap","state":"OPEN","isDraft":false,"reviewDecision":""}"#.utf8)
     let closed = Data(#"{"number":42,"url":"https://github.com/acme/repo/pull/42","state":"CLOSED","isDraft":false,"reviewDecision":""}"#.utf8)
     #expect(PullRequestStatus(ghJSON: open)?.state == .inReview)
+    #expect(PullRequestStatus(ghJSON: open)?.chipLabel == "PR #42 · review")
+    #expect(PullRequestStatus(ghJSON: open)?.stateDescription == "in review")
     #expect(PullRequestStatus(ghJSON: unsafe) == nil)
     #expect(PullRequestStatus(ghJSON: closed) == nil)
 }
