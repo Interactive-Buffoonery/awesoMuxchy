@@ -215,6 +215,7 @@ private final class ApplicationState: @unchecked Sendable {
     private(set) var focusedSurface: TerminalSurface?
     private(set) var focusedPaneID: UUID?
     private var surfacesByPane: [UUID: TerminalSurface] = [:]
+    private var paneChromeByPane: [UUID: BoxRef] = [:]
     private var retiringSurfaces: [TerminalSurface] = []
     private var workspaceByPane: [UUID: UUID] = [:]
     private var surfaceGenerationByPane: [UUID: Int] = [:]
@@ -291,6 +292,7 @@ private final class ApplicationState: @unchecked Sendable {
     private var window: ApplicationWindowRef?
     private var title: LabelRef?
     private var rootWidget: BoxRef?
+    private var titlebarWidget: WidgetRef?
     private var sidebarFooter: SidebarStatusFooter?
     private var sidebarPaned: PanedRef?
     private var sidebarHost: OverlayRef?
@@ -369,8 +371,12 @@ private final class ApplicationState: @unchecked Sendable {
             styles.styleProvider.style_provider_ptr, UInt32(GTK_STYLE_PROVIDER_PRIORITY_APPLICATION))
     }
 
-    func attach(window: ApplicationWindowRef, stack: StackRef, title: LabelRef, root: BoxRef, sidebarFooter: SidebarStatusFooter) {
-        self.window = window; self.stack = stack; self.title = title; rootWidget = root; self.sidebarFooter = sidebarFooter
+    func attach(
+        window: ApplicationWindowRef, stack: StackRef, title: LabelRef,
+        root: BoxRef, titlebar: WidgetRef, sidebarFooter: SidebarStatusFooter
+    ) {
+        self.window = window; self.stack = stack; self.title = title
+        rootWidget = root; titlebarWidget = titlebar; self.sidebarFooter = sidebarFooter
         applyTheme(); sidebarFooter.update(AgentFooterSummary(snapshot: snapshot))
     }
 
@@ -817,6 +823,7 @@ private final class ApplicationState: @unchecked Sendable {
             && !wasLifted
             && snapshot.attentionWorkspaceIDs.contains(workspaceID)
         refreshWorkspaceAgentTile(workspaceID)
+        refreshPaneChrome(paneID)
         refreshWorkspaceRowPresentation(workspaceID)
         refreshLiftedRows()
         sidebarFooter?.update(AgentFooterSummary(snapshot: snapshot))
@@ -920,11 +927,14 @@ private final class ApplicationState: @unchecked Sendable {
                 description: "Terminal pane \(ordinal) of \(workspace.layout.paneCount) in the \(workspace.name) workspace")
             else { return nil }
             surface.widget.setHexpand(expand: true); surface.widget.setVexpand(expand: true)
-            return (surface.widget, [surface])
+            return (makePaneChrome(pane: pane, surface: surface.widget), [surface])
         case let .split(axis, fraction, first, second):
             guard let one = buildLayout(first, workspace: workspace), let two = buildLayout(second, workspace: workspace) else { return nil }
-            let paned = PanedRef(orientation: axis == .horizontal ? .horizontal : .vertical)
-            paned.setWideHandle(wide: true); paned.setStart(child: one.0); paned.setEnd(child: two.0)
+            let paned = makeAccessiblePaned(
+                orientation: axis == .horizontal ? .horizontal : .vertical
+            )
+            paned.add(cssClass: "aw-pane-split")
+            paned.setWideHandle(wide: false); paned.setStart(child: one.0); paned.setEnd(child: two.0)
             configurePaneDivider(
                 paned, axis: axis, fraction: fraction,
                 workspaceID: workspace.id, splitPaneIDs: layout.paneIDs
@@ -939,14 +949,17 @@ private final class ApplicationState: @unchecked Sendable {
             guard let surface = surfacesByPane[pane.id] else { return nil }
             surface.widget.setHexpand(expand: true)
             surface.widget.setVexpand(expand: true)
-            return surface.widget
+            return makePaneChrome(pane: pane, surface: surface.widget)
         case let .split(axis, fraction, first, second):
             guard let one = buildMountedLayout(first, workspaceID: workspaceID),
                   let two = buildMountedLayout(second, workspaceID: workspaceID) else {
                 return nil
             }
-            let paned = PanedRef(orientation: axis == .horizontal ? .horizontal : .vertical)
-            paned.setWideHandle(wide: true)
+            let paned = makeAccessiblePaned(
+                orientation: axis == .horizontal ? .horizontal : .vertical
+            )
+            paned.add(cssClass: "aw-pane-split")
+            paned.setWideHandle(wide: false)
             paned.setStart(child: one)
             paned.setEnd(child: two)
             configurePaneDivider(
@@ -964,6 +977,14 @@ private final class ApplicationState: @unchecked Sendable {
         workspaceID: UUID,
         splitPaneIDs: [UUID]
     ) {
+        setAccessibleLabel(
+            paned,
+            axis == .horizontal ? "Vertical pane divider" : "Horizontal pane divider"
+        )
+        setAccessibleDescription(
+            paned,
+            "Use arrow keys to resize the adjacent terminal panes"
+        )
         let boundedFraction = min(max(fraction, 0.1), 0.9)
         var appliedInitialPosition = false
         var isApplyingPosition = false
@@ -1002,6 +1023,48 @@ private final class ApplicationState: @unchecked Sendable {
             isApplyingPosition = false
             appliedInitialPosition = true
         }
+    }
+
+    private func makePaneChrome(pane: PaneSnapshot, surface: WidgetRef) -> WidgetRef {
+        let root = BoxRef(orientation: .vertical, spacing: 0)
+        root.add(cssClass: "aw-pane-chrome")
+        let edge = SeparatorRef(orientation: .horizontal)
+        edge.add(cssClass: "aw-pane-focus-edge")
+        let terminalHost = OverlayRef()
+        terminalHost.set(child: surface)
+        let inactiveScrim = BoxRef(orientation: .vertical, spacing: 0)
+        inactiveScrim.add(cssClass: "aw-pane-inactive-scrim")
+        inactiveScrim.setHexpand(expand: true)
+        inactiveScrim.setVexpand(expand: true)
+        inactiveScrim.set(canTarget: false)
+        setAccessibleHidden(inactiveScrim, true)
+        terminalHost.addOverlay(widget: inactiveScrim)
+        root.append(child: edge)
+        root.append(child: terminalHost)
+        root.setHexpand(expand: true)
+        root.setVexpand(expand: true)
+        paneChromeByPane[pane.id] = root
+        refreshPaneChrome(pane.id)
+        return WidgetRef(root)
+    }
+
+    private func refreshPaneChrome(_ paneID: UUID) {
+        guard let chrome = paneChromeByPane[paneID],
+              let workspaceID = workspaceByPane[paneID],
+              let workspace = snapshot.workspace(id: workspaceID),
+              let pane = workspace.layout.pane(id: paneID)
+        else { return }
+        for css in ["aw-pane-focused", "aw-pane-unfocused", "aw-pane-attention", "aw-pane-error"] {
+            chrome.remove(cssClass: css)
+        }
+        chrome.add(cssClass: workspace.focusedPaneID == paneID ? "aw-pane-focused" : "aw-pane-unfocused")
+        if pane.agentState == .needsAttention { chrome.add(cssClass: "aw-pane-attention") }
+        if pane.agentState == .error { chrome.add(cssClass: "aw-pane-error") }
+    }
+
+    private func refreshPaneChrome(in workspaceID: UUID) {
+        guard let workspace = snapshot.workspace(id: workspaceID) else { return }
+        for paneID in workspace.layout.paneIDs { refreshPaneChrome(paneID) }
     }
 
     private func paneDividerMoved(
@@ -1052,6 +1115,7 @@ private final class ApplicationState: @unchecked Sendable {
 
     private func discardPaneRuntime(_ paneID: UUID) {
         let surface = surfacesByPane.removeValue(forKey: paneID)
+        paneChromeByPane.removeValue(forKey: paneID)
         workspaceByPane.removeValue(forKey: paneID)
         surfaceGenerationByPane.removeValue(forKey: paneID)
         lastAgentStateChangeAt.removeValue(forKey: paneID)
@@ -1077,6 +1141,7 @@ private final class ApplicationState: @unchecked Sendable {
         if changed { try? snapshot.focusPane(paneID, in: workspaceID) }
         runtime.focusedPaneID = paneID; runtime.focusedSurface = surface
         focusedPaneID = paneID; focusedSurface = surface
+        refreshPaneChrome(in: workspaceID)
         if changed { refreshWorkspaceRowPresentation(workspaceID) }
         updateChrome(workspaceID)
         scheduleAttentionAcknowledgement(workspaceID: workspaceID, paneID: paneID)
@@ -3059,6 +3124,8 @@ private final class ApplicationState: @unchecked Sendable {
     private func applyTheme() {
         guard let rootWidget else { return }
         applyThemeClasses(to: rootWidget)
+        if let titlebarWidget { applyThemeClasses(to: titlebarWidget) }
+        applySidebarDensityGeometry()
     }
 
     private func applyThemeClasses<T: Gtk.WidgetProtocol>(to widget: T) {
@@ -3070,7 +3137,6 @@ private final class ApplicationState: @unchecked Sendable {
         if appearance.reducesMotion { widget.add(cssClass: "reduced-motion") }
         for density in SidebarDensity.allCases { widget.remove(cssClass: "density-\(density.rawValue)") }
         widget.add(cssClass: "density-\(preferences.sidebarDensity.rawValue)")
-        applySidebarDensityGeometry()
     }
 
     private func applySidebarDensityGeometry() {
@@ -3897,12 +3963,15 @@ private func buildWindow(for application: Gtk.ApplicationRef) {
     title.setHexpand(expand: state.configuredSidebarPosition == .right)
     title.setEllipsize(mode: PangoEllipsizeMode(rawValue: 3)); title.setMaxWidthChars(nChars: 64)
     title.setHalign(align: .center); titleHost.setCenterWidget(child: title)
+    let windowControls = WindowControls(side: .end)
+    windowControls.add(cssClass: "aw-window-controls")
+    windowControls.setDecoration(layout: ":minimize,maximize,close")
     if state.configuredSidebarPosition == .left {
-        titlebar.append(child: brand); titlebar.append(child: titleHost)
+        titlebar.append(child: brand); titlebar.append(child: titleHost); titlebar.append(child: windowControls)
     } else {
-        titlebar.append(child: titleHost); titlebar.append(child: brand)
+        titlebar.append(child: titleHost); titlebar.append(child: brand); titlebar.append(child: windowControls)
     }
-    root.append(child: titlebar)
+    window.set(titlebar: titlebar)
 
     let main = BoxRef(orientation: .horizontal, spacing: 0); main.setVexpand(expand: true)
     let sidebar = BoxRef(orientation: .vertical, spacing: 0); sidebar.add(cssClass: "aw-sidebar")
@@ -4030,7 +4099,10 @@ private func buildWindow(for application: Gtk.ApplicationRef) {
     emptyPage.append(child: emptyBrand); emptyPage.append(child: emptyHeading)
     emptyPage.append(child: emptyCopy); emptyPage.append(child: emptyActions)
     "awesomux-empty-workspace".withCString { _ = stack.addNamed(child: emptyPage, name: $0) }
-    state.attach(window: window, stack: stack, title: title, root: root, sidebarFooter: sidebarFooter)
+    state.attach(
+        window: window, stack: stack, title: title, root: root,
+        titlebar: WidgetRef(titlebar), sidebarFooter: sidebarFooter
+    )
     state.attachEmptyState(page: emptyPage, copy: emptyCopy, reopen: emptyReopen, collapsedAction: collapsedEmpty)
 
     for projection in SidebarChromeProjection(snapshot: snapshot).groups {

@@ -22,6 +22,31 @@ func makeAccessibleToggleButton(role: GtkAccessibleRole) -> ToggleButtonRef {
     ToggleButtonRef(raw: makeAccessibleObject(type: gtk_toggle_button_get_type(), role: role).ptr)
 }
 
+func makeAccessiblePaned(orientation: GtkOrientation) -> PanedRef {
+    let roleValue = GLibObject.Value()
+    _ = roleValue.init_(gType: gtk_accessible_role_get_type())
+    roleValue.setEnum(vEnum: Int(GTK_ACCESSIBLE_ROLE_SEPARATOR.rawValue))
+    let orientationValue = GLibObject.Value()
+    _ = orientationValue.init_(gType: gtk_orientation_get_type())
+    orientationValue.setEnum(vEnum: Int(orientation.rawValue))
+
+    let object = "accessible-role".withCString { roleName in
+        "orientation".withCString { orientationName in
+            var names: [UnsafePointer<CChar>?] = [roleName, orientationName]
+            var values = [roleValue.value_ptr.pointee, orientationValue.value_ptr.pointee]
+            return names.withUnsafeMutableBufferPointer { namesBuffer in
+                values.withUnsafeMutableBufferPointer { valuesBuffer in
+                    GLibObject.ObjectRef(
+                        properties: gtk_paned_get_type(), nProperties: 2,
+                        names: namesBuffer.baseAddress, values: valuesBuffer.baseAddress!
+                    )
+                }
+            }
+        }
+    }
+    return PanedRef(raw: object.ptr)
+}
+
 func makeAccessibleLabel(_ text: String, role: GtkAccessibleRole) -> LabelRef {
     let label = LabelRef(raw: makeAccessibleObject(type: gtk_label_get_type(), role: role).ptr)
     label.label = text

@@ -11,6 +11,29 @@ help, and agent context while preserving the compact reference geometry.
 
 ## Completed evidence
 
+- Pane-boundary implementation now retains native `GtkPaned` resizing with a
+  one-logical-pixel app-owned separator and pane-owned focused, unfocused,
+  attention, error, high-contrast, and reduced-motion top-edge states, plus an
+  input-transparent inactive-pane scrim. Real
+  native Wayland vertical, horizontal, and nested release frames at 1440×888
+  plus native 125/150/200% constrained-width frames and X11
+  focus-transfer/live-event/appearance frames were inspected with complete
+  terminal allocations and no GTK diagnostics.
+  Equivalent-size pinned macOS dark fixtures now cover focus A/B, nested
+  focus, hover, pointer drag, keyboard resize, and narrow layout. They expose
+  remaining rail-color and pane-header differences. Linux physical state,
+  paired appearance/accessibility variants, and audible accessibility remain
+  open, so this is not claimed as visual parity.
+  Native AT-SPI now verifies explicit named horizontal/vertical `separator`
+  roles and resize descriptions for a nested layout. GTK 4.14 does not honor
+  direct AT-SPI focus/value manipulation, leaving physical keyboard and audible
+  Orca checks open.
+
+- Primary-window decoration now installs the awesoMux titlebar as GTK's
+  client-side titlebar and retains explicit native GTK minimize, maximize, and
+  close controls. Inspected X11 and native Wayland release frames have one
+  integrated header; paired-macOS verification remains open.
+
 - The private origin, pinned read-only macOS baseline, Ghostty/zmx submodules,
   wording baseline, parity matrix, ADRs, and no-CI policy are verified.
 - Verified repo-local Swift 6.3.3 and Zig 0.16.0 toolchains build the pinned

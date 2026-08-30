@@ -10,6 +10,28 @@ geometry and state styling have also passed a real-window visual correction.
 
 ## Completed
 
+- The app-owned pane-boundary system replaces the stock wide `GtkPaned`
+  appearance while retaining GTK allocation, pointer dragging, and keyboard
+  resize semantics. Pane top edges track focused/unfocused/attention/error;
+  an input-transparent scrim dims inactive panes; high contrast adds a
+  black/white non-color thickness cue and reduced motion disables transitions.
+  Native Wayland vertical, horizontal, and nested release frames and X11
+  focus-transfer/live-event/appearance frames were inspected, along with native
+  125/150/200% constrained-width scale frames. Equivalent-size pinned macOS
+  dark fixtures now cover focus A/B, nested focus, hover, drag, keyboard resize,
+  and narrow layout, exposing remaining rail-color and pane-header differences.
+  Linux physical interaction and the paired appearance/accessibility matrix
+  are explicitly still pending.
+  Native AT-SPI directly verifies both orientation-specific names, explicit
+  `separator` roles, and resize descriptions in a nested layout; GTK 4.14's
+  inert AT-SPI focus/value operations are not represented as interaction proof.
+
+- The awesoMux titlebar now owns GTK client-side decoration and native window
+  controls, removing the duplicate outer header in inspected X11 and native
+  Wayland release frames. Explicit decoration layout retains minimize,
+  maximize, and close under COSMIC. Paired-reference verification remains
+  pending.
+
 - Swift 6.3.3 builds the pinned SwiftGtk dependency graph without warnings in
   owned Swift code or concurrency-suppression flags.
 - `AwesoMuxTerminal` contains every raw Ghostty handle and exposes owned Swift

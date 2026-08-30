@@ -79,10 +79,10 @@ artifact; **C** = covered by current source/model/AT-SPI evidence only;
 | --- | --- | --- |
 | Empty application | I/C | Latte 1440×852 missing-profile frame and AT-SPI action evidence; no paired macOS frame |
 | One workspace/one pane | I | Multiple real-app frames; no precise equivalent macOS image |
-| Two panes, vertical split | R/I | Native Wayland two-pane rendering passed; divider/focus mismatch found |
-| Two panes, horizontal split | C | Action/model evidence; no final-state equivalent screenshot located |
+| Two panes, vertical split | R/I | Equivalent-size macOS focus A/B and hover fixtures now paired with the native Wayland frame; color/header differences remain |
+| Two panes, horizontal split | R/I | Equivalent-size macOS focus A/B, hover, drag, and keyboard-resize fixtures now paired; Linux physical interaction remains open |
 | Multiple workspaces/groups | I | Standard/Compact, attention, pinned, reordered and long-name fixtures |
-| Narrow/wide resize | R/C | Rapid native resize passed; narrow shell visual matrix incomplete |
+| Narrow/wide resize | R/I | Native 1440×888 wide frames and scale-constrained Linux frames inspected; macOS 1440×888 wide and 900×700 narrow fixtures now exist, but the complete paired scale matrix remains open |
 | Left/right sidebar | I | Both positions represented; right-side RTL frame also inspected |
 | Expanded/collapsed/hidden | I/C | Final artifacts exist; physical hover reveal documented on X11, not rerun here |
 | Selected/focused/hover | I | Separate row and focus artifacts exist |
@@ -93,7 +93,7 @@ artifact; **C** = covered by current source/model/AT-SPI evidence only;
 | Pane peek/roster | I/C | Composited popup inspected; physical pointer invocation and audible Orca pending |
 | Search empty/populated/highlight/no-results | I/C | Real GTK images and AT-SPI editing evidence |
 | Footer path/Git/PR/CI | I/C | Real Git footer and overflow fixtures; PR/CI unavailable matrix incomplete |
-| Divider hover/drag/focus | C/N | Model and pointer-release code only; no sufficient physical visual matrix |
+| Divider hover/drag/focus | R/I/C | Pinned macOS hover, drag, keyboard-resize, focus A/B, and nested states captured; Linux app-owned final states inspected, but Linux physical hover/drag/keyboard proof remains open |
 | Command palette | I/C | Latte palette inspected; macOS-equivalent pixel comparison absent |
 | Workspace/group menus | I | Normal and HC popovers represented |
 | Quick settings/help | I | Small popovers represented; full settings absent |
@@ -112,6 +112,13 @@ artifact; **C** = covered by current source/model/AT-SPI evidence only;
 ### Application shell
 
 #### P1 — The primary-window chrome does not form one dark, integrated shell
+
+**2026-08-29 implementation update:** the existing awesoMux titlebar is now
+GTK's client-side titlebar and owns native GTK window controls. An inspected
+X11/GLX release frame and a corrected native Wayland release frame have one
+continuous header instead of the duplicate outer header, with explicit
+minimize/maximize/close controls. Keep this P1 open until the complete
+theme/accessibility matrix and paired macOS evidence pass.
 
 - **Surface/state:** Mocha, populated window, native Wayland.
 - **macOS expected:** the titlebar is part of the same awesoMux-owned chrome;
@@ -217,24 +224,58 @@ artifact; **C** = covered by current source/model/AT-SPI evidence only;
 
 #### P1 — Pane divider and focus chrome are fundamentally different
 
+**2026-08-29 implementation update:** Linux now uses a one-logical-pixel
+`GtkPaned` separator footprint with app-owned rest/hover/focus visuals and
+pane-owned focused/unfocused/attention/error top edges. Native Wayland release
+captures cover vertical, horizontal, and nested final states at 100% and were
+inspected at original resolution. X11 release captures additionally cover
+focus transfer with inactive-pane scrims, live attention/error, high contrast,
+and reduced motion. Native Wayland 125/150/200% frames additionally cover
+progressively constrained narrow layouts and were inspected at original
+resolution after exact display restoration. GTK remains the resize owner. Keep
+this P1 open until physical hover/drag, keyboard focus/resize, Orca, and paired
+equivalent macOS fixtures pass; current evidence is implementation and partial
+behavior verification, not complete parity.
+
+**2026-08-29 accessibility update:** the release app now constructs pane splits
+with GTK's explicit `separator` accessible role. Direct AT-SPI inspection on
+native Wayland exposes named horizontal and vertical dividers with the exact
+keyboard-resize description and `Value` interface. GTK 4.14 reports zero
+increment and does not honor AT-SPI `GrabFocus` or `CurrentValue` mutation, so
+this proves discovery but not physical keyboard resize or audible Orca. The
+existing 1440×888 native fixtures satisfy the deliberate wide-window case.
+
+**2026-08-30 paired-reference update:** the pinned release macOS app was run at
+the same 1440×888 logical wide size and at 900×700 narrow. Focus A/B for both
+axes, nested focus, both hover axes, pointer drag before/after, and keyboard
+resize before/after were exercised and all twelve retained PNGs were inspected
+at original resolution. This closes the missing canonical-reference-fixture
+gap for these dark states, but does not close the finding: Linux physical
+hover/drag/keyboard behavior is not yet proved, its focused rail is visibly
+brighter/bluer, and its pane surface lacks the reference pane-header layer.
+The appearance, contrast, motion, RTL, and audible accessibility pairing also
+remains incomplete.
+
 - **Surface/state:** two-pane vertical/horizontal splits; focused/unfocused,
   hover, drag, keyboard focus, attention, HC.
 - **macOS expected:** a 1-point/rest divider expands to 3 points on hover;
   focus may be absorbed into the adjacent divider, while active/attention
   states use 4/6-point non-color-distinguishable treatment and a coordinated
   terminal top edge. Animation is 150 ms unless reduced motion is enabled.
-- **Linux observed:** the app creates stock `GtkPaned` with `wideHandle=true`.
-  The native Wayland frame shows a bright, approximately 4-point white stripe
-  at rest and no visible focused-pane top accent. No app-owned stateful divider
-  CSS/controller maps pane focus or attention into the handle.
+- **Linux observed:** the remediated app retains `GtkPaned` allocation and input
+  semantics behind a one-logical-pixel app-owned separator and pane-owned state
+  edges. Equivalent dark fixtures show correct split allocation and focus
+  ownership, but the focused rail is brighter/bluer than the muted reference
+  accent and the pane surface lacks the reference pane-header layer. Linux
+  physical hover/drag/keyboard evidence is still absent.
 - **Why it matters:** the divider is the central visual landmark of every split
   workspace and currently makes Linux look like a different terminal product.
 - **macOS source:** `TerminalSplitLayoutView.swift:26-94,213-405` and
   `TerminalPaneFocusChrome.swift`.
-- **Linux source:** `main.swift:914-1005` (notably `wideHandle=true` at 927 and
-  949); no corresponding divider style in `ChromeStyles.swift`.
-- **Evidence:** `progress/48-native-wayland/native-wayland-two-pane.png` and
-  `progress/36-pane-commands/split-right-pane-count-x11.png`.
+- **Linux source:** `swift-gtk/Sources/AwesoMuxApp/main.swift` and
+  `swift-gtk/Sources/AwesoMuxApp/ChromeStyles.swift`.
+- **Evidence:** `artifacts/visual-qa/swift-gtk/progress/49-pane-boundary/` and
+  `artifacts/visual-qa/macos-reference/fed33ff/pane-boundary/`.
 - **Correction direction:** keep `GtkPaned` for resize semantics but make its
   separator an awesoMux-owned visual layer with a larger transparent hit target.
   Publish focused pane, hover, keyboard focus, attention, axis, HC, and reduced
@@ -250,8 +291,9 @@ artifact; **C** = covered by current source/model/AT-SPI evidence only;
   horizontal and vertical compositions; only the nearest relevant divider
   absorbs focus.
 - **Linux observed:** commands and tree mutation are tested, but the current
-  final visual set does not prove horizontal or nested divider geometry,
-  clipping, focus movement, or drag styling.
+  final visual set now proves horizontal and nested divider geometry and
+  clipping. Equivalent macOS focus and drag fixtures exist; Linux physical
+  drag styling and full focus/close-neighbor interaction evidence remain open.
 - **Why it matters:** a vertical-only screenshot can conceal incorrect nested
   allocation and duplicate focus borders.
 - **macOS source:** `TerminalSplitLayoutView.swift:46-149`.
@@ -509,7 +551,7 @@ domains are intentionally omitted.
 
 | Surface | Difference |
 | --- | --- |
-| Pane divider | Stock wide GtkPaned; lacks macOS stateful focus/hover/attention ownership |
+| Pane divider | App-owned thin GtkPaned visual and pane focus/attention ownership implemented; physical pointer/keyboard timing and paired comparison remain open |
 | Command palette | GtkPopover plus delayed focus; accessible focus not reliably exposed |
 | Quick Settings | Compact autohiding popover instead of the wider owned quick sheet/full-settings gateway |
 | Modal sheets | Separate GTK modal windows/crops; parent dimming and exact focus hierarchy not proven |
