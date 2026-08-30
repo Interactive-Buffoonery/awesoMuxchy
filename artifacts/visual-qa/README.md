@@ -1,5 +1,94 @@
 # Visual QA
 
+## 2026-08-29 — SwiftGtk4 primary-window decoration implementation
+
+- Linux images: [native Wayland client-owned titlebar](swift-gtk/progress/50-primary-window-decoration/native-wayland-client-titlebar.png)
+  and [X11 client-owned titlebar](swift-gtk/progress/50-primary-window-decoration/x11-client-titlebar.png).
+- Implementation: the existing 38-point awesoMux titlebar is now installed as
+  GTK's client-side titlebar and explicitly owns native minimize, maximize,
+  and close controls. The former duplicate outer header is absent.
+- Inspection: both 1440 × 888 release frames were opened at original
+  resolution. The titlebar, sidebar brand, centered focused-pane title, three
+  native controls, and content form one continuous window surface without
+  clipping. The first native pass exposed compositor-default suppression of
+  minimize/maximize; the explicit GTK decoration layout corrected it before
+  the indexed native frame was retained.
+- Status: implementation and native Wayland rendering are verified. Paired
+  macOS comparison plus the complete theme/accessibility interaction matrix
+  remain required before closing the audit finding.
+- Privacy: the isolated fixture contains only synthetic shell identity and
+  `/tmp`; it contains no history, commands, clipboard data, credentials,
+  private paths, or arbitrary agent output.
+
+## 2026-08-29 — SwiftGtk4 pane-boundary implementation pass
+
+- Linux images: [vertical split](swift-gtk/progress/49-pane-boundary/native-wayland-vertical-focused.png),
+  [horizontal split](swift-gtk/progress/49-pane-boundary/native-wayland-horizontal-focused.png),
+  [nested split](swift-gtk/progress/49-pane-boundary/native-wayland-nested-focused.png),
+  [focused/unfocused scrim](swift-gtk/progress/49-pane-boundary/x11-focused-unfocused-scrim.png),
+  [focus transferred to pane one](swift-gtk/progress/49-pane-boundary/x11-focus-switched-pane-one.png),
+  [live attention](swift-gtk/progress/49-pane-boundary/x11-attention.png),
+  [live error](swift-gtk/progress/49-pane-boundary/x11-error.png),
+  [high contrast](swift-gtk/progress/49-pane-boundary/x11-high-contrast.png),
+  and [reduced motion](swift-gtk/progress/49-pane-boundary/x11-reduced-motion.png).
+  Native Wayland scale/narrow-layout images cover
+  [125%](swift-gtk/progress/49-pane-boundary/native-wayland-scale-125.png),
+  [150%](swift-gtk/progress/49-pane-boundary/native-wayland-scale-150.png), and
+  [200%](swift-gtk/progress/49-pane-boundary/native-wayland-scale-200.png).
+- Paired macOS inputs: the [pinned-reference fixture index](macos-reference/fed33ff/pane-boundary/README.md)
+  records focused vertical and horizontal A/B states, nested focus, pointer
+  hover on both axes, pointer drag before/after, keyboard resize before/after,
+  and a narrow nested layout. The wide reference window is the same 1440 x 888
+  logical size as the Linux Wayland fixtures; the narrow reference is 900 x
+  700. All twelve retained reference PNGs were inspected at original
+  resolution.
+- Reference: `TerminalSplitLayoutView.swift` and
+  `TerminalPaneFocusChrome.swift` at macOS baseline
+  `fed33ff47c559344fc6db6fa53f16e75fcc4a116`.
+- Captured content: the real 1440 × 888 release app on native COSMIC Wayland at
+  100% scale, using isolated profiles and `/tmp`-only terminal working
+  directories. Each image contains real independently rendered Ghostty panes.
+- Implementation: `GtkPaned` retains native resize, allocation, pointer, and
+  keyboard semantics while app-owned CSS replaces its wide visual handle.
+  Pane-owned top edges distinguish focused, unfocused, needs-attention, and
+  error states, and an input-transparent scrim matches the reference's 0.32
+  inactive-pane dimming. High contrast uses a thicker black/white non-color cue
+  and reduced motion removes the 150 ms transitions. Dividers expose
+  orientation-specific names and keyboard-resize descriptions.
+- Inspection: every listed PNG was opened at original resolution. The focused
+  edge and inactive scrim transfer to the exact focused leaf; live provider
+  events produce distinct attention and error rails; high contrast remains
+  visible against the dark terminal; terminal allocations remain complete.
+  COSMIC constrained the logical window from 1364×696 through 852×408 as scale
+  increased, exercising title truncation, terminal reflow, fixed sidebar/footer
+  ownership, and increasingly narrow split panes without holes or clipping.
+  The display was restored and confirmed at 2560×1440@99.946 Hz, 100% after
+  every pass.
+- Accessibility: direct AT-SPI inspection of the native Wayland release app
+  initially found unnamed generic `GtkPaned` objects despite accessible label
+  properties. The app now constructs pane splits with the explicit GTK
+  `separator` role. After a clean nested-layout launch, AT-SPI exposed both
+  `Vertical pane divider` and `Horizontal pane divider`, each with the exact
+  description `Use arrow keys to resize the adjacent terminal panes` and the
+  `Component`, `Value`, and `Action` interfaces. GTK 4.14 reports zero minimum
+  increment and rejects `GrabFocus`; setting `CurrentValue` also leaves the
+  allocation unchanged, so direct assistive manipulation and audible Orca are
+  not claimed.
+- Comparison result: the macOS fixtures now establish the reference behavior
+  over time, including hover, drag, keyboard resize, and focus transfer. Linux
+  structurally matches the split axes and nested allocation, but the retained
+  Linux focused rail is brighter/bluer than the muted reference accent and the
+  Linux pane surface does not yet reproduce the reference pane-header layer.
+- Status: implementation and baseline native rendering are complete, but
+  visual parity is not yet verified. Physical hover/drag and keyboard divider
+  focus/resize remain unproved in the Linux app, along with audible Orca and
+  the paired appearance/accessibility matrix. The 1440×888 native frames serve
+  as the wide-window fixture. This milestone is therefore not listed in
+  `VISUAL_PARITY_ACHIEVED.md`.
+- Privacy: fixtures contain synthetic workspace identity and `/tmp` only; no
+  terminal history, typed commands, clipboard data, credentials, private
+  paths, or arbitrary agent output is present.
+
 ## 2026-08-29 — SwiftGtk4 native Wayland terminal rendering
 
 - Linux image: [native Wayland two-pane workspace](swift-gtk/progress/48-native-wayland/native-wayland-two-pane.png).
