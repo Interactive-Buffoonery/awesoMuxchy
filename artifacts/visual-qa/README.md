@@ -1,5 +1,103 @@
 # Visual QA
 
+## 2026-09-05 — current macOS baseline and titlebar/sidebar correction
+
+The comparison now pins macOS **`2fd33a0`** (2026-09-05 remote `main`), with a
+new release build and [revision-specific fixture index](macos-reference/2fd33a0/titlebar-sidebar/README.md).
+The older `fed33ff` images below remain historical evidence.
+
+| State | Current macOS reference | Linux release |
+| --- | --- | --- |
+| Dark, expanded sidebar | [macOS](macos-reference/2fd33a0/titlebar-sidebar/macos-dark.png) | [Linux](swift-gtk/progress/52-current-reference-sidebar/dark.png) |
+| Light, expanded sidebar | [macOS](macos-reference/2fd33a0/titlebar-sidebar/macos-light.png) | [Linux](swift-gtk/progress/52-current-reference-sidebar/light.png) |
+| Empty, no workspace | Not paired in this pass | [Linux](swift-gtk/progress/52-current-reference-sidebar/empty.png) |
+| Collapsed sidebar | Not paired in this pass | [Linux](swift-gtk/progress/52-current-reference-sidebar/rail.png) |
+| Right sidebar | Not paired in this pass | [Linux](swift-gtk/progress/52-current-reference-sidebar/right.png) |
+| High contrast | Not paired in this pass | [Linux](swift-gtk/progress/52-current-reference-sidebar/hc.png) |
+
+- **Geometry:** paired windows are 1440×888 logical points, with 296-point
+  expanded sidebars. macOS PNGs are 2880×1776 at Retina 2×; Linux PNGs are
+  1440×888 at 1×. All Linux captures use the real XWayland/GLX release app.
+- **Fixture:** two groups, three named synthetic workspaces, equally sized
+  terminal panes, right-pane focus. Selected panes show `/tmp` and `qa$`;
+  dormant rows show `~`. No terminal history, private repository locations,
+  credentials, clipboard data, or arbitrary agent output is retained.
+- **Corrected:** the ツ/uppercase wordmark, integrated gradient titlebar,
+  folder/title anchored to the content column, group-colored selected-row
+  border/glow, elevated idle rows, close controls, group-header footprint,
+  search/creation-row density, metadata size/order, and sidebar separator.
+  The light-titlebar selector now matches its actual theme-class owner.
+  Group-color mutations refresh existing rows rather than leaving stale tints.
+  Collapsed icons fit their rail; the right-sidebar wordmark aligns with its
+  column, with native window controls at the opposite edge. High-contrast
+  window-control glyphs remain visible.
+- **Measurements:** search begins at y=48 in both captures. The first selected
+  row begins at approximately y=114.5 on macOS and y=115 on Linux; regular
+  row heights are approximately 55 points on both. The third row begins near
+  y=305 in both. Measurements use native PNG pixels divided by capture scale;
+  antialiased borders/glow account for half-point edges.
+- **Verification:** final local `./script/preflight.sh` passes 134 Swift tests,
+  debug/release builds, secondary activation, command enablement, forced-quit
+  persistence, X11 and native Wayland terminal integration, and 100 two-surface
+  lifecycle cycles on each backend. Wording regeneration/check and
+  `git diff --check` pass. Every retained image was inspected.
+- **Still partial:** native Wayland app-local capture has no usable compositor
+  allocation in this unattended launch; a passing native runtime harness does
+  not close that visual gate. Font/symbol outlines, group action controls,
+  the exact selected-rail shape, footer proportions/tint, and the light-mode
+  pane-focus color still differ. Physical hover/drag, keyboard/Orca, fractional
+  scale, and additional current-macOS surfaces remain unverified. The unpaired
+  states above are Linux regression evidence, not macOS parity claims.
+- **Baseline upkeep:** the source/wording pin is centralized in
+  `shared/product-contract/reference-baseline.json`; the wording tools read
+  pinned Git objects from the clean reference. Future passes should resolve
+  current `main`, capture that exact revision, and retain older evidence under
+  its original commit. This refresh does not upgrade the Linux Ghostty ABI or
+  imply feature parity with newly added macOS capabilities.
+
+
+## 2026-08-30 — SwiftGtk4 pane-header and focus-token correction
+
+- Linux images: [vertical focus B](swift-gtk/progress/51-pane-header/x11-dark-vertical-focus-b.png)
+  and [horizontal focus B](swift-gtk/progress/51-pane-header/x11-dark-horizontal-focus-b.png).
+  Both are privacy-safe 1440 × 888 release-app XWayland captures with two real
+  Ghostty surfaces running the capture-gated `qa$` terminal command.
+- Reference trace: the clean pinned macOS source at
+  `fed33ff47c559344fc6db6fa53f16e75fcc4a116` confirms that everyday multi-pane
+  chrome contains a 4-point focus band and a fixed 24-point `PaneTitleBarView`.
+  It also confirms that the lower single pane in a stacked split absorbs its
+  focus band into the adjacent divider. Default Mocha divider tokens are
+  `#8c674f` at rest and `#a1765b` on hover; the focused peach is `#fab387`.
+- Correction: each multi-pane GTK terminal now owns the same 4 + 24 vertical
+  structure, including a sanitized ellipsized title and a named 24-point Close
+  Pane control. The former blue/gray focus and divider colors use the pinned
+  peach/muted family. Stacked splits paint the lower pane's focus on the
+  existing `GtkPaned` separator while suppressing its duplicate top edge;
+  GTK still owns the one-point allocation, native hit target, drag, keyboard
+  resize, terminal allocation, and reflow.
+- Measurement: the vertical focused band is four exact `#fab387` rows
+  (`y=39…42`) above a 24-row `#171721` pane header (`y=43…66`). The vertical
+  rest divider remains two visible `#8c674f` rows around its one-point GTK
+  allocation. In the stacked frame, absorbed focus is four exact `#fab387`
+  rows (`y=441…444`) immediately above the lower header.
+- Inspection: both retained images were opened at original resolution. The
+  focus band/header/divider relationship is continuous, both terminal
+  framebuffers are complete, inactive dimming remains pane-local, titles and
+  close controls do not clip, and the stacked lower pane has no duplicate
+  focus rail.
+- Native evidence boundary: the release app registered and ran cleanly with
+  GTK's Wayland backend and an isolated profile, but the unattended COSMIC
+  launch did not receive a current window allocation for app-local snapshotting;
+  the desktop screenshot portal requires interactive consent. No native image
+  or physical-input claim is made from that attempt. Native pointer hover,
+  held drag, keyboard divider focus/resize, and the paired theme/scale/RTL/IME/
+  Orca matrix remain open, so pane boundaries are still excluded from
+  `VISUAL_PARITY_ACHIEVED.md`.
+- Privacy: the capture-only terminal override is accepted only when a visual-QA
+  capture path is also active. The retained frames contain `qa$`, `/tmp`, and
+  synthetic `Primary terminal` labels only—no host identity, history, typed
+  commands, clipboard data, credentials, private paths, or agent output.
+
 ## 2026-08-29 — SwiftGtk4 primary-window decoration implementation
 
 - Linux images: [native Wayland client-owned titlebar](swift-gtk/progress/50-primary-window-decoration/native-wayland-client-titlebar.png)
