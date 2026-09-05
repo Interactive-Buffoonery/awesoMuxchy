@@ -1,5 +1,67 @@
 # Visual QA
 
+## 2026-09-05 — main-window fonts, glyphs, footer, and empty state
+
+Current macOS build/source/wording pin: **`160c2b17589c688efd88a5a63652f807c45d8ffc`**.
+The release was rebuilt on Purple iMac and captured on MiniMighty in the
+isolated QA profile. Earlier `2fd33a0` images retain their original labels.
+
+| State | Current macOS | Linux release |
+| --- | --- | --- |
+| Dark, expanded, right pane focused | [macOS](macos-reference/160c2b1/main-window/dark.png) | [Linux](swift-gtk/progress/53-main-window/dark.png) |
+| Light, expanded, right pane focused | [macOS](macos-reference/160c2b1/main-window/light.png) | [Linux](swift-gtk/progress/53-main-window/light.png) |
+| Empty, no workspaces | [macOS](macos-reference/160c2b1/main-window/empty.png) | [Linux](swift-gtk/progress/53-main-window/empty.png) |
+| Collapsed sidebar | Not paired | [Linux](swift-gtk/progress/53-main-window/rail.png) |
+| Right sidebar | Not paired | [Linux](swift-gtk/progress/53-main-window/right.png) |
+| High contrast | Not paired | [Linux](swift-gtk/progress/53-main-window/hc.png) |
+
+All windows are **1440×888 logical points** with a 296-point expanded sidebar.
+macOS files are Retina 2× (2880×1776); Linux files are 1× (1440×888), from the
+real XWayland/GLX app. Screenshots are unedited and inspected individually.
+PNG color profiles and native font rasterization must be considered when
+comparing raw pixels. The fixture remains two groups / three synthetic
+workspaces, two side-by-side panes, `/tmp`, `~`, and `qa$`; empty captures have
+no workspaces. No user terminal history, private paths, or credentials are retained.
+
+Corrections in this pass:
+
+- Geist was silently missing: SwiftPM flattens processed font resources, but
+  the loader searched only `Fonts/`. It now resolves both layouts and registers
+  before GTK initializes its font map. Row labels use the reference medium weight.
+- Close, folder, help, and path chevrons use product-owned Cairo strokes; the
+  containing GTK controls retain input, focus, and accessibility ownership.
+- Selected rows use a two-point rail inset eight points vertically. Collapsed
+  tiles occupy the reference 40-point footprint. Group counts reach the trailing
+  edge; overflow controls overlay the header and reveal on hover/focus.
+- Footer backgrounds/dividers are continuous, redundant sidebar rules and
+  theme button shadows are removed, path controls are 24 points high and peach,
+  and light-mode pane focus uses the reference peach rather than burnt orange.
+- Empty content uses the reference 460-point outer width, nested 16/8-point
+  spacing, correctly sized ツ branding, and peach heading. Shortcut spelling
+  follows Linux; the primary button follows the desktop's native accent.
+
+Verification: `./script/preflight.sh` passes **134 Swift tests**, release/debug
+builds, the new bundled-font resource/Fontconfig check, single-window activation,
+command enablement, forced-termination persistence, terminal integration, and
+100 two-surface lifecycle cycles on both X11 and native Wayland. The font check
+was observed failing before the loader correction and passing afterward.
+Wording check and `git diff --check` pass; pinned submodules/reference remain clean.
+
+Remaining coverage: native Wayland app-local capture still yields no image;
+its runtime tests do not establish visual parity. Pointer automation did not
+produce a verified group-menu activation in the retained window capture, so
+hover/menu/keyboard interaction remains an explicit coverage gap. Full physical
+input, Orca, fractional scaling, and additional current-macOS surfaces are not
+closed by this pass. Mono/CJK rasterization, some glyph contours and glow, native
+window controls, and the system-accent empty-state button still differ. The three
+unpaired Linux states are regression evidence, not macOS parity claims.
+
+The prior implementation was committed with Sarah's approval as `98c4691`.
+This evidence is published on a dedicated visual-QA branch; the newly authorized
+local commit is not implicitly pushed with the screenshots. New implementation
+and baseline updates remain uncommitted pending review.
+
+
 ## 2026-09-05 — current macOS baseline and titlebar/sidebar correction
 
 The comparison now pins macOS **`2fd33a0`** (2026-09-05 remote `main`), with a
