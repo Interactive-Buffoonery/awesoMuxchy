@@ -1,6 +1,21 @@
 # Implementation status
 
-Updated: 2026-08-29
+Consolidation update: 2026-09-22. Runtime evidence below was recorded during
+the August implementation work and has not been rerun for this cleanup.
+
+## Consolidation checkpoint
+
+Swift/GTK/Ghostty is the sole active Linux application. The Electron source,
+tests, licenses, screenshots, and reachable history are preserved in a verified
+offline bundle; twelve behavior/regression items are captured in
+[`docs/electron-behavior-handoff.md`](docs/electron-behavior-handoff.md).
+See [`docs/linux-consolidation.md`](docs/linux-consolidation.md) for revisions,
+archive verification, next work, and the unresolved i5 local changes.
+
+The September visual-QA branch contains no implementation changes. Its
+134-test/font-fix claims refer to unavailable local source, not this checkout.
+No runtime fixes or new parity claims are part of the consolidation. Swift is
+not installed on the current host; full preflight and desktop QA remain pending.
 
 ## Current phase
 

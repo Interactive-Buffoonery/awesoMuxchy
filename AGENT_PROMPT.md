@@ -1,8 +1,7 @@
 # Build awesoMux for Linux with GTK and an awesoMux-owned Ghostty shim
 
-You are working on Sarah's i5GamingPC in:
-
-`/home/sarah/Development/awesomux-linux-gtk`
+The current development workspace is `~/development/awesomux-linux-gtk` on
+pinguchy. i5GamingPC remains the target machine for desktop and visual QA.
 
 Your mission is to build a production-quality Linux version of awesoMux that
 matches the current macOS awesoMux as closely as Linux allows. Use GTK4 for the
@@ -10,10 +9,17 @@ application and an awesoMux-owned Linux embedding shim around canonical
 Ghostty. This is a complete product port, not a visual mockup and not a small
 terminal demonstration.
 
-This repository deliberately contains two application tracks:
+This repository contains one active application and one dormant fallback:
 
 - `swift-gtk/` is the active first implementation.
 - `rust-gtk/` is the prepared fallback implementation.
+
+The former Electron prototype is a historical reference, not an active Linux
+implementation or a required checkout. Its preserved evidence and behavior
+handoff are documented in `docs/electron-behavior-handoff.md` and
+`docs/linux-consolidation.md`. Follow
+`docs/adr/0004-consolidate-linux-development.md` for the current consolidation
+decision.
 
 Start with SwiftGtk4. Do not build both applications in parallel and do not
 silently switch to Rust. The shared product contract and Ghostty shim must stay
@@ -49,8 +55,8 @@ workspaces does not lose work or route an action to the wrong pane.
 1. Make no changes of any kind to the macOS awesoMux repository. Treat it as a
    read-only product and behavior reference. Do not create branches, edit
    files, format files, commit, push, open issues, or open pull requests there.
-2. Work only in `/home/sarah/Development/awesomux-linux-gtk`, apart from a
-   separate read-only reference clone and normal build caches.
+2. Work in this GTK repository for the Linux implementation, apart from a
+   separate read-only reference checkout and normal build caches.
 3. Before and after every reference pass, verify that the macOS reference
    checkout is clean with `git status --short`. If it is not clean, stop and do
    not alter or clean it.
@@ -66,9 +72,9 @@ workspaces does not lose work or route an action to the wrong pane.
 7. Do not change canonical Ghostty in place. Keep awesoMux-owned Linux changes
    as a small, reviewable patch series or wrapper layer in this repository,
    applied to a staged build copy. Keep the submodule checkout clean.
-8. Do not use Electron, Chromium, xterm.js, node-pty, or the existing Electron
-   prototype as the implementation foundation. It may be inspected read-only
-   for Linux product lessons and visual comparison only.
+8. Do not use Electron, Chromium, xterm.js, node-pty, or the former Electron
+   prototype as the implementation foundation. Use its preserved handoff and
+   archive for historical Linux behavior evidence when needed.
 9. Do not silently substitute `libghostty-vt` plus a new renderer. The chosen
    direction is the full embedded Ghostty runtime and renderer through an
    awesoMux-owned GTK shim.
@@ -85,8 +91,9 @@ workspaces does not lose work or route an action to the wrong pane.
     hosted CI, self-hosted runners, automated build services, required CI
     checks, workflow badges, or dependency-update automation. Do not create
     files under `.github/workflows/`. Run every build, test, lint, lifecycle,
-    packaging, license, and visual check locally on i5GamingPC. No CI does not
-    mean no testing.
+    packaging, and license checks locally. Checks without a desktop requirement
+    may run on pinguchy. Real desktop, Wayland/X11, and visual evidence must
+    come from i5GamingPC. No CI does not mean no testing.
 
 ## Repository state
 
@@ -105,9 +112,8 @@ approved below. Do not commit or push other work without separate approval.
 
 ## Required reference material
 
-Create or refresh a separate read-only clone at:
-
-`/home/sarah/Development/awesomux-macos-reference`
+Use a separate read-only checkout of the macOS reference. Do not assume a
+machine-specific path; record the checkout location locally.
 
 Clone from:
 
@@ -138,13 +144,10 @@ Read all instructions in that repository before using it. At minimum, read:
 - current GitHub issues only when a behavior is not settled in code, docs, or
   an ADR
 
-Use the existing Linux prototype only as secondary, read-only evidence:
-
-`/home/sarah/Development/awesomux-linux-prototype`
-
-Do not edit it. It contains useful Linux behavior and screenshots, but the
-macOS reference is the authority for product behavior, wording, command names,
-and visual identity.
+Use `docs/electron-behavior-handoff.md` and the preserved prototype archive
+only as secondary historical evidence. An Electron working checkout is not
+required. The macOS reference is the authority for product behavior, wording,
+command names, and visual identity.
 
 ## Define exact parity before implementation
 
@@ -202,7 +205,7 @@ settings labels, dialog text, help text, accessibility wording, and error
 language. Do not paraphrase or invent replacement copy when the macOS product
 already defines it.
 
-Create `resources/text-baseline.json` containing the Linux app's required
+Maintain `shared/resources/text-baseline.json` containing the Linux app's required
 user-facing text and its source location in the pinned macOS reference. Add an
 automated check that detects accidental wording drift. Preserve plural forms
 and localization boundaries rather than building strings through manual
@@ -219,7 +222,8 @@ screenshots at the same window sizes.
 Screenshots are a required part of implementation, not final polish. After
 every meaningful visual milestone:
 
-1. Run the real GTK application on i5GamingPC.
+1. Run the real GTK application on i5GamingPC. If the target machine is
+   unavailable, mark desktop evidence pending and do not claim the milestone.
 2. Put the app into representative states, including populated and empty
    states where both exist.
 3. Capture screenshots at a recorded window size.
@@ -278,8 +282,8 @@ Use:
 - a narrow C ABI between the shared shim and either application
 - the maintained `Interactive-Buffoonery/zmx` fork, branded and invoked as
   `amx`, for persistent sessions where the macOS architecture requires it
-- SQLite or another clearly justified local store for durable application
-  state, with versioned migrations and atomic writes
+- defensive, profile-scoped JSON session snapshots, as decided in
+  `docs/adr/0003-json-session-snapshots.md`
 - structured logging without commands, terminal contents, secrets, or private
   paths leaking by default
 
@@ -406,11 +410,14 @@ patches no longer apply.
 
 ## Implementation order
 
-Work in dependency order, keeping the application runnable after each stage:
+The immediate sequence is baseline reconciliation, terminal reliability,
+`amx`, real agents, and daily-use validation. The full parity plan below remains
+the product goal; work in dependency order and keep the application runnable
+after each stage. Reconcile already completed work before repeating a phase:
 
 1. Repository rules, documentation, baseline commit, full parity matrix, and
    architecture decision records.
-2. Rust workspace, GTK4 application shell, design tokens, resources, logging,
+2. SwiftPM workspace, GTK4 application shell, design tokens, resources, logging,
    and test harness.
 3. Canonical Ghostty pin, staged build system, independently written Linux GTK
    shim, and one reliable terminal surface.
@@ -517,16 +524,18 @@ The selected production track is done only when:
 - terminal lifecycle, persistence, multi-pane use, agents, SSH, documents,
   accessibility, and packaging are verified
 - the complete automated test suite and preflight pass
-- all verification runs locally on i5GamingPC and the repository contains no
-  CI workflows or remote build automation
+- all checks run locally, with desktop and visual verification on i5GamingPC,
+  and the repository contains no CI workflows or remote build automation
 - canonical Ghostty and zmx submodules remain clean and correctly pinned
 - licenses and notices are complete
 - the macOS awesoMux repository remains byte-for-byte untouched by this work
 - no issue, pull request, package, release, visibility setting, or unrelated
   remote content has been created or changed without Sarah's explicit approval
 
-Begin by inspecting the machine and both reference projects, confirming the
-GitHub repository situation, recording the reference commit, and writing the
-parity matrix and implementation plan. Then read `swift-gtk/AGENT_PROMPT.md`
-and proceed into the SwiftGtk4 implementation. Do not merely return a plan
-unless a real external blocker prevents safe progress.
+Begin by reconciling the recorded GTK baseline against the checkout and the
+preserved Electron behavior handoff. Then resolve terminal lifecycle and
+reliability, integrate `amx` persistence, integrate real agent state, and
+validate daily use on i5GamingPC. Continue toward the full parity matrix after
+those foundations. Read `swift-gtk/AGENT_PROMPT.md` before implementation and
+keep verification evidence current. Do not claim desktop work completed from
+source inspection alone.

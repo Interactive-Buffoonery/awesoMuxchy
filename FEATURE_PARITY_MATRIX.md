@@ -1,6 +1,13 @@
 # Feature parity matrix
 
 Baseline: macOS `fed33ff47c559344fc6db6fa53f16e75fcc4a116`.
+The 2026-09-22 [consolidation](docs/linux-consolidation.md) changes project
+direction and preserves Electron evidence; it does not upgrade any runtime
+status in this matrix. Historical verification applies to its recorded build.
+Recheck close/teardown, continuous-update persistence, and clipboard confirmation
+before daily use. The [Electron handoff](docs/electron-behavior-handoff.md) adds
+acceptance scenarios without claiming that GTK already passes them.
+
 Statuses describe working Linux behavior, not documentation completeness.
 “Catalog baseline” means the exact entry in
 `shared/resources/text-baseline.json`; paraphrases in this matrix are never a

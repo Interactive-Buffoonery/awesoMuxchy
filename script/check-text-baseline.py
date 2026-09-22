@@ -44,10 +44,11 @@ def validate_reference_drift() -> None:
     reference = Path(
         os.environ.get(
             "AWESOMUX_MACOS_REFERENCE",
-            "/home/sarah/Development/awesomux-macos-reference",
+            str(ROOT.parent / "awesomux-macos-reference"),
         )
     )
     if not reference.is_dir():
+        print("text-baseline: reference checkout unavailable; live catalog comparison skipped")
         return
     head = subprocess.check_output(
         ["git", "-C", str(reference), "rev-parse", "HEAD"], text=True

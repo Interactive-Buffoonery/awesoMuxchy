@@ -4,9 +4,14 @@ Read `AGENT_PROMPT.md` and the active track prompt completely before changing
 this repository. `swift-gtk/` is active. `rust-gtk/` stays untouched unless
 Sarah explicitly activates it.
 
+This GTK repository is the Linux development home. The Electron prototype is
+historical evidence preserved in this repository; see
+`docs/electron-behavior-handoff.md` and `docs/linux-consolidation.md`. Follow
+`docs/adr/0004-consolidate-linux-development.md` for the current sequence.
+
 ## Boundaries
 
-- Treat `/home/sarah/Development/awesomux-macos-reference` as read-only. Check
+- Treat any macOS awesoMux reference checkout as read-only. Check
   `git status --short` before and after every reference pass and stop if dirty.
 - Never inspect or copy GPL/AGPL source or unlicensed implementation source.
 - Use canonical MIT Ghostty only through the pinned `vendor/ghostty` submodule.
@@ -36,3 +41,6 @@ Keep `IMPLEMENTATION_STATUS.md`, `swift-gtk/IMPLEMENTATION_STATUS.md`, and
 `FEATURE_PARITY_MATRIX.md` current. A visual milestone is incomplete until the
 real app was run, the image was inspected, the comparison index was updated,
 and the focused visual-QA commit was pushed to the verified private origin.
+Build and source checks may run in the development workspace on pinguchy.
+Desktop behavior and visual claims require a real run on i5GamingPC; record
+unavailable target-machine evidence as pending.

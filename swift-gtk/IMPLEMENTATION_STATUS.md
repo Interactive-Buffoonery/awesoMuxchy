@@ -1,6 +1,19 @@
 # SwiftGtk4 implementation status
 
-Updated: 2026-08-29
+Consolidation update: 2026-09-22. Runtime evidence below is historical and was
+not rerun during cleanup.
+
+## Consolidation checkpoint
+
+This is the active Linux application. Read the
+[consolidation record](../docs/linux-consolidation.md) and
+[Electron behavior handoff](../docs/electron-behavior-handoff.md) before further
+implementation. Electron's full fetched Git history is preserved offline; no
+Electron dependency or runtime code was added to SwiftGtk4.
+
+Next: reconcile i5GamingPC's local-only implementation, verify terminal close
+and sustained-save behavior, then add persistent `amx` sessions and real agents.
+No new Swift, GTK, or desktop verification is claimed by this cleanup.
 
 ## Current phase
 
