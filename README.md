@@ -22,6 +22,38 @@ Read `AGENT_PROMPT.md` first, then the prompt inside the selected track. Start
 with `swift-gtk/AGENT_PROMPT.md`. Do not work on both tracks at the same time
 unless Sarah explicitly asks for a comparison.
 
+## Build and run locally
+
+The setup below is on `chore/consolidate-linux-development` until merged.
+Clone that branch with its pinned Ghostty and zmx submodules (or run
+`git submodule update --init --recursive` in an existing clone):
+
+```sh
+git clone --branch chore/consolidate-linux-development --recurse-submodules https://github.com/Interactive-Buffoonery/awesomux-linux-gtk.git
+cd awesomux-linux-gtk
+```
+
+Follow [development setup](docs/development.md) to prepare repository-local
+Swift 6.3.3, Zig 0.16.0, and the documented GTK/GIR and compatibility
+dependencies. The scripts check prerequisites; they do not install system
+packages. From the repository root, choose the command you need:
+
+```sh
+./script/dev.sh --build-only  # Compile the Swift/GTK app and Ghostty shim
+./script/dev.sh --run-only    # Launch the existing debug build immediately
+./script/dev.sh               # Build and launch the isolated development app
+./script/dev.sh --test        # Run the local Swift package tests
+./script/preflight.sh         # Run the complete local verification gate
+```
+
+The development app uses `.build/dev-profile/` for its configuration and state.
+Shells opened inside it currently inherit that profile and the local build
+environment, so their normal CLI configuration can differ. The complete
+preflight gate includes desktop checks and needs a suitable display; see the
+development guide for prerequisites and the exact scope. A debug build and
+native Wayland launch with a real Ghostty shell have been checked on pinguchy.
+Target i5GamingPC desktop and daily-use validation remain pending.
+
 Progress screenshots are stored under:
 
 ```text

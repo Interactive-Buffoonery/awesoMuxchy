@@ -4,6 +4,12 @@ set -euo pipefail
 repo_root=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 stage_root="${AWESOMUX_GHOSTTY_STAGE:-$repo_root/.build/ghostty-stage}"
 zig_bin="${AWESOMUX_ZIG:-zig}"
+build_jobs="${AWESOMUX_BUILD_JOBS:-2}"
+
+if [[ ! "$build_jobs" =~ ^[1-9][0-9]*$ ]]; then
+  echo "AWESOMUX_BUILD_JOBS must be a positive integer." >&2
+  exit 1
+fi
 
 if [[ ! -d "$stage_root" ]]; then
   "$repo_root/script/stage-ghostty.sh" >/dev/null
@@ -28,11 +34,19 @@ if [[ "$version" != "0.16.0" ]]; then
   exit 1
 fi
 
+host_linker_options=()
+if [[ -f /etc/arch-release ]]; then
+  # Arch's glibc 2.44/GCC 16 crt1.o needs LLVM and LLD for the host helper.
+  host_linker_options+=(-Dawesomux-host-llvm-lld=true)
+fi
+
 "$zig_bin" build \
   --build-file "$stage_root/build.zig" \
   --prefix "$repo_root/.build/ghostty-prefix" \
+  -j"$build_jobs" \
   -Dapp-runtime=none \
-  -Doptimize=ReleaseFast
+  -Doptimize=ReleaseFast \
+  "${host_linker_options[@]}"
 
 # Ghostty's installed internal library currently has SONAME libghostty.so but
 # is emitted as ghostty-internal.so. Keep that upstream output untouched and

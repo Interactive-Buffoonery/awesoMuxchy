@@ -8,6 +8,9 @@ Recheck close/teardown, continuous-update persistence, and clipboard confirmatio
 before daily use. The [Electron handoff](docs/electron-behavior-handoff.md) adds
 acceptance scenarios without claiming that GTK already passes them.
 
+The subsequent pinguchy development build and terminal-startup smoke check are
+recorded in `docs/development.md`; they do not change parity statuses here.
+
 Statuses describe working Linux behavior, not documentation completeness.
 “Catalog baseline” means the exact entry in
 `shared/resources/text-baseline.json`; paraphrases in this matrix are never a

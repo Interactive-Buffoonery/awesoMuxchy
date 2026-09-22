@@ -4203,7 +4203,9 @@ private func buildWindow(for application: Gtk.ApplicationRef) {
 
 let applicationID = ProcessInfo.processInfo.environment["AWESOMUX_SINGLE_WINDOW_PROBE"] == "1"
     ? "com.interactivebuffoonery.awesomux.activationprobe"
-    : "com.interactivebuffoonery.awesomux"
+    : ProcessInfo.processInfo.environment["AWESOMUX_DEVELOPMENT"] == "1"
+        ? "com.interactivebuffoonery.awesomux.development"
+        : "com.interactivebuffoonery.awesomux"
 guard TerminalRuntime.prepareGTKEnvironment() else {
     fatalError("Could not prepare GTK for Ghostty rendering")
 }

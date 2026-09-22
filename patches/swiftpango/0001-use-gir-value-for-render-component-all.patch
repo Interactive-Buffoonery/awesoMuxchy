@@ -1,0 +1,8 @@
+diff --git a/Pango-1.0.verbatim b/Pango-1.0.verbatim
+--- a/Pango-1.0.verbatim
++++ b/Pango-1.0.verbatim
+@@ -3,3 +3,4 @@ GLYPH_INVALID_INPUT
+ GLYPH_UNKNOWN_FLAG
+ VERSION_MIN_REQUIRED
+ ATTR_INDEX_TO_TEXT_END
++RENDER_COMPONENT_ALL

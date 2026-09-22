@@ -14,8 +14,22 @@ archive verification, next work, and the unresolved i5 local changes.
 
 The September visual-QA branch contains no implementation changes. Its
 134-test/font-fix claims refer to unavailable local source, not this checkout.
-No runtime fixes or new parity claims are part of the consolidation. Swift is
-not installed on the current host; full preflight and desktop QA remain pending.
+No runtime fixes or new parity claims are part of the consolidation.
+
+## Local development setup — 2026-09-22
+
+Verified repository-local Swift 6.3.3 and Zig 0.16.0 are now available on
+pinguchy, with repository-local Ubuntu runtime libraries for Swift and signed
+Arch GIR metadata. Core warnings-as-errors typechecking passes. Ghostty and
+the GTK shim build successfully with the scoped Arch host-linker workaround.
+The debug application builds and runs on pinguchy under native Wayland. Its
+development application ID exposes the workspace action, and creating a
+workspace renders a live Ghostty shell; an app-only capture was inspected.
+This is local startup evidence, not target-machine parity. All 130 Swift
+package tests pass on this host. Full preflight and target-machine desktop QA
+remain pending. See
+[`docs/development.md`](docs/development.md) for the development wrapper and
+reproduction details.
 
 ## Current phase
 

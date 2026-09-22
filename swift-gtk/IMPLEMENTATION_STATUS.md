@@ -15,6 +15,18 @@ Next: reconcile i5GamingPC's local-only implementation, verify terminal close
 and sustained-save behavior, then add persistent `amx` sessions and real agents.
 No new Swift, GTK, or desktop verification is claimed by this cleanup.
 
+## Local development check — 2026-09-22
+
+On pinguchy, pinned Swift 6.3.3 builds the debug app against GTK 4.22.4 after
+repository-local compatibility setup and a narrow SwiftPango constant patch.
+Ghostty and the shim build with the Arch host-helper linker workaround.
+The development application opens on native Wayland, exports its workspace
+action, and creates a real terminal workspace; its window capture was inspected.
+This does not replace i5GamingPC desktop, visual-parity, or daily-use evidence.
+All 130 Swift package tests pass on this host. See
+[development instructions](../docs/development.md). Full preflight remains
+pending.
+
 ## Current phase
 
 Viability, defensive restoration, and the enriched sidebar/terminal footer
