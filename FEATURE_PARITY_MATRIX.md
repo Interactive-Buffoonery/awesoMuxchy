@@ -1,5 +1,20 @@
 # Feature parity matrix
 
+INT-1116 source update (2026-09-23): the session writer now applies the same
+4 MiB encoded-byte limit as the loader before touching current or previous
+snapshot files. Boundary, Unicode, preservation, retry, and successful reload
+tests passed in a temporary core-only SwiftPM package (131 core tests total).
+With a privately staged signed Xvfb binary, isolated Ghostty config, and
+private headless Weston Wayland and D-Bus, full preflight passed (exit 0):
+Swift tests, release build, X11 `:1` single-window activation, dynamic command
+enablement, forced-termination persistence, terminal integration and 100-cycle
+lifecycle stress, and native Wayland terminal integration with private clipboard
+and 100-cycle lifecycle stress. A prior `swift-package`/libdispatch crash during
+release build has unproven cause; retry passed. The earlier missing X11 display
+was host setup. Live Omarchy desktop and daily-use acceptance remain pending.
+Crash recovery stays partial because other recovery and process-survival gaps
+remain open.
+
 2026-09-23 acceptance update: SwiftGtk4 is the sole application implementation;
 the unused fallback scaffolding has been removed. Omarchy/Hyprland is the
 required Linux baseline. Acceptance remains pending until real Omarchy desktop

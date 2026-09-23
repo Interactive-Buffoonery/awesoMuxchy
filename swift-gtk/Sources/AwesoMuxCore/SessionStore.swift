@@ -108,11 +108,14 @@ public struct SessionStore: Sendable {
 
     public func save(_ snapshot: SessionSnapshot) throws {
         let validated = try snapshot.validated()
-        let directory = snapshotURL.deletingLastPathComponent()
-        try prepareDirectory(directory)
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
         let data = try encoder.encode(validated)
+        guard data.count <= Self.maximumSnapshotBytes else {
+            throw SessionStoreError.snapshotTooLarge
+        }
+        let directory = snapshotURL.deletingLastPathComponent()
+        try prepareDirectory(directory)
         if FileManager.default.fileExists(atPath: snapshotURL.path),
            (try? decodeSnapshot(at: snapshotURL)) != nil {
             let previousData = try Data(contentsOf: snapshotURL)
