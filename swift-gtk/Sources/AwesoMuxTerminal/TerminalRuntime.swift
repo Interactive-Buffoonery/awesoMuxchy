@@ -185,6 +185,14 @@ public final class TerminalSurface {
         return value == 0 ? nil : value
     }
 
+    public func containsText(_ text: String) -> Bool {
+        text.withCString { amx_ghostty_surface_contains_text(handle, $0) }
+    }
+
+    public var displayRecoveryCount: UInt32 {
+        amx_ghostty_surface_display_recovery_count(handle)
+    }
+
     public var isReady: Bool {
         amx_ghostty_surface_is_ready(handle)
     }

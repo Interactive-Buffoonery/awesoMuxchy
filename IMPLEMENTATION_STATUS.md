@@ -1,5 +1,58 @@
 # Implementation status
 
+## INT-1112 terminal layout survival — 2026-09-23
+
+Real Omarchy/Hyprland reproduction confirmed the prior split-layout defect:
+after synthetic output and a harmless `sleep 15`, shell PID 1583197 and job
+PID 1583525 were recorded. GTK detach made the shim surface unready; reattach
+created a new process (foreground PID 1583925) and the original job was gone.
+The prior split/resize evidence below established pane identity and clean GTK
+diagnostics, not shell or job continuity. A narrow staged Ghostty patch now
+exposes its renderer display unrealize/realize lifecycle to the Linux embedder;
+the shim keeps the terminal core through GTK remounts. The same real Wayland
+reproduction against the patched shim kept shell PID 1676855 and active job PID
+1677212 alive while detached and after reattach. A native Wayland integration
+run passed eight live-job remounts, full scrollback, Unicode input/output,
+focus transfer and callback, post-remount title/directory callbacks, and stable
+prompt/close-risk signals. Clipboard writes were explicitly disabled for that
+live-session run. A separate app action probe kept the original shell PID
+through Split Right and Grow/Shrink. It then exposed a closed sibling retained
+indefinitely by the old exit-polling path; the source now releases that removed
+surface on the next GTK turn after focus ownership moves to the survivor.
+That close-path change builds but has not had a live retest after desktop QA was
+paused. A bounded one-shot release Wayland integration then stopped at a fresh
+focus-callback assertion whose prerequisite (active window and successful
+sibling focus transfer) had not been checked, before reaching detached-close
+PID verification. Its runtime, children, and window all exited; the test guard
+now checks that prerequisite. A subsequent one-shot Omarchy/Wayland integration
+injected an unrealize failure, recovered the original context exactly once,
+passed eight live-job remounts and detached shell PID exit, and left no test
+executable, process-group member, or window. Focus transfer was skipped in that
+Wayland run because the compositor focus prerequisite was unavailable. A later
+private Xvfb `:2` preflight with isolated Ghostty configuration passed Swift
+tests, release build, single-window and dynamic-enablement probes,
+forced-termination persistence, X11 terminal integration, and 100 lifecycle
+cycles. The X11 integration verified post-remount focus transfer, private
+clipboard, eight live-process remounts, and detached process release. Final
+native Wayland preflight was deliberately pointed at an invalid display to
+protect the live clipboard and could not open a display, so full preflight
+remains incomplete. Broader Omarchy daily-use acceptance remains pending.
+Canonical `vendor/ghostty` remains clean.
+
+Lifecycle review found a second failure path: if GTK cannot make the original
+GL context current during unrealize, GPU cleanup must wait for that same
+context. The shim now retains it, disables drawing while cleanup is pending,
+and retries cleanup before building the replacement display. The staged Linux
+Ghostty patch adds a final no-GL teardown for an irrecoverable or detached
+display so closing the pane can still retire its terminal process without
+deleting GPU handles under a different context. A one-shot fault switch and
+recovery-count assertion cover the transient path in the integration harness;
+the native fault and detached final-close run passed. The private X11 preflight
+also verified focus transfer after remount, superseding the focus-skipped
+coverage in the later Wayland run. A true lost-context
+quarantine remains untested on live Omarchy. The failed pane displays
+a close-and-reopen message if its context cannot recover.
+
 2026-09-23 acceptance update: SwiftGtk4 is the sole application implementation;
 the unused fallback scaffolding has been removed. Omarchy/Hyprland is the
 required Linux baseline. Acceptance remains pending until real Omarchy desktop
@@ -453,8 +506,8 @@ help, and agent context while preserving the compact reference geometry.
 - `Split Right`, `Split Down`, and the primary `Close Pane` route are now real
   GTK application actions and command-palette entries. Both split directions
   inherit the focused local pane cwd, mint and focus exactly one Ghostty
-  surface, remount the authoritative layout without recreating surviving
-  terminals, and refresh the row, peek, agent, accessibility, and focused-pane
+  surface, remount the authoritative layout while retaining surviving Swift
+  surface objects, and refresh the row, peek, agent, accessibility, and focused-pane
   footer projections. Multi-pane close uses pane-specific live risk evidence
   and exact reference confirmation copy; the last pane continues through the
   existing soft-close workspace path. Closed surfaces are detached, generation
