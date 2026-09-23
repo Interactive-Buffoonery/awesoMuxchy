@@ -1,5 +1,26 @@
 # Implementation status
 
+2026-09-23 acceptance update: SwiftGtk4 is the sole application implementation;
+the unused fallback scaffolding has been removed. Omarchy/Hyprland is the
+required Linux baseline. Acceptance remains pending until real Omarchy desktop
+and daily-use checks pass; historical runs on other desktops and build-only
+checks do not satisfy this gate. This cleanup changes no runtime behavior.
+
+## awesoMuxchy planning and repository rename — 2026-09-23
+
+Sarah chose an Omarchy edition of the shared app and renamed the public origin
+to `Interactive-Buffoonery/awesoMuxchy`. The local checkout directory is
+unchanged. See [ADR 0005](docs/adr/0005-awesomuxchy-omarchy-edition.md) and the
+[Linear project](https://linear.app/interactive-buffoonery/project/awesomuxchy-190ce1959bdf).
+
+The full source review identified open terminal-survival, clipboard,
+persistence, accessibility, and keyboard findings. These qualify the historical
+completion claims below; none was fixed by the repository rename. The existing
+130-test binary passed, current core warnings-as-errors typechecking passed,
+and local text-baseline validation passed with live reference comparison
+unavailable. Full preflight and new target-desktop evidence remain pending.
+Historical references to a private origin describe uploads before publication.
+
 Consolidation update: 2026-09-22. Runtime evidence below was recorded during
 the August implementation work and has not been rerun for this cleanup.
 

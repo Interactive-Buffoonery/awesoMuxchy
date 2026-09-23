@@ -2,19 +2,18 @@
 
 - Status: Accepted
 - Date: 2026-08-28
+- Amended: 2026-09-23, by Sarah: SwiftGtk4 is the sole implementation.
 - Deciders: Sarah (repository prompt)
 
 ## Context
 
-The repository contains SwiftGtk4 and Rust/gtk4-rs tracks. The root phase list
-contains one stale “Rust workspace” phrase, while all track-selection rules say
-SwiftGtk4 is first and Rust is an explicit fallback.
+The Linux application uses SwiftGtk4 with a shared Ghostty shim. Sarah has
+chosen to keep a single application implementation in this repository.
 
 ## Decision
 
 Build only `swift-gtk/`. Shared product contracts and `ghostty-shim/` remain
-language-neutral. Rust stays untouched unless Sarah activates it after an
-evidence-backed failed Swift viability checkpoint.
+language-neutral. Maintain one SwiftGtk4 implementation shared across editions.
 
 ## Consequences
 

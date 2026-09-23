@@ -4,6 +4,10 @@
 - Date: 2026-09-22
 - Deciders: Sarah
 
+Updated by [ADR 0005](0005-awesomuxchy-omarchy-edition.md) for the shared
+Omarchy edition, public repository rename, and Sarah-authorized code-review
+tools. The consolidation and shared implementation decisions remain active.
+
 ## Context
 
 Linux work has lived in a SwiftGtk4 repository and an earlier Electron
@@ -16,9 +20,8 @@ session snapshots.
 ## Decision
 
 This repository is the single working home for Linux awesoMux. `swift-gtk/`
-is the active GTK4 application, using the shared awesoMux-owned Ghostty shim.
-`rust-gtk/` stays dormant unless Sarah explicitly activates it after the Swift
-viability evidence warrants a switch. The Electron prototype remains historical
+is the sole GTK4 application, using the shared awesoMux-owned Ghostty shim.
+The Electron prototype remains historical
 product and behavior evidence; it is not a second implementation track, and
 future GTK work does not require an Electron working checkout. Preserve its
 useful evidence and repository history here before any later deletion of that
@@ -33,9 +36,10 @@ continue to apply; this decision grants no new remote publishing permission.
 
 The current development workspace is `~/development/awesomux-linux-gtk` on
 pinguchy. Local build, source, and documentation checks may run there. Real
-desktop behavior, Wayland/X11, visual comparisons, and daily-use evidence must
-be gathered on the target i5GamingPC. If it is unavailable, record that
-evidence as pending rather than marking it verified.
+desktop behavior, visual comparisons, and daily-use evidence must be gathered
+in a real Omarchy/Hyprland session, as required by ADR 0005. If that evidence
+is unavailable, record acceptance as pending. Other desktop runs, including
+X11, are supplementary.
 
 ## Sequence and consequences
 
@@ -48,7 +52,7 @@ evidence as pending rather than marking it verified.
    send, history, and recovery against the product contract.
 4. Integrate real agent state and actions for Claude Code, Codex, and Grok,
    scoped to the focused pane.
-5. Validate sustained daily use on i5GamingPC, then continue the full feature,
+5. Validate sustained daily use on Omarchy/Hyprland, then continue the full feature,
    accessibility, packaging, and visual parity program.
 
 This sequence narrows the next milestone without reducing the final macOS

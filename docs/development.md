@@ -1,9 +1,11 @@
 # Local GTK development on pinguchy
 
 This is the current Arch/Omarchy development host. The active application is
-`swift-gtk/`, using the shared Ghostty shim. The target i5GamingPC still owns
-Wayland/X11 desktop comparison and daily-use validation evidence; launching on
-pinguchy is a local development check, not a parity sign-off.
+`swift-gtk/`, using the shared Ghostty shim. Omarchy/Hyprland is the required
+Linux acceptance target. Verify desktop behavior, visuals, and daily use in a
+real session on this host or another verified Omarchy host. A launch smoke
+check alone is insufficient; if the app does not run well on Omarchy, it does
+not pass. Other desktop runs provide supplementary coverage.
 
 ## Prerequisites
 
