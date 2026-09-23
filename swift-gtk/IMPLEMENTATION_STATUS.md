@@ -1,5 +1,33 @@
 # SwiftGtk4 implementation status
 
+## INT-1114 command-palette focus — 2026-09-23
+
+Search owns the command palette's keyboard focus. Result buttons can still be
+clicked but cannot take Tab focus away from the highlighted result. Tab and
+Shift-Tab return to search; Up and Down move the highlight; Return activates
+that result. GTK accessibility announces arrow and filtered selection changes,
+including empty filtered results. Dismissal now defers controller removal and
+popover unparenting until capture event dispatch completes, clears its owner
+synchronously for rapid reopen, and restores the prior focused widget on
+Escape. The capture controller keeps a native reference separate from GTK's
+attached ownership. Earlier native runs exposed post-Escape and rapid-reopen
+crashes; after the ownership fix, the full regression passed three consecutive
+times, including twice with fatal GLib criticals enabled.
+The debug app builds, and `../script/test-command-palette-focus.py` passed on
+native Omarchy Wayland with two isolated workspaces. AT-SPI confirmed rows
+are not focusable, search is actually FOCUSED, and selected states follow arrows/filtering; Return and row
+Click routed exact workspace identities; Escape followed immediately by
+Control-K reopened a fresh palette that remained open. The exact widget
+focused before opening regained focus after Escape. All seven focused Swift
+palette tests passed. A private Xvfb `:2` preflight passed Swift tests and the
+cold release build (713.66 seconds), single-window activation, dynamic command
+enablement, forced-termination persistence, X11 terminal integration including
+private clipboard, and 100-cycle lifecycle stress. Its final native Wayland
+stage could not open the display because `WAYLAND_DISPLAY` was intentionally
+invalid to protect the live session's clipboard; full preflight remains
+incomplete. The separate palette regression above used real Omarchy Wayland.
+Audible screen-reader announcements were not measured.
+
 2026-09-23 acceptance update: SwiftGtk4 is the sole application implementation;
 the unused fallback scaffolding has been removed. Omarchy/Hyprland is the
 required Linux baseline. Acceptance remains pending until real Omarchy desktop

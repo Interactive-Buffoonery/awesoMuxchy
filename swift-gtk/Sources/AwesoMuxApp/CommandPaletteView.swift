@@ -26,6 +26,12 @@ final class CommandPaletteController: @unchecked Sendable {
     private var selectedIndex: Int?
     private var resultButtons: [ButtonRef] = []
     private var didFinish = false
+    private var previousFocus: UnsafeMutablePointer<GtkWidget>?
+    private var restoreFocusOnClose = false
+
+    deinit {
+        if let previousFocus { g_object_unref(previousFocus) }
+    }
 
     init(
         anchor: WidgetRef,
@@ -66,6 +72,7 @@ final class CommandPaletteController: @unchecked Sendable {
         keys.onKeyPressed { [weak self] _, keyval, _, _ in
             self?.handleKey(keyval) ?? false
         }
+        _ = keys.ref()
         gtk_widget_add_controller(popover.widget_ptr, keys.event_controller_ptr)
         popover.onClosed { [weak self] _ in
             self?.finish()
@@ -85,6 +92,12 @@ final class CommandPaletteController: @unchecked Sendable {
     }
 
     func present() {
+        if previousFocus == nil,
+           let gtkRoot = gtk_widget_get_root(popover.widget_ptr),
+           let focused = gtk_root_get_focus(gtkRoot) {
+            _ = g_object_ref(focused)
+            previousFocus = focused
+        }
         if let parent = popover.getParent() {
             let geometry = CommandPaletteGeometry.fit(
                 parentWidth: parent.getWidth(), parentHeight: parent.getHeight()
@@ -105,7 +118,8 @@ final class CommandPaletteController: @unchecked Sendable {
         }
     }
 
-    func close() {
+    func close(restoreFocus: Bool = false) {
+        restoreFocusOnClose = restoreFocus
         popover.popdown()
         finish()
     }
@@ -113,9 +127,23 @@ final class CommandPaletteController: @unchecked Sendable {
     private func finish() {
         guard !didFinish else { return }
         didFinish = true
-        gtk_widget_remove_controller(popover.widget_ptr, keys.event_controller_ptr)
-        popover.unparent()
+        // Clear the owner's reference now so a rapid reopen creates a new
+        // controller. Only this old controller's GTK teardown is deferred.
         onDismiss()
+        // A capture-phase key callback may still be traversing this controller.
+        // Release its GTK owner after that event dispatch has unwound.
+        timeout(add: 0) { [self] in
+            gtk_widget_remove_controller(popover.widget_ptr, keys.event_controller_ptr)
+            popover.unparent()
+            if let previousFocus {
+                if restoreFocusOnClose, gtk_widget_get_root(previousFocus) != nil {
+                    _ = gtk_widget_grab_focus(previousFocus)
+                }
+                g_object_unref(previousFocus)
+                self.previousFocus = nil
+            }
+            return false
+        }
     }
 
     private func makeSearchHeader() -> BoxRef {
@@ -189,7 +217,10 @@ final class CommandPaletteController: @unchecked Sendable {
         if flattened.isEmpty { results.append(child: emptyState()) }
         updateMode()
         resultCount.label = "\(flattened.count) results"
-        updateSelection()
+        updateSelection(announce: !rawQuery.isEmpty)
+        if !rawQuery.isEmpty && flattened.isEmpty {
+            announceAccessibilityStatus(from: search, "No results")
+        }
     }
 
     private func resultButton(
@@ -198,6 +229,10 @@ final class CommandPaletteController: @unchecked Sendable {
         let button = ButtonRef()
         button.add(cssClass: "aw-palette-row")
         button.setHalign(align: .fill)
+        // Search owns keyboard focus and Return activation. Rows remain pointer
+        // actions, but cannot acquire a second focus that disagrees with selection.
+        gtk_widget_set_focusable(button.widget_ptr, 0)
+        gtk_widget_set_focus_on_click(button.widget_ptr, 0)
         let row = BoxRef(orientation: .horizontal, spacing: 10)
         let glyphText: String
         switch item.target {
@@ -265,7 +300,7 @@ final class CommandPaletteController: @unchecked Sendable {
         }
     }
 
-    private func updateSelection() {
+    private func updateSelection(announce: Bool = false) {
         for (index, button) in resultButtons.enumerated() {
             let selected = index == selectedIndex
             if selected { button.add(cssClass: "aw-palette-selected") }
@@ -273,6 +308,18 @@ final class CommandPaletteController: @unchecked Sendable {
             setAccessibleSelected(button, selected)
         }
         scrollSelectionIntoView()
+        if announce, let selectedIndex, projection.items.indices.contains(selectedIndex) {
+            let item = projection.items[selectedIndex]
+            let kind: String
+            switch item.target {
+            case .workspace: kind = "Workspace"
+            case .command: kind = "Action"
+            }
+            announceAccessibilityStatus(
+                from: search,
+                "\(kind): \(item.title). Result \(selectedIndex + 1) of \(projection.items.count)"
+            )
+        }
     }
 
     private func scrollSelectionIntoView() {
@@ -298,14 +345,17 @@ final class CommandPaletteController: @unchecked Sendable {
     private func handleKey(_ keyval: UInt) -> Bool {
         switch keyval {
         case UInt(GDK_KEY_Escape):
-            close()
+            close(restoreFocus: true)
+            return true
+        case UInt(GDK_KEY_Tab), UInt(GDK_KEY_ISO_Left_Tab):
+            _ = search.grabFocus()
             return true
         case UInt(GDK_KEY_Down), UInt(GDK_KEY_Up):
             let delta = keyval == UInt(GDK_KEY_Down) ? 1 : -1
             selectedIndex = CommandPaletteSelectionPolicy.destination(
                 current: selectedIndex, count: projection.items.count, delta: delta
             )
-            updateSelection()
+            updateSelection(announce: true)
             return true
         case UInt(GDK_KEY_Return), UInt(GDK_KEY_KP_Enter):
             guard let selectedIndex, projection.items.indices.contains(selectedIndex) else {

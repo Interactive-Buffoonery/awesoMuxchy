@@ -1,5 +1,38 @@
 # Implementation status
 
+## INT-1114 command-palette focus — 2026-09-23
+
+The palette keeps keyboard focus in search: result buttons are removed from
+the Tab sequence, Tab and Shift-Tab return to search, and Return uses the
+highlighted result. Pointer activation still invokes the clicked row. Arrow
+and filtered selections are announced through GTK accessibility. Dismissal
+now defers GTK controller removal and popover unparenting until after capture
+event dispatch, releases the owner synchronously for rapid reopen, and restores
+the previously focused widget after Escape. The capture controller retains its
+own native reference while GTK owns the attached reference; this fixed a
+rapid-reopen lifecycle crash seen during the native run.
+
+`./script/dev.sh --build-only` passed after a cold pinned SwiftGtk build.
+`./script/dev.sh --test --filter CommandPalette` passed all seven selected
+Swift Testing cases.
+`script/test-command-palette-focus.py` passed on the live Omarchy/Hyprland
+Wayland session with a fresh isolated profile. It checked result focusability,
+Tab and Shift-Tab, arrows, Return routing across two workspaces, row Click,
+actions-only filtering, empty Return, Escape, immediate sequential reopen,
+and process survival. AT-SPI confirmed the search's actual FOCUSED state,
+selected rows, and return to the exact widget focused before Escape. The same
+flow passed three consecutive native runs, two with `G_DEBUG=fatal-criticals`.
+Audible screen-reader announcements remain to be checked.
+`./script/preflight.sh` ran against private Xvfb `:2`: Swift tests and the
+release build passed (cold build 713.66 seconds), followed by single-window
+activation, dynamic command enablement, forced-termination persistence, X11
+terminal integration including private clipboard, and 100-cycle lifecycle
+stress. The final native Wayland stage could not open its display because
+`WAYLAND_DISPLAY` was intentionally set invalid to protect the live session's
+clipboard. Full preflight therefore remains incomplete; this is no evidence
+of a Wayland app failure. The separate Omarchy palette regression above ran
+on the real Wayland session.
+
 2026-09-23 acceptance update: SwiftGtk4 is the sole application implementation;
 the unused fallback scaffolding has been removed. Omarchy/Hyprland is the
 required Linux baseline. Acceptance remains pending until real Omarchy desktop
