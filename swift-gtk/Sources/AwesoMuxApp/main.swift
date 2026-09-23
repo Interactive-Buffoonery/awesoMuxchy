@@ -2636,12 +2636,24 @@ private final class ApplicationState: @unchecked Sendable {
                   let surface = self.surfacesByPane[paneID] else { return }
             surface.resolvePermission(requestID, allow: allow)
         }
-        guard kind == .clipboardWrite, activeSheetWindow == nil, window != nil,
+        guard activeSheetWindow == nil, window != nil,
               surfaceGenerationByPane[paneID] == generation else {
             resolve(false)
             return
         }
         activePermissionID = requestID
+        if kind == .unsafePaste {
+            presentDestructiveConfirmation(
+                title: "This paste could run a command before you finish pasting. Paste anyway?",
+                bodyText: "The paste contains \(characters) characters (\(bytes) bytes).",
+                keyboardHint: "Press Ctrl+Return to paste anyway. Esc cancels.",
+                destructiveTitle: "Paste Anyway",
+                onCancel: { resolve(false) },
+                approvalUsesControl: true,
+                onConfirm: { resolve(true) }
+            )
+            return
+        }
         presentDestructiveConfirmation(
             title: "Update clipboard from terminal escape sequence?",
             bodyText: "Terminal output wants to replace the system clipboard with \(characters) characters (\(bytes) bytes).",

@@ -1,5 +1,34 @@
 # Implementation status
 
+2026-09-23 INT-1113 (stacked on INT-1115): Ghostty PASTE confirmation
+callbacks no longer complete with `confirmed=true` automatically; unexpected
+LIST confirmations are denied because ordinary MIME-listing paste events do
+not need unsafe-text confirmation. The shim
+retains at most 1 MiB of borrowed confirmation data behind an opaque request
+ID and only returns it to Ghostty after explicit approval. Denial, repeated
+requests, stale IDs, unrealize, and pane teardown clear the pending decision;
+the app presents the awesoMux unsafe-paste title and a cancel-default sheet.
+The isolated Broadway callback test passes for ordinary text/MIME-list reads, bounded
+multiline and bracket-ending callback fixtures, approval, denial, replacement,
+unexpected LIST denial, stale IDs, and teardown without using the live clipboard. The existing
+terminal integration covers ordinary paste. Real Ghostty unsafe classification,
+bracketed-mode behavior, and real-app Omarchy modal
+input/visual acceptance remain pending. No clipboard contents are logged.
+Focused checks passed: C syntax with `-Wall -Wextra -Werror`, shim link,
+isolated Broadway permission test, text-baseline validation, `git diff --check`,
+130 Swift tests, and a release Swift build. The full `./script/preflight.sh`
+passed with signed private Xvfb `:1`, private headless Weston
+`wayland-awesomux-qa`, and isolated D-Bus, configuration, and clipboard. It
+covered single-window activation, dynamic command enablement,
+forced-termination persistence, terminal/clipboard integration, and 100
+two-surface lifecycle cycles on X11, plus terminal integration and lifecycle
+stress on native Wayland. Four additional focused dynamic-command runs passed. A prior
+private-Xvfb run produced one unexplained SIGSEGV in libdispatch's manager
+thread during dynamic command testing; core inspection showed GTK's main
+thread in XPending and no permission callback frame. The reruns did not
+reproduce it, so it is not claimed fixed. Real-app Omarchy unsafe-paste modal
+input, visual evidence, and daily-use acceptance remain pending.
+
 2026-09-23 INT-1115: The Ghostty shim now retains confirmation-required OSC52
 clipboard writes behind an explicit opaque request ID. The GTK app presents an
 awesoMux-owned cancel-default approval sheet. Confirmation-required writes
@@ -26,8 +55,8 @@ confirmation interaction, visual comparison, and daily-use acceptance remain
 pending. Earlier missing-`:1` and invalid-Wayland-display blockers are
 superseded by this isolated full preflight pass.
 The focused C build and isolated test also passed with both the 1 MiB accepted
-boundary and the first rejected byte covered. No implementation commit or push
-was made.
+boundary and the first rejected byte covered. INT-1115 is committed and pushed;
+INT-1113 is stacked locally pending publication.
 
 2026-09-23 acceptance update: SwiftGtk4 is the sole application implementation;
 the unused fallback scaffolding has been removed. Omarchy/Hyprland is the
@@ -47,8 +76,8 @@ persistence, accessibility, and keyboard findings. These qualify the historical
 completion claims below; none was fixed by the repository rename. The existing
 130-test binary passed, current core warnings-as-errors typechecking passed,
 and local text-baseline validation passed with live reference comparison
-unavailable. At the rename checkpoint, full preflight and new target-desktop
-evidence were pending; the latest isolated full preflight result is above.
+unavailable at the rename checkpoint. The later isolated Xvfb/Weston full
+preflight passes; live Omarchy target-desktop evidence remains pending.
 Historical references to a private origin describe uploads before publication.
 
 Consolidation update: 2026-09-22. Runtime evidence below was recorded during

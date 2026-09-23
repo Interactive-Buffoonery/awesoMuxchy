@@ -22,6 +22,10 @@ struct amx_ghostty_surface {
   size_t environment_count;
   size_t pending_clipboard_reads;
   char *pending_clipboard_write;
+  char *pending_paste_mime;
+  char *pending_paste_data;
+  size_t pending_paste_length;
+  void *pending_paste_request;
   ghostty_clipboard_e pending_clipboard_destination;
   uint64_t pending_permission_id;
   bool destroying;
@@ -38,11 +42,27 @@ static uint64_t next_permission_id = 1;
 /* Bound synchronous validation, copying, and counting on the GTK callback. */
 #define MAX_PENDING_CLIPBOARD_WRITE_BYTES (1024 * 1024)
 
+static bool bounded_c_string(const char *value, size_t limit) {
+  if (value == NULL) return false;
+  for (size_t i = 0; i <= limit; i++) {
+    if (value[i] == '\0') return true;
+  }
+  return false;
+}
+
 static void cancel_pending_permission(amx_ghostty_surface *surface) {
   if (surface->pending_permission_id == 0) return;
   const uint64_t id = surface->pending_permission_id;
   surface->pending_permission_id = 0;
   g_clear_pointer(&surface->pending_clipboard_write, g_free);
+  g_clear_pointer(&surface->pending_paste_mime, g_free);
+  g_clear_pointer(&surface->pending_paste_data, g_free);
+  void *request = surface->pending_paste_request;
+  surface->pending_paste_request = NULL;
+  surface->pending_paste_length = 0;
+  if (request != NULL && surface->core != NULL && !surface->destroying) {
+    ghostty_surface_deny_clipboard_request(surface->core, request);
+  }
   if (surface->callbacks.permission_cancelled != NULL) {
     surface->callbacks.permission_cancelled(surface->callbacks.userdata, id);
   }
@@ -53,10 +73,33 @@ bool amx_ghostty_surface_resolve_permission(amx_ghostty_surface *surface,
   if (surface == NULL || surface->destroying || request_id == 0 ||
       request_id != surface->pending_permission_id) return false;
   char *text = surface->pending_clipboard_write;
+  char *paste_mime = surface->pending_paste_mime;
+  char *paste_data = surface->pending_paste_data;
+  const size_t paste_length = surface->pending_paste_length;
+  void *paste_request = surface->pending_paste_request;
   const ghostty_clipboard_e clipboard = surface->pending_clipboard_destination;
   surface->pending_clipboard_write = NULL;
+  surface->pending_paste_mime = NULL;
+  surface->pending_paste_data = NULL;
+  surface->pending_paste_request = NULL;
+  surface->pending_paste_length = 0;
   surface->pending_permission_id = 0;
   bool completed = !allow;
+  if (paste_request != NULL && surface->core != NULL) {
+    if (allow) {
+      const ghostty_clipboard_content_s content = {
+          .mime = paste_mime, .data = paste_data, .len = paste_length};
+      const ghostty_clipboard_complete_s completion = {
+          .contents = paste_mime != NULL ? &content : NULL,
+          .contents_len = paste_mime != NULL ? 1 : 0,
+          .confirmed = true};
+      ghostty_surface_complete_clipboard_request(
+          surface->core, &completion, paste_request);
+    } else {
+      ghostty_surface_deny_clipboard_request(surface->core, paste_request);
+    }
+    completed = true;
+  }
   if (allow && text != NULL && surface->area != NULL) {
     GdkDisplay *display = gtk_widget_get_display(surface->area);
     if (display != NULL) {
@@ -69,6 +112,8 @@ bool amx_ghostty_surface_resolve_permission(amx_ghostty_surface *surface,
     }
   }
   g_free(text);
+  g_free(paste_mime);
+  g_free(paste_data);
   return completed;
 }
 
@@ -235,20 +280,47 @@ static void confirm_read_clipboard(
   amx_ghostty_surface *surface = userdata;
   if (surface == NULL || surface->destroying || surface->core == NULL) return;
 
-  if (request_type != GHOSTTY_CLIPBOARD_REQUEST_PASTE &&
-      request_type != GHOSTTY_CLIPBOARD_REQUEST_LIST) {
+  /* The borrowed confirmation data expires when this callback returns. */
+  cancel_pending_permission(surface);
+  /* LIST is a MIME-listing paste event, not an unsafe text paste. Ghostty
+   * normally bypasses this callback for it; deny if one arrives here. */
+  if (request_type != GHOSTTY_CLIPBOARD_REQUEST_PASTE ||
+      confirmation == NULL || confirmation->contents_len != 1 ||
+      confirmation->available_len != 0 ||
+      confirmation->contents == NULL ||
+      surface->callbacks.permission_requested == NULL) {
     ghostty_surface_deny_clipboard_request(surface->core, request);
     return;
   }
+  size_t bytes = 0;
+  const ghostty_clipboard_content_s *content = &confirmation->contents[0];
+  if (!bounded_c_string(content->mime, 256) ||
+      content->data == NULL ||
+      content->len > MAX_PENDING_CLIPBOARD_WRITE_BYTES) goto deny;
+  surface->pending_paste_mime = g_strdup(content->mime);
+  surface->pending_paste_data = g_try_malloc(content->len + 1);
+  if (surface->pending_paste_mime == NULL ||
+      surface->pending_paste_data == NULL) goto deny;
+  memcpy(surface->pending_paste_data, content->data, content->len);
+  surface->pending_paste_data[content->len] = 0;
+  surface->pending_paste_length = content->len;
+  bytes = content->len;
+  surface->pending_paste_request = request;
+  surface->pending_permission_id = next_permission_id++;
+  if (next_permission_id == 0) next_permission_id = 1;
+  surface->callbacks.permission_requested(
+      surface->callbacks.userdata, surface->pending_permission_id,
+      AMX_GHOSTTY_PERMISSION_UNSAFE_PASTE,
+      surface->pending_paste_data != NULL &&
+          g_utf8_validate(surface->pending_paste_data, bytes, NULL)
+          ? g_utf8_strlen(surface->pending_paste_data, bytes) : 0,
+      bytes);
+  return;
 
-  const ghostty_clipboard_complete_s completion = {
-      .contents = confirmation->contents,
-      .contents_len = confirmation->contents_len,
-      .available = confirmation->available,
-      .available_len = confirmation->available_len,
-      .confirmed = true,
-  };
-  ghostty_surface_complete_clipboard_request(surface->core, &completion, request);
+deny:
+  g_clear_pointer(&surface->pending_paste_mime, g_free);
+  g_clear_pointer(&surface->pending_paste_data, g_free);
+  ghostty_surface_deny_clipboard_request(surface->core, request);
 }
 
 static void write_clipboard(void *userdata,
