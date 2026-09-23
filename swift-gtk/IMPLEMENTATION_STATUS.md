@@ -1,5 +1,22 @@
 # SwiftGtk4 implementation status
 
+2026-09-23 INT-1113 (stacked on INT-1115): The app now presents a cancel-default
+unsafe-paste confirmation sheet for Ghostty PASTE requests. Unexpected LIST
+confirmation callbacks are denied without a sheet. The shared
+permission resolver releases copied data (up to 1 MiB) only on explicit approval;
+replacement, stale IDs, unrealize, and teardown cancel it. The isolated
+Broadway callback test passed without touching the live clipboard. Real
+Ghostty unsafe/bracketed paste fixtures and Omarchy sheet input/visual QA are
+pending.
+The C shim and isolated Broadway permission test pass, and the Swift test
+suite passed 130 tests; the release build passed. Signed private Xvfb `:1`
+preflight passed the single-window, dynamic-command, persistence, terminal,
+clipboard, and 100-cycle lifecycle gates. It stopped at native Wayland because
+an invalid display name was supplied to protect the live clipboard. Four
+focused dynamic-command reruns passed after one earlier unexplained libdispatch
+SIGSEGV during that gate; the crash is not claimed fixed. Real Omarchy
+unsafe-paste sheet interaction remains pending.
+
 2026-09-23 INT-1115: OSC52 writes marked `confirm` now require an explicit
 app-owned approval through `TerminalSurface.resolvePermission`. A bounded
 pending value stays inside the shim; the Swift callback sees request identity
