@@ -34,5 +34,7 @@ env "${common_environment[@]}" \
   "$release_bin/awesomux-terminal-integration"
 env "${common_environment[@]}" \
   "$release_bin/awesomux-lifecycle-stress"
+env "${common_environment[@]}" \
+  "$repo_root/script/test-clipboard-permission.sh"
 
-echo "native Wayland test: passed terminal integration and lifecycle stress"
+echo "native Wayland test: passed terminal integration, lifecycle stress, and clipboard permission"

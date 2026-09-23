@@ -21,6 +21,9 @@ struct amx_ghostty_surface {
   ghostty_env_var_s *environment;
   size_t environment_count;
   size_t pending_clipboard_reads;
+  char *pending_clipboard_write;
+  ghostty_clipboard_e pending_clipboard_destination;
+  uint64_t pending_permission_id;
   bool destroying;
 };
 
@@ -31,6 +34,43 @@ typedef struct {
 } clipboard_read;
 
 static bool ghostty_initialized = false;
+static uint64_t next_permission_id = 1;
+/* Bound synchronous validation, copying, and counting on the GTK callback. */
+#define MAX_PENDING_CLIPBOARD_WRITE_BYTES (1024 * 1024)
+
+static void cancel_pending_permission(amx_ghostty_surface *surface) {
+  if (surface->pending_permission_id == 0) return;
+  const uint64_t id = surface->pending_permission_id;
+  surface->pending_permission_id = 0;
+  g_clear_pointer(&surface->pending_clipboard_write, g_free);
+  if (surface->callbacks.permission_cancelled != NULL) {
+    surface->callbacks.permission_cancelled(surface->callbacks.userdata, id);
+  }
+}
+
+bool amx_ghostty_surface_resolve_permission(amx_ghostty_surface *surface,
+                                            uint64_t request_id, bool allow) {
+  if (surface == NULL || surface->destroying || request_id == 0 ||
+      request_id != surface->pending_permission_id) return false;
+  char *text = surface->pending_clipboard_write;
+  const ghostty_clipboard_e clipboard = surface->pending_clipboard_destination;
+  surface->pending_clipboard_write = NULL;
+  surface->pending_permission_id = 0;
+  bool completed = !allow;
+  if (allow && text != NULL && surface->area != NULL) {
+    GdkDisplay *display = gtk_widget_get_display(surface->area);
+    if (display != NULL) {
+      GdkClipboard *destination = clipboard == GHOSTTY_CLIPBOARD_SELECTION ||
+          clipboard == GHOSTTY_CLIPBOARD_PRIMARY
+          ? gdk_display_get_primary_clipboard(display)
+          : gdk_display_get_clipboard(display);
+      gdk_clipboard_set_text(destination, text);
+      completed = true;
+    }
+  }
+  g_free(text);
+  return completed;
+}
 
 static void finalize_surface(amx_ghostty_surface *surface);
 static void clipboard_read_text_finished(GObject *source,
@@ -216,9 +256,27 @@ static void write_clipboard(void *userdata,
                             const ghostty_clipboard_content_s *contents,
                             size_t contents_len,
                             bool confirm) {
-  (void)confirm;
   amx_ghostty_surface *surface = userdata;
-  if (surface == NULL || contents_len == 0) return;
+  if (surface == NULL || surface->destroying || contents == NULL ||
+      contents_len == 0 || contents[0].data == NULL) return;
+
+  /* A new request supersedes an unanswered one. Keep pending data bounded. */
+  cancel_pending_permission(surface);
+  if (confirm) {
+    if (surface->callbacks.permission_requested == NULL ||
+        contents[0].len > MAX_PENDING_CLIPBOARD_WRITE_BYTES ||
+        !g_utf8_validate(contents[0].data, contents[0].len, NULL)) return;
+    surface->pending_clipboard_write = g_strndup(contents[0].data,
+                                                 contents[0].len);
+    surface->pending_clipboard_destination = clipboard;
+    surface->pending_permission_id = next_permission_id++;
+    if (next_permission_id == 0) next_permission_id = 1;
+    surface->callbacks.permission_requested(
+        surface->callbacks.userdata, surface->pending_permission_id,
+        AMX_GHOSTTY_PERMISSION_CLIPBOARD_WRITE,
+        g_utf8_strlen(surface->pending_clipboard_write, -1), contents[0].len);
+    return;
+  }
 
   GdkDisplay *display = gtk_widget_get_display(surface->area);
   GdkClipboard *destination = clipboard == GHOSTTY_CLIPBOARD_SELECTION ||
@@ -301,6 +359,7 @@ static void on_realize(GtkGLArea *area, amx_ghostty_surface *surface) {
 }
 
 static void on_unrealize(GtkGLArea *area, amx_ghostty_surface *surface) {
+  cancel_pending_permission(surface);
   if (surface->core == NULL) return;
   gtk_gl_area_make_current(area);
   ghostty_surface_free(surface->core);
@@ -566,6 +625,7 @@ fail:
 void amx_ghostty_surface_destroy(amx_ghostty_surface *surface) {
   if (surface == NULL) return;
   surface->destroying = true;
+  cancel_pending_permission(surface);
   if (surface->core != NULL) {
     gtk_gl_area_make_current(GTK_GL_AREA(surface->area));
     ghostty_surface_free(surface->core);

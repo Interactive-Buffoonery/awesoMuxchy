@@ -331,6 +331,8 @@ private final class ApplicationState: @unchecked Sendable {
     private var globalModifierKeyController: EventControllerKey?
     private var activeSheetWindow: WindowRef?
     private var activeSheetKeyController: EventControllerKey?
+    private var activePermissionID: UInt64?
+    private var activePermissionCancellation: (() -> Void)?
     private var commandPaletteController: CommandPaletteController?
     private var isWorkspaceJumpModifierHeld = false
     private let sidebarDragNonce = UUID().uuidString
@@ -714,6 +716,18 @@ private final class ApplicationState: @unchecked Sendable {
                         directory, paneID: pane.id, workspaceID: workspaceID, generation: generation
                     )
                 }
+            },
+            onPermissionRequested: { [weak self] requestID, kind, characters, bytes in
+                self?.presentTerminalPermission(
+                    requestID: requestID, kind: kind, characters: characters, bytes: bytes,
+                    paneID: pane.id, generation: generation
+                )
+            },
+            onPermissionCancelled: { [weak self] requestID in
+                guard let self, self.activePermissionID == requestID else { return }
+                self.activePermissionCancellation = nil
+                self.activePermissionID = nil
+                self.dismissActiveSheet()
             }) else {
             surfaceGenerationByPane.removeValue(forKey: pane.id)
             if let endpoint { try? FileManager.default.removeItem(at: endpoint.fileURL) }
@@ -2509,6 +2523,10 @@ private final class ApplicationState: @unchecked Sendable {
     }
 
     private func dismissActiveSheet() {
+        let cancellation = activePermissionCancellation
+        activePermissionCancellation = nil
+        activePermissionID = nil
+        cancellation?()
         let presented = activeSheetWindow
         if let presented, let controller = activeSheetKeyController {
             gtk_widget_remove_controller(presented.widget_ptr, controller.event_controller_ptr)
@@ -2521,7 +2539,8 @@ private final class ApplicationState: @unchecked Sendable {
 
     private func installActiveSheetDismissal(
         on window: WindowRef,
-        destructiveAction: (() -> Void)? = nil
+        destructiveAction: (() -> Void)? = nil,
+        approvalUsesControl: Bool = false
     ) {
         let keys = EventControllerKey()
         keys.onKeyPressed { [weak self] _, keyval, _, modifiers in
@@ -2530,7 +2549,7 @@ private final class ApplicationState: @unchecked Sendable {
             }
             if let destructiveAction,
                (keyval == UInt(GDK_KEY_Return) || keyval == UInt(GDK_KEY_KP_Enter)),
-               modifiers.contains(.superMask)
+               modifiers.contains(approvalUsesControl ? .controlMask : .superMask)
             {
                 destructiveAction(); return true
             }
@@ -2540,6 +2559,10 @@ private final class ApplicationState: @unchecked Sendable {
         activeSheetKeyController = keys
         gtk_widget_add_controller(window.widget_ptr, keys.event_controller_ptr)
         window.onCloseRequest { [weak self] _ in
+            let cancellation = self?.activePermissionCancellation
+            self?.activePermissionCancellation = nil
+            self?.activePermissionID = nil
+            cancellation?()
             self?.activeSheetWindow = nil
             self?.activeSheetKeyController = nil
             self?.refreshCommandEnablement()
@@ -2552,6 +2575,8 @@ private final class ApplicationState: @unchecked Sendable {
         bodyText: String,
         keyboardHint: String,
         destructiveTitle: String,
+        onCancel: (() -> Void)? = nil,
+        approvalUsesControl: Bool = false,
         onConfirm: @escaping () -> Void
     ) {
         if let activeSheetWindow { activeSheetWindow.present(); return }
@@ -2583,17 +2608,49 @@ private final class ApplicationState: @unchecked Sendable {
         setAccessibleDescription(destructive, keyboardHint)
         let confirmAndDismiss = { [weak self] in
             guard let self else { return }
+            self.activePermissionCancellation = nil
+            self.activePermissionID = nil
             self.dismissActiveSheet()
             onConfirm()
         }
+        activePermissionCancellation = onCancel
         cancel.onClicked { [weak self] _ in self?.dismissActiveSheet() }
         destructive.onClicked { _ in confirmAndDismiss() }
         window.set(defaultWidget: cancel)
-        installActiveSheetDismissal(on: window, destructiveAction: confirmAndDismiss)
+        installActiveSheetDismissal(
+            on: window, destructiveAction: confirmAndDismiss,
+            approvalUsesControl: approvalUsesControl
+        )
         actions.append(child: cancel); actions.append(child: destructive)
         box.append(child: heading); box.append(child: body); box.append(child: hint)
         box.append(child: actions)
         window.set(child: box); refreshCommandEnablement(); window.present(); _ = cancel.grabFocus()
+    }
+
+    private func presentTerminalPermission(
+        requestID: UInt64, kind: TerminalPermissionKind, characters: Int, bytes: Int,
+        paneID: UUID, generation: Int
+    ) {
+        let resolve: (Bool) -> Void = { [weak self] allow in
+            guard let self, self.surfaceGenerationByPane[paneID] == generation,
+                  let surface = self.surfacesByPane[paneID] else { return }
+            surface.resolvePermission(requestID, allow: allow)
+        }
+        guard kind == .clipboardWrite, activeSheetWindow == nil, window != nil,
+              surfaceGenerationByPane[paneID] == generation else {
+            resolve(false)
+            return
+        }
+        activePermissionID = requestID
+        presentDestructiveConfirmation(
+            title: "Update clipboard from terminal escape sequence?",
+            bodyText: "Terminal output wants to replace the system clipboard with \(characters) characters (\(bytes) bytes).",
+            keyboardHint: "Press Ctrl+Return to update clipboard. Return or Esc cancels.",
+            destructiveTitle: "Update Clipboard",
+            onCancel: { resolve(false) },
+            approvalUsesControl: true,
+            onConfirm: { resolve(true) }
+        )
     }
 
     func presentWorkspaceNameDialog(_ workspaceID: UUID) {

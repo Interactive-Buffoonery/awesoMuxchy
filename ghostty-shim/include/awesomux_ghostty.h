@@ -27,6 +27,17 @@ typedef void (*amx_ghostty_title_cb)(void *userdata, const char *title);
 typedef void (*amx_ghostty_cwd_cb)(void *userdata, const char *working_directory);
 typedef void (*amx_ghostty_close_cb)(void *userdata, bool process_alive);
 typedef void (*amx_ghostty_focus_cb)(void *userdata, bool focused);
+typedef enum {
+  AMX_GHOSTTY_PERMISSION_CLIPBOARD_WRITE = 1,
+  AMX_GHOSTTY_PERMISSION_UNSAFE_PASTE = 2,
+} amx_ghostty_permission_kind;
+/* The host must resolve the request ID explicitly. Payload bytes never cross this callback. */
+typedef void (*amx_ghostty_permission_cb)(void *userdata, uint64_t request_id,
+                                           amx_ghostty_permission_kind kind,
+                                           size_t character_count,
+                                           size_t byte_count);
+typedef void (*amx_ghostty_permission_cancel_cb)(void *userdata,
+                                                  uint64_t request_id);
 
 typedef struct {
   void *userdata;
@@ -34,6 +45,8 @@ typedef struct {
   amx_ghostty_cwd_cb working_directory_changed;
   amx_ghostty_close_cb close_requested;
   amx_ghostty_focus_cb focus_changed;
+  amx_ghostty_permission_cb permission_requested;
+  amx_ghostty_permission_cancel_cb permission_cancelled;
 } amx_ghostty_callbacks;
 
 /* Must be called before GTK initialization so GTK selects desktop OpenGL. */
@@ -55,6 +68,9 @@ AMX_GHOSTTY_API amx_ghostty_surface *amx_ghostty_surface_create_with_environment
     size_t environment_count,
     amx_ghostty_callbacks callbacks);
 AMX_GHOSTTY_API void amx_ghostty_surface_destroy(amx_ghostty_surface *surface);
+/* Returns false for stale, cancelled, or destroyed requests. GTK main thread only. */
+AMX_GHOSTTY_API bool amx_ghostty_surface_resolve_permission(
+    amx_ghostty_surface *surface, uint64_t request_id, bool allow);
 
 /* Returns the GtkWidget pointer as an opaque language-neutral handle. */
 AMX_GHOSTTY_API void *amx_ghostty_surface_widget(amx_ghostty_surface *surface);

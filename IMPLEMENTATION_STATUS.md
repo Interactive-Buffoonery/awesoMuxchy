@@ -1,5 +1,34 @@
 # Implementation status
 
+2026-09-23 INT-1115: The Ghostty shim now retains confirmation-required OSC52
+clipboard writes behind an explicit opaque request ID. The GTK app presents an
+awesoMux-owned cancel-default approval sheet. Confirmation-required writes
+larger than 1 MiB are denied to bound synchronous GTK callback work; requests
+within that limit are cancelled on rejection, replacement, unrealize, or pane
+teardown. The limit bounds the pending copy to 1 MiB and the validation,
+copying, and character-count passes to at most 1 MiB each. The request callback
+exposes only counts, never clipboard bytes. A synthetic GTK test passed inside
+an isolated Broadway display on the Omarchy host for ask, approval, denial,
+replacement, and teardown; live Omarchy/Hyprland sheet interaction and visual
+acceptance are pending. The permission callback and resolver are shared ABI
+seams for unsafe-paste work.
+Local `cc -fsyntax-only -Wall -Wextra -Werror`, shim link, isolated Broadway
+permission test, text-baseline check, `git diff --check`, and release Swift
+build passed. Full `./script/preflight.sh` passed with signed, user-staged
+private Xvfb `:1`, headless Weston `wayland-awesomux-qa`, private D-Bus, and
+isolated Ghostty configuration. Swift tests, release build,
+single-window activation, dynamic command enablement, forced-termination
+persistence, X11 terminal clipboard integration, and 100-cycle lifecycle stress
+passed. Native Wayland terminal integration and lifecycle stress passed inside
+the private Weston compositor; its synthetic clipboard permission test also
+passed ask, approval, denial, replacement, and teardown. Live Omarchy/Hyprland
+confirmation interaction, visual comparison, and daily-use acceptance remain
+pending. Earlier missing-`:1` and invalid-Wayland-display blockers are
+superseded by this isolated full preflight pass.
+The focused C build and isolated test also passed with both the 1 MiB accepted
+boundary and the first rejected byte covered. No implementation commit or push
+was made.
+
 2026-09-23 acceptance update: SwiftGtk4 is the sole application implementation;
 the unused fallback scaffolding has been removed. Omarchy/Hyprland is the
 required Linux baseline. Acceptance remains pending until real Omarchy desktop
@@ -18,7 +47,8 @@ persistence, accessibility, and keyboard findings. These qualify the historical
 completion claims below; none was fixed by the repository rename. The existing
 130-test binary passed, current core warnings-as-errors typechecking passed,
 and local text-baseline validation passed with live reference comparison
-unavailable. Full preflight and new target-desktop evidence remain pending.
+unavailable. At the rename checkpoint, full preflight and new target-desktop
+evidence were pending; the latest isolated full preflight result is above.
 Historical references to a private origin describe uploads before publication.
 
 Consolidation update: 2026-09-22. Runtime evidence below was recorded during
@@ -47,8 +77,9 @@ The debug application builds and runs on pinguchy under native Wayland. Its
 development application ID exposes the workspace action, and creating a
 workspace renders a live Ghostty shell; an app-only capture was inspected.
 This is local startup evidence, not target-machine parity. All 130 Swift
-package tests pass on this host. Full preflight and target-machine desktop QA
-remain pending. See
+package tests pass on this host. At this setup checkpoint, full preflight and
+target-machine desktop QA were pending; the latest isolated full preflight
+result is above. See
 [`docs/development.md`](docs/development.md) for the development wrapper and
 reproduction details.
 
