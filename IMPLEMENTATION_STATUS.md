@@ -1,5 +1,37 @@
 # Implementation status
 
+## INT-1114 command-palette focus — 2026-09-23
+
+The palette keeps keyboard focus in search: result buttons are removed from
+the Tab sequence, Tab and Shift-Tab return to search, and Return uses the
+highlighted result. Pointer activation still invokes the clicked row. Arrow
+and filtered selections are announced through GTK accessibility. Dismissal
+now defers GTK controller removal and popover unparenting until after capture
+event dispatch, releases the owner synchronously for rapid reopen, and restores
+the previously focused widget after Escape. The capture controller retains its
+own native reference while GTK owns the attached reference; this fixed a
+rapid-reopen lifecycle crash seen during the native run.
+
+`./script/dev.sh --build-only` passed after a cold pinned SwiftGtk build.
+`./script/dev.sh --test --filter CommandPalette` passed all seven selected
+Swift Testing cases.
+`script/test-command-palette-focus.py` passed on the live Omarchy/Hyprland
+Wayland session with a fresh isolated profile. It checked result focusability,
+Tab and Shift-Tab, arrows, Return routing across two workspaces, row Click,
+actions-only filtering, empty Return, Escape, immediate sequential reopen,
+and process survival. AT-SPI confirmed the search's actual FOCUSED state,
+selected rows, and return to the exact widget focused before Escape. The same
+flow passed three consecutive native runs, two with `G_DEBUG=fatal-criticals`.
+Audible screen-reader announcements remain to be checked.
+Full `./script/preflight.sh` passed with exit 0 using private Xvfb `:1` and
+headless Weston `wayland-awesomux-qa`, with isolated D-Bus, configuration, and
+clipboard. Swift tests/release, single-window activation, dynamic command
+enablement, forced-termination persistence, X11 terminal integration, native
+Wayland terminal integration, and 100 two-surface lifecycle cycles passed.
+The separate palette regression above ran on the real Omarchy/Hyprland
+session. Live Omarchy daily-use/visual acceptance and audible Orca output
+remain pending.
+
 2026-09-23 acceptance update: SwiftGtk4 is the sole application implementation;
 the unused fallback scaffolding has been removed. Omarchy/Hyprland is the
 required Linux baseline. Acceptance remains pending until real Omarchy desktop
