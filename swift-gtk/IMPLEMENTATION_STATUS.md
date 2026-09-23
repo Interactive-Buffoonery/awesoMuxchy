@@ -1,6 +1,51 @@
 # SwiftGtk4 implementation status
 
-Updated: 2026-08-29
+2026-09-23 acceptance update: SwiftGtk4 is the sole application implementation;
+the unused fallback scaffolding has been removed. Omarchy/Hyprland is the
+required Linux baseline. Acceptance remains pending until real Omarchy desktop
+and daily-use checks pass; historical runs on other desktops and build-only
+checks do not satisfy this gate. This cleanup changes no runtime behavior.
+
+## awesoMuxchy planning — 2026-09-23
+
+This remains the shared active implementation for the planned Omarchy edition.
+The public repository is now `Interactive-Buffoonery/awesoMuxchy`; the local
+folder and executable names are unchanged. See
+[ADR 0005](../docs/adr/0005-awesomuxchy-omarchy-edition.md) and the
+[Linear project](https://linear.app/interactive-buffoonery/project/awesomuxchy-190ce1959bdf).
+The review's open runtime, clipboard, recovery, accessibility, and keyboard
+findings qualify historical completion claims below. No implementation fixes
+or new desktop verification accompany the rename. The existing 130-test binary,
+fresh core typecheck, and local text-baseline check passed; live reference
+comparison and full preflight remain pending. Private-origin statements below
+describe historical uploads.
+
+Consolidation update: 2026-09-22. Runtime evidence below is historical and was
+not rerun during cleanup.
+
+## Consolidation checkpoint
+
+This is the active Linux application. Read the
+[consolidation record](../docs/linux-consolidation.md) and
+[Electron behavior handoff](../docs/electron-behavior-handoff.md) before further
+implementation. Electron's full fetched Git history is preserved offline; no
+Electron dependency or runtime code was added to SwiftGtk4.
+
+Next: reconcile i5GamingPC's local-only implementation, verify terminal close
+and sustained-save behavior, then add persistent `amx` sessions and real agents.
+No new Swift, GTK, or desktop verification is claimed by this cleanup.
+
+## Local development check — 2026-09-22
+
+On pinguchy, pinned Swift 6.3.3 builds the debug app against GTK 4.22.4 after
+repository-local compatibility setup and a narrow SwiftPango constant patch.
+Ghostty and the shim build with the Arch host-helper linker workaround.
+The development application opens on native Wayland, exports its workspace
+action, and creates a real terminal workspace; its window capture was inspected.
+This does not replace i5GamingPC desktop, visual-parity, or daily-use evidence.
+All 130 Swift package tests pass on this host. See
+[development instructions](../docs/development.md). Full preflight remains
+pending.
 
 ## Current phase
 

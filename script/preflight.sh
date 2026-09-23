@@ -2,6 +2,10 @@
 set -euo pipefail
 
 repo_root=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
+compat_lib="$repo_root/.build/toolchains/compat/usr/lib/x86_64-linux-gnu"
+if [[ -d "$compat_lib" ]]; then
+  export LD_LIBRARY_PATH="$compat_lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+fi
 swift_bin="$repo_root/.build/toolchains/swift/usr/bin/swift"
 swiftc_bin="$repo_root/.build/toolchains/swift/usr/bin/swiftc"
 zig_bin="$repo_root/.build/toolchains/zig/zig"
@@ -19,6 +23,7 @@ fail() {
 "$swift_bin" --version | grep -q 'Swift version 6.3.3' || fail "Swift pin mismatch"
 pkg-config --exists gtk4 || fail "gtk4 development metadata is missing"
 "$repo_root/script/stage-atk-dev.sh"
+"$repo_root/script/stage-girs.sh"
 
 [[ "$(git -C "$repo_root/vendor/ghostty" rev-parse HEAD)" == "$ghostty_commit" ]] ||
   fail "Ghostty submodule pin mismatch"
@@ -47,7 +52,7 @@ export PATH="$repo_root/.build/toolchains/swift/usr/bin:$repo_root/.build/toolch
 export PKG_CONFIG_PATH="$repo_root/.build/ghostty-shim:$repo_root/.build/sysroot/root/usr/lib/x86_64-linux-gnu/pkgconfig${PKG_CONFIG_PATH:+:$PKG_CONFIG_PATH}"
 export LIBRARY_PATH="$repo_root/.build/link-lib${LIBRARY_PATH:+:$LIBRARY_PATH}"
 export LD_LIBRARY_PATH="$repo_root/.build/link-lib:$repo_root/.build/ghostty-shim/lib:$repo_root/.build/ghostty-prefix/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
-export GIR2SWIFT_GIR_PATH="$repo_root/.build/sysroot/root/usr/share/gir-1.0"
+export GIR2SWIFT_GIR_PATH="$repo_root/.build/sysroot/root/usr/share/gir-1.0:/usr/share/gir-1.0"
 export C_INCLUDE_PATH="$repo_root/.build/sysroot/root/usr/include/atk-1.0${C_INCLUDE_PATH:+:$C_INCLUDE_PATH}"
 "$repo_root/script/patch-swift-dependencies.sh"
 swift test --package-path "$repo_root/swift-gtk"

@@ -2,6 +2,14 @@
 
 Recorded: 2026-08-28 (America/New_York)
 
+Consolidation note, 2026-09-22: the macOS commit below remains the executable
+text/parity baseline. Later screenshot references (`2fd33a0`, `160c2b1`) do not
+silently change that pin. Historical machine paths below record the original
+inspection; current tooling defaults to a sibling `awesomux-macos-reference`
+checkout or `AWESOMUX_MACOS_REFERENCE`. See
+[`docs/linux-consolidation.md`](docs/linux-consolidation.md) for missing local
+implementation evidence and the reconciliation sequence.
+
 ## macOS product reference
 
 - Repository: `https://github.com/Interactive-Buffoonery/awesomux.git`
@@ -31,8 +39,12 @@ inventories, localization catalogs, fonts, icons, templates, and licenses.
 `.agents/AGENTS.md` was not present. No GitHub issues were needed to settle the
 initial inventory.
 
-## Secondary Linux prototype
+## Historical Electron reference
 
-- Path: `/home/sarah/Development/awesomux-linux-prototype`
-- Commit observed: `fc4322b`
-- Role: secondary read-only behavior and visual evidence only
+- Originally inspected: `fc4322b` in the i5GamingPC prototype checkout.
+- Final fetched source preserved during consolidation:
+  `ee95c6a74910ff8a8b1d01493e8a4c192e3199c1`.
+- Archive: [`reference/legacy-electron/README.md`](reference/legacy-electron/README.md).
+- Extracted behavior: [`docs/electron-behavior-handoff.md`](docs/electron-behavior-handoff.md).
+- Role: historical Linux behavior and visual evidence; not an active production
+  direction or required neighboring checkout. Its old prompts are superseded.

@@ -1,0 +1,216 @@
+{
+  "captured_date": "2026-09-22",
+  "scope": "GitHub metadata only; workflow logs, credentials and repository administration settings are not exported.",
+  "artifacts": {
+    "artifacts": [],
+    "total_count": 0
+  },
+  "issues_and_prs": [],
+  "releases": [],
+  "repository": {
+    "archived": false,
+    "created_at": "2026-08-28T01:46:31Z",
+    "default_branch": "main",
+    "description": "Independent awesoMux implementation for Linux",
+    "full_name": "Interactive-Buffoonery/awesomux-linux-prototype",
+    "has_discussions": false,
+    "has_wiki": false,
+    "license": "MIT",
+    "private": true,
+    "pushed_at": "2026-08-28T18:11:11Z"
+  },
+  "workflow_runs": {
+    "total_count": 21,
+    "workflow_runs": [
+      {
+        "conclusion": "failure",
+        "created_at": "2026-08-28T16:12:51Z",
+        "head_sha": "fc4322b7e5f0c39470c78cb722791571cc2655c5",
+        "html_url": "https://github.com/Interactive-Buffoonery/awesomux-linux-prototype/actions/runs/33188887190",
+        "id": 33188887190,
+        "name": "Linux CI",
+        "status": "completed"
+      },
+      {
+        "conclusion": "failure",
+        "created_at": "2026-08-28T16:02:40Z",
+        "head_sha": "3430e8d160b8515439e1b34a3f5f56b26af1e23e",
+        "html_url": "https://github.com/Interactive-Buffoonery/awesomux-linux-prototype/actions/runs/33188071596",
+        "id": 33188071596,
+        "name": "Linux CI",
+        "status": "completed"
+      },
+      {
+        "conclusion": "failure",
+        "created_at": "2026-08-28T15:55:05Z",
+        "head_sha": "4c54fef5e222775d38653502f53ae45c18841032",
+        "html_url": "https://github.com/Interactive-Buffoonery/awesomux-linux-prototype/actions/runs/33187459240",
+        "id": 33187459240,
+        "name": "Linux CI",
+        "status": "completed"
+      },
+      {
+        "conclusion": "failure",
+        "created_at": "2026-08-28T15:48:50Z",
+        "head_sha": "5282c7ce6215c4b49217bd6e9101a6a1b8368afd",
+        "html_url": "https://github.com/Interactive-Buffoonery/awesomux-linux-prototype/actions/runs/33186964757",
+        "id": 33186964757,
+        "name": "Linux CI",
+        "status": "completed"
+      },
+      {
+        "conclusion": "failure",
+        "created_at": "2026-08-28T15:46:18Z",
+        "head_sha": "d9e7d9c89fe331bf9e69c93843015969150218d8",
+        "html_url": "https://github.com/Interactive-Buffoonery/awesomux-linux-prototype/actions/runs/33186767465",
+        "id": 33186767465,
+        "name": "Linux CI",
+        "status": "completed"
+      },
+      {
+        "conclusion": "failure",
+        "created_at": "2026-08-28T15:41:55Z",
+        "head_sha": "71755123f90a08226284a6c596db2859e531ca31",
+        "html_url": "https://github.com/Interactive-Buffoonery/awesomux-linux-prototype/actions/runs/33186413543",
+        "id": 33186413543,
+        "name": "Linux CI",
+        "status": "completed"
+      },
+      {
+        "conclusion": "failure",
+        "created_at": "2026-08-28T15:30:27Z",
+        "head_sha": "51afe3fcbd482c3d7f97904b31642b0a77108cd9",
+        "html_url": "https://github.com/Interactive-Buffoonery/awesomux-linux-prototype/actions/runs/33185465295",
+        "id": 33185465295,
+        "name": "Linux CI",
+        "status": "completed"
+      },
+      {
+        "conclusion": "failure",
+        "created_at": "2026-08-28T15:26:35Z",
+        "head_sha": "3581c2a9b42fc11904d437705311bd8808084e88",
+        "html_url": "https://github.com/Interactive-Buffoonery/awesomux-linux-prototype/actions/runs/33185154848",
+        "id": 33185154848,
+        "name": "Linux CI",
+        "status": "completed"
+      },
+      {
+        "conclusion": "failure",
+        "created_at": "2026-08-28T15:11:12Z",
+        "head_sha": "05a733cb43814659449b818fd13b8263cdfac31e",
+        "html_url": "https://github.com/Interactive-Buffoonery/awesomux-linux-prototype/actions/runs/33183902694",
+        "id": 33183902694,
+        "name": "Linux CI",
+        "status": "completed"
+      },
+      {
+        "conclusion": "failure",
+        "created_at": "2026-08-28T15:06:20Z",
+        "head_sha": "2e7eec30e1de3ce3262c79c65d5b179985a8ace5",
+        "html_url": "https://github.com/Interactive-Buffoonery/awesomux-linux-prototype/actions/runs/33183498200",
+        "id": 33183498200,
+        "name": "Linux CI",
+        "status": "completed"
+      },
+      {
+        "conclusion": "failure",
+        "created_at": "2026-08-28T15:03:04Z",
+        "head_sha": "18df98bda19a829fcaf35767a3c2dab5d6478193",
+        "html_url": "https://github.com/Interactive-Buffoonery/awesomux-linux-prototype/actions/runs/33183219097",
+        "id": 33183219097,
+        "name": "Linux CI",
+        "status": "completed"
+      },
+      {
+        "conclusion": "failure",
+        "created_at": "2026-08-28T14:56:01Z",
+        "head_sha": "f79566acd31babf8bf5994af4fa1ffc7306faf17",
+        "html_url": "https://github.com/Interactive-Buffoonery/awesomux-linux-prototype/actions/runs/33182636758",
+        "id": 33182636758,
+        "name": "Linux CI",
+        "status": "completed"
+      },
+      {
+        "conclusion": "failure",
+        "created_at": "2026-08-28T14:43:19Z",
+        "head_sha": "3e1cf06a9f2ebad981f1bd27542b15b803804d22",
+        "html_url": "https://github.com/Interactive-Buffoonery/awesomux-linux-prototype/actions/runs/33181585216",
+        "id": 33181585216,
+        "name": "Linux CI",
+        "status": "completed"
+      },
+      {
+        "conclusion": "failure",
+        "created_at": "2026-08-28T14:40:54Z",
+        "head_sha": "59d648aac07bb557e558f2363155e7f766600df0",
+        "html_url": "https://github.com/Interactive-Buffoonery/awesomux-linux-prototype/actions/runs/33181385960",
+        "id": 33181385960,
+        "name": "Linux CI",
+        "status": "completed"
+      },
+      {
+        "conclusion": "failure",
+        "created_at": "2026-08-28T14:36:18Z",
+        "head_sha": "9e8b5229d31faaca5c1eee1d63d969cc67a36afb",
+        "html_url": "https://github.com/Interactive-Buffoonery/awesomux-linux-prototype/actions/runs/33181003172",
+        "id": 33181003172,
+        "name": "Linux CI",
+        "status": "completed"
+      },
+      {
+        "conclusion": "failure",
+        "created_at": "2026-08-28T14:19:09Z",
+        "head_sha": "dea23f9c10c7eb35d415d5662fc944aa25f2e436",
+        "html_url": "https://github.com/Interactive-Buffoonery/awesomux-linux-prototype/actions/runs/33179553435",
+        "id": 33179553435,
+        "name": "Linux CI",
+        "status": "completed"
+      },
+      {
+        "conclusion": "failure",
+        "created_at": "2026-08-28T14:10:47Z",
+        "head_sha": "995de75a0b3c3c34994ca9184ab3bfc107d39675",
+        "html_url": "https://github.com/Interactive-Buffoonery/awesomux-linux-prototype/actions/runs/33178870324",
+        "id": 33178870324,
+        "name": "Linux CI",
+        "status": "completed"
+      },
+      {
+        "conclusion": "failure",
+        "created_at": "2026-08-28T14:03:57Z",
+        "head_sha": "5ddbd0f629d4b6dc3782c08b297f8674842e3208",
+        "html_url": "https://github.com/Interactive-Buffoonery/awesomux-linux-prototype/actions/runs/33178316540",
+        "id": 33178316540,
+        "name": "Linux CI",
+        "status": "completed"
+      },
+      {
+        "conclusion": "failure",
+        "created_at": "2026-08-28T13:43:37Z",
+        "head_sha": "e222787c81dcfe90b70128bfb3db75347fa851bc",
+        "html_url": "https://github.com/Interactive-Buffoonery/awesomux-linux-prototype/actions/runs/33176718920",
+        "id": 33176718920,
+        "name": "Linux CI",
+        "status": "completed"
+      },
+      {
+        "conclusion": "failure",
+        "created_at": "2026-08-28T13:40:42Z",
+        "head_sha": "538f0ebbab6e4da462615c96009176103bc55f5c",
+        "html_url": "https://github.com/Interactive-Buffoonery/awesomux-linux-prototype/actions/runs/33176491515",
+        "id": 33176491515,
+        "name": "Linux CI",
+        "status": "completed"
+      },
+      {
+        "conclusion": "failure",
+        "created_at": "2026-08-28T13:39:03Z",
+        "head_sha": "a3d3c96e2b42724a37a777863ca68f752a03e5b0",
+        "html_url": "https://github.com/Interactive-Buffoonery/awesomux-linux-prototype/actions/runs/33176361271",
+        "id": 33176361271,
+        "name": "Linux CI",
+        "status": "completed"
+      }
+    ]
+  }
+}

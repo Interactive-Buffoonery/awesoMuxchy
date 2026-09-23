@@ -39,6 +39,14 @@ the host can distinguish startup state from trustworthy close-risk evidence.
 The third patch installs Ghostty's canonical terminfo and shell-integration
 resources beside the embedded library; local launch wrappers pass that staged
 resource location explicitly.
+The fourth patch adds an opt-in LLVM/LLD backend for the host build-data tool.
+The build wrapper enables it on Arch, where Zig 0.16's default linker rejects
+the system startup object's `.sframe` relocations. Ubuntu retains its existing
+linker selection. On pinguchy, the default isolated libc link probe failed with
+`R_X86_64_PC64` in `crt1.o`; `-flld` alone crashed, while `-fllvm -flld`
+linked and ran. The full staged Ghostty build and GTK shim link then passed
+with the fourth patch and `AWESOMUX_BUILD_JOBS=2`, leaving `vendor/ghostty`
+clean. This verifies the local build, not a GTK desktop run.
 
 No GPL, AGPL, or unlicensed source may be copied into this repository. System
 GTK libraries remain dynamically linked under their own distribution terms.
@@ -47,9 +55,10 @@ The exact Geist faces and OFL text live under
 the awesoMux process and does not modify the user's font installation.
 
 The approved `libgtk-4-dev` package is installed on i5GamingPC. SwiftGtk also
-requires the legacy `libatk1.0-dev` development files even though GTK4 no
-longer uses Atk directly. While the system-wide ATK install waits for Sarah,
-`script/stage-atk-dev.sh` downloads that exact package without installing it,
+requires legacy ATK development files even though GTK4 no longer uses Atk
+directly. `script/stage-atk-dev.sh` first uses installed ATK metadata, headers,
+and GIR files (the path used on pinguchy). On Ubuntu/Debian without those files,
+it downloads the approved `libatk1.0-dev` package without installing it,
 extracts only its public development artifacts beneath the ignored
 `.build/sysroot`, and links them to the already-installed ATK runtime. No root
 access or system mutation is involved.
@@ -57,6 +66,10 @@ access or system mutation is involved.
 The pinned gir2swift checkout receives two audited, idempotent build-copy
 patches from `patches/gir2swift/`. They add `GIR2SWIFT_GIR_PATH` to both the
 plugin and library lookup paths so the repo-local ATK GIR is discoverable.
+The pinned SwiftPango checkout also receives the build-copy patch in
+`patches/swiftpango/`: its existing verbatim-constant configuration emits the
+GIR value for `RENDER_COMPONENT_ALL`, whose composed C macro cannot be imported
+by Swift on Pango 1.58. No dependency revision changes are required.
 
 ## Upstream maintenance risk
 

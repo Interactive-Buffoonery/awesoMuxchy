@@ -6,7 +6,7 @@ SwiftGtk is suitable for continuing the awesoMux Linux implementation. The
 required lifecycle is understandable, raw pointers are contained in one small
 wrapper boundary, owned Swift code builds cleanly under Swift 6.3.3, and the
 real renderer remains stable under repeated multi-surface teardown. Continue
-through the root implementation order; do not activate the Rust track.
+through the root implementation order.
 
 ## Evidence
 

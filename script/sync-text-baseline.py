@@ -15,7 +15,7 @@ ROOT = Path(__file__).resolve().parents[1]
 REFERENCE = Path(
     os.environ.get(
         "AWESOMUX_MACOS_REFERENCE",
-        "/home/sarah/Development/awesomux-macos-reference",
+        str(ROOT.parent / "awesomux-macos-reference"),
     )
 )
 OUTPUT = Path(

@@ -20,3 +20,23 @@ for patch in "$repo_root"/patches/gir2swift/*.patch; do
     exit 1
   fi
 done
+
+# Pango 1.58 exposes RENDER_COMPONENT_ALL as a C macro that Swift cannot import.
+# Its GIR records the integer value; SwiftPango's verbatim list selects that
+# value for generated Swift without changing the generator for other constants.
+pango_checkout="$repo_root/swift-gtk/.build/checkouts/SwiftPango"
+[[ -d "$pango_checkout/.git" ]] || {
+  echo "Resolve SwiftPango before applying dependency patches." >&2
+  exit 1
+}
+for patch in "$repo_root"/patches/swiftpango/*.patch; do
+  if git -C "$pango_checkout" apply --reverse --check "$patch" 2>/dev/null; then
+    echo "SwiftPango patch already applied: $(basename "$patch")"
+  elif git -C "$pango_checkout" apply --check "$patch"; then
+    git -C "$pango_checkout" apply "$patch"
+    echo "SwiftPango patch applied: $(basename "$patch")"
+  else
+    echo "SwiftPango patch does not apply cleanly: $patch" >&2
+    exit 1
+  fi
+done

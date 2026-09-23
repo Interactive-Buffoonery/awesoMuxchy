@@ -1,6 +1,56 @@
 # Implementation status
 
-Updated: 2026-08-29
+2026-09-23 acceptance update: SwiftGtk4 is the sole application implementation;
+the unused fallback scaffolding has been removed. Omarchy/Hyprland is the
+required Linux baseline. Acceptance remains pending until real Omarchy desktop
+and daily-use checks pass; historical runs on other desktops and build-only
+checks do not satisfy this gate. This cleanup changes no runtime behavior.
+
+## awesoMuxchy planning and repository rename — 2026-09-23
+
+Sarah chose an Omarchy edition of the shared app and renamed the public origin
+to `Interactive-Buffoonery/awesoMuxchy`. The local checkout directory is
+unchanged. See [ADR 0005](docs/adr/0005-awesomuxchy-omarchy-edition.md) and the
+[Linear project](https://linear.app/interactive-buffoonery/project/awesomuxchy-190ce1959bdf).
+
+The full source review identified open terminal-survival, clipboard,
+persistence, accessibility, and keyboard findings. These qualify the historical
+completion claims below; none was fixed by the repository rename. The existing
+130-test binary passed, current core warnings-as-errors typechecking passed,
+and local text-baseline validation passed with live reference comparison
+unavailable. Full preflight and new target-desktop evidence remain pending.
+Historical references to a private origin describe uploads before publication.
+
+Consolidation update: 2026-09-22. Runtime evidence below was recorded during
+the August implementation work and has not been rerun for this cleanup.
+
+## Consolidation checkpoint
+
+Swift/GTK/Ghostty is the sole active Linux application. The Electron source,
+tests, licenses, screenshots, and reachable history are preserved in a verified
+offline bundle; twelve behavior/regression items are captured in
+[`docs/electron-behavior-handoff.md`](docs/electron-behavior-handoff.md).
+See [`docs/linux-consolidation.md`](docs/linux-consolidation.md) for revisions,
+archive verification, next work, and the unresolved i5 local changes.
+
+The September visual-QA branch contains no implementation changes. Its
+134-test/font-fix claims refer to unavailable local source, not this checkout.
+No runtime fixes or new parity claims are part of the consolidation.
+
+## Local development setup — 2026-09-22
+
+Verified repository-local Swift 6.3.3 and Zig 0.16.0 are now available on
+pinguchy, with repository-local Ubuntu runtime libraries for Swift and signed
+Arch GIR metadata. Core warnings-as-errors typechecking passes. Ghostty and
+the GTK shim build successfully with the scoped Arch host-linker workaround.
+The debug application builds and runs on pinguchy under native Wayland. Its
+development application ID exposes the workspace action, and creating a
+workspace renders a live Ghostty shell; an app-only capture was inspected.
+This is local startup evidence, not target-machine parity. All 130 Swift
+package tests pass on this host. Full preflight and target-machine desktop QA
+remain pending. See
+[`docs/development.md`](docs/development.md) for the development wrapper and
+reproduction details.
 
 ## Current phase
 

@@ -4,7 +4,7 @@ Continue the active SwiftGtk4 visual-parity work in:
 
 `/home/sarah/Development/awesomux-linux-gtk`
 
-The active implementation is `swift-gtk/`. Do not touch `rust-gtk/`.
+The sole application implementation is `swift-gtk/`.
 
 Before changing anything, read completely:
 

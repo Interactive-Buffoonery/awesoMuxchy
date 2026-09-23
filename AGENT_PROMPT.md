@@ -1,8 +1,16 @@
 # Build awesoMux for Linux with GTK and an awesoMux-owned Ghostty shim
 
-You are working on Sarah's i5GamingPC in:
+The current development workspace is `~/development/awesomux-linux-gtk` on
+pinguchy. Omarchy/Hyprland is the required desktop and visual QA target.
+If the app does not run well on Omarchy, it does not pass. Runs on other Linux
+desktops are supplementary and cannot substitute for Omarchy acceptance.
 
-`/home/sarah/Development/awesomux-linux-gtk`
+On 2026-09-23 Sarah renamed this repository to the public
+`Interactive-Buffoonery/awesoMuxchy` and chose an Omarchy edition of the shared
+app. See `docs/adr/0005-awesomuxchy-omarchy-edition.md`. Omarchy-specific
+presentation and integration may differ through shared edition configuration;
+the existing product behavior remains the baseline. The edition is planned,
+not implemented or desktop-verified. The local folder name is unchanged.
 
 Your mission is to build a production-quality Linux version of awesoMux that
 matches the current macOS awesoMux as closely as Linux allows. Use GTK4 for the
@@ -10,15 +18,17 @@ application and an awesoMux-owned Linux embedding shim around canonical
 Ghostty. This is a complete product port, not a visual mockup and not a small
 terminal demonstration.
 
-This repository deliberately contains two application tracks:
+The sole application implementation is `swift-gtk/`.
 
-- `swift-gtk/` is the active first implementation.
-- `rust-gtk/` is the prepared fallback implementation.
+The former Electron prototype is a historical reference, not an active Linux
+implementation or a required checkout. Its preserved evidence and behavior
+handoff are documented in `docs/electron-behavior-handoff.md` and
+`docs/linux-consolidation.md`. Follow
+`docs/adr/0004-consolidate-linux-development.md` for the current consolidation
+decision.
 
-Start with SwiftGtk4. Do not build both applications in parallel and do not
-silently switch to Rust. The shared product contract and Ghostty shim must stay
-language-neutral so verified work survives a later switch if SwiftGtk4 proves
-unsuitable.
+Use SwiftGtk4 with the shared product contract and a narrow, language-neutral
+Ghostty shim ABI.
 
 Continue through the full implementation plan. Do not stop after creating a
 window, rendering one terminal, or reproducing the broad layout. Keep an
@@ -49,8 +59,8 @@ workspaces does not lose work or route an action to the wrong pane.
 1. Make no changes of any kind to the macOS awesoMux repository. Treat it as a
    read-only product and behavior reference. Do not create branches, edit
    files, format files, commit, push, open issues, or open pull requests there.
-2. Work only in `/home/sarah/Development/awesomux-linux-gtk`, apart from a
-   separate read-only reference clone and normal build caches.
+2. Work in this GTK repository for the Linux implementation, apart from a
+   separate read-only reference checkout and normal build caches.
 3. Before and after every reference pass, verify that the macOS reference
    checkout is clean with `git status --short`. If it is not clean, stop and do
    not alter or clean it.
@@ -66,13 +76,13 @@ workspaces does not lose work or route an action to the wrong pane.
 7. Do not change canonical Ghostty in place. Keep awesoMux-owned Linux changes
    as a small, reviewable patch series or wrapper layer in this repository,
    applied to a staged build copy. Keep the submodule checkout clean.
-8. Do not use Electron, Chromium, xterm.js, node-pty, or the existing Electron
-   prototype as the implementation foundation. It may be inspected read-only
-   for Linux product lessons and visual comparison only.
+8. Do not use Electron, Chromium, xterm.js, node-pty, or the former Electron
+   prototype as the implementation foundation. Use its preserved handoff and
+   archive for historical Linux behavior evidence when needed.
 9. Do not silently substitute `libghostty-vt` plus a new renderer. The chosen
    direction is the full embedded Ghostty runtime and renderer through an
    awesoMux-owned GTK shim.
-10. The private GitHub repository and progress-screenshot uploads described
+10. The public GitHub repository and progress-screenshot uploads described
     below are authorized. Do not publish packages, open issues, open pull
     requests, post comments, change repository visibility, or push unrelated
     work without Sarah's explicit approval for that exact action. Local
@@ -85,19 +95,24 @@ workspaces does not lose work or route an action to the wrong pane.
     hosted CI, self-hosted runners, automated build services, required CI
     checks, workflow badges, or dependency-update automation. Do not create
     files under `.github/workflows/`. Run every build, test, lint, lifecycle,
-    packaging, license, and visual check locally on i5GamingPC. No CI does not
-    mean no testing.
+    packaging, and license checks locally. Checks without a desktop requirement
+    may run on pinguchy. Required desktop and visual evidence must
+    come from a real Omarchy/Hyprland session; X11 checks are supplementary. No CI does not mean no testing.
+    Sarah's separately authorized repository code-review tools are an exception;
+    their setup does not authorize additional agent-created automation.
 
 ## Repository state
 
-The private repository is:
+The public repository is:
 
-`Interactive-Buffoonery/awesomux-linux-gtk`
+`Interactive-Buffoonery/awesoMuxchy`
 
-`https://github.com/Interactive-Buffoonery/awesomux-linux-gtk`
+`https://github.com/Interactive-Buffoonery/awesoMuxchy`
 
-Verify that `origin` points to this exact repository and that it remains
-private before every push. Do not substitute another owner or repository.
+Verify that `origin` points to this exact repository and verify its visibility
+before every push. Sarah made it public on 2026-09-23. Do not substitute another
+owner or repository, or change visibility. Review public uploads for private
+information.
 
 If this folder is not already a Git repository, initialize it with `main` as
 the branch. Screenshot and visual-QA index commits and pushes are explicitly
@@ -105,9 +120,8 @@ approved below. Do not commit or push other work without separate approval.
 
 ## Required reference material
 
-Create or refresh a separate read-only clone at:
-
-`/home/sarah/Development/awesomux-macos-reference`
+Use a separate read-only checkout of the macOS reference. Do not assume a
+machine-specific path; record the checkout location locally.
 
 Clone from:
 
@@ -138,13 +152,10 @@ Read all instructions in that repository before using it. At minimum, read:
 - current GitHub issues only when a behavior is not settled in code, docs, or
   an ADR
 
-Use the existing Linux prototype only as secondary, read-only evidence:
-
-`/home/sarah/Development/awesomux-linux-prototype`
-
-Do not edit it. It contains useful Linux behavior and screenshots, but the
-macOS reference is the authority for product behavior, wording, command names,
-and visual identity.
+Use `docs/electron-behavior-handoff.md` and the preserved prototype archive
+only as secondary historical evidence. An Electron working checkout is not
+required. The macOS reference is the authority for product behavior, wording,
+command names, and visual identity.
 
 ## Define exact parity before implementation
 
@@ -202,7 +213,7 @@ settings labels, dialog text, help text, accessibility wording, and error
 language. Do not paraphrase or invent replacement copy when the macOS product
 already defines it.
 
-Create `resources/text-baseline.json` containing the Linux app's required
+Maintain `shared/resources/text-baseline.json` containing the Linux app's required
 user-facing text and its source location in the pinned macOS reference. Add an
 automated check that detects accidental wording drift. Preserve plural forms
 and localization boundaries rather than building strings through manual
@@ -219,13 +230,13 @@ screenshots at the same window sizes.
 Screenshots are a required part of implementation, not final polish. After
 every meaningful visual milestone:
 
-1. Run the real GTK application on i5GamingPC.
+1. Run the real GTK application on Omarchy/Hyprland. If the target machine is
+   unavailable, mark desktop evidence pending and do not claim the milestone.
 2. Put the app into representative states, including populated and empty
    states where both exist.
 3. Capture screenshots at a recorded window size.
 4. Save them under
-   `artifacts/visual-qa/<track>/progress/<phase>/<descriptive-name>.png`, where
-   `<track>` is `swift-gtk` or `rust-gtk`.
+   `artifacts/visual-qa/swift-gtk/progress/<phase>/<descriptive-name>.png`.
 5. Compare them directly with the equivalent pinned macOS reference
    screenshots.
 6. Inspect the actual image rather than assuming a successful launch means it
@@ -239,8 +250,8 @@ every meaningful visual milestone:
 9. Commit the new screenshots and their comparison notes with a focused
    Conventional Commit such as
    `docs(visual-qa): add split-pane progress shots`.
-10. Push that screenshot commit to the private
-    `Interactive-Buffoonery/awesomux-linux-gtk` repository so Sarah can inspect
+10. Push that screenshot commit to the public
+    `Interactive-Buffoonery/awesoMuxchy` repository so Sarah can inspect
     the images directly on GitHub as development proceeds.
 
 Capture progress at minimum for the initial shell, real terminal, sidebar and
@@ -248,8 +259,10 @@ workspace groups, split panes, focused-pane bottom bar, settings, command
 palette, session manager, keyboard cheat sheet, agent states, Git context, SSH,
 Markdown/document panes, recovery states, and final parity pass.
 
-The GitHub repository must remain private. Screenshot files and their visual-QA
-index are explicitly approved for commit and push as work progresses. This
+Sarah made the GitHub repository public on 2026-09-23. Inspect screenshots and
+comparison notes for private information before uploading them. Screenshot
+files and their visual-QA index are explicitly approved for commit and push as
+work progresses. This
 does not authorize changing visibility, posting screenshots to issues or pull
 requests, publishing releases, or pushing unrelated code without separate
 approval.
@@ -259,27 +272,25 @@ reproduced correctly. Record every deliberate difference in
 `PLATFORM_DIFFERENCES.md` with the reason and user effect. Do not use
 "platform-native" as a reason for broad visual drift.
 
-## Two-track implementation architecture
+## Implementation architecture
 
 The repository has one shared product contract, one shared Ghostty shim, and
-two isolated GTK application folders. SwiftGtk4 is the active choice. Rust is a
-fallback that can use the same shim and product evidence without disrupting or
-deleting the Swift work.
+one SwiftGtk4 application. Omarchy is the baseline Linux platform; edition
+configuration keeps runtime and product logic shared.
 
 Use:
 
 - GTK4 through SwiftGtk4 in `swift-gtk/`
-- GTK4 through `gtk4-rs` in `rust-gtk/` if Sarah activates that track
 - plain GTK4 widgets with an awesoMux-owned design system and CSS
 - Libadwaita only for a narrowly justified platform facility; do not let its
   default visual language replace awesoMux's design
 - canonical Ghostty as a pinned Git submodule at `vendor/ghostty`
 - one shared, awesoMux-owned shim under `ghostty-shim/`
-- a narrow C ABI between the shared shim and either application
+- a narrow C ABI between the shared shim and the Swift application
 - the maintained `Interactive-Buffoonery/zmx` fork, branded and invoked as
   `amx`, for persistent sessions where the macOS architecture requires it
-- SQLite or another clearly justified local store for durable application
-  state, with versioned migrations and atomic writes
+- defensive, profile-scoped JSON session snapshots, as decided in
+  `docs/adr/0003-json-session-snapshots.md`
 - structured logging without commands, terminal contents, secrets, or private
   paths leaking by default
 
@@ -310,11 +321,6 @@ swift-gtk/
   Sources/
   Tests/
   IMPLEMENTATION_STATUS.md
-rust-gtk/
-  AGENT_PROMPT.md
-  Cargo.toml
-  crates/
-  IMPLEMENTATION_STATUS.md
 script/
 patches/
   ghostty-linux-embedded/
@@ -325,17 +331,13 @@ tests/
 artifacts/
   visual-qa/
     swift-gtk/
-    rust-gtk/
 ```
 
-Do not place Swift build products inside `rust-gtk/` or Rust build products
-inside `swift-gtk/`. Do not duplicate the Ghostty patch series, copied product
-text, fonts, icons, or reference screenshots between tracks. Each application
-may have a thin language-specific wrapper around the shared C ABI.
+Keep build products in ignored build directories. Keep the Ghostty patch
+series, product text, fonts, icons, and reference screenshots centralized.
+The Swift application uses a thin wrapper around the shared C ABI.
 
-Read the selected track's `AGENT_PROMPT.md` in full after this root prompt.
-Start in `swift-gtk/`. Leave `rust-gtk/` as a prompt and clean fallback until
-Sarah explicitly activates it.
+Read `swift-gtk/AGENT_PROMPT.md` in full after this root prompt.
 
 ## Build the shim independently
 
@@ -367,8 +369,8 @@ Keep its public interface small and stable. It should cover:
 - multiple simultaneously active surfaces
 - error reporting that does not crash the whole application
 
-Do not expose GTK or Ghostty raw pointers broadly through either application.
-Contain Zig and C interop inside the shared shim and each track's thin wrapper,
+Do not expose GTK or Ghostty raw pointers broadly through the Swift application.
+Contain Zig and C interop inside the shared shim and the thin Swift wrapper,
 document why each unsafe operation is valid, and test lifecycle boundaries.
 
 Keep the Ghostty patch series as small as possible. Prefer a wrapper using
@@ -406,11 +408,14 @@ patches no longer apply.
 
 ## Implementation order
 
-Work in dependency order, keeping the application runnable after each stage:
+The immediate sequence is baseline reconciliation, terminal reliability,
+`amx`, real agents, and daily-use validation. The full parity plan below remains
+the product goal; work in dependency order and keep the application runnable
+after each stage. Reconcile already completed work before repeating a phase:
 
 1. Repository rules, documentation, baseline commit, full parity matrix, and
    architecture decision records.
-2. Rust workspace, GTK4 application shell, design tokens, resources, logging,
+2. SwiftPM workspace, GTK4 application shell, design tokens, resources, logging,
    and test harness.
 3. Canonical Ghostty pin, staged build system, independently written Linux GTK
    shim, and one reliable terminal surface.
@@ -517,16 +522,18 @@ The selected production track is done only when:
 - terminal lifecycle, persistence, multi-pane use, agents, SSH, documents,
   accessibility, and packaging are verified
 - the complete automated test suite and preflight pass
-- all verification runs locally on i5GamingPC and the repository contains no
-  CI workflows or remote build automation
+- all checks run locally, with desktop and visual verification on Omarchy/Hyprland,
+  and the repository contains no CI workflows or remote build automation
 - canonical Ghostty and zmx submodules remain clean and correctly pinned
 - licenses and notices are complete
 - the macOS awesoMux repository remains byte-for-byte untouched by this work
 - no issue, pull request, package, release, visibility setting, or unrelated
   remote content has been created or changed without Sarah's explicit approval
 
-Begin by inspecting the machine and both reference projects, confirming the
-GitHub repository situation, recording the reference commit, and writing the
-parity matrix and implementation plan. Then read `swift-gtk/AGENT_PROMPT.md`
-and proceed into the SwiftGtk4 implementation. Do not merely return a plan
-unless a real external blocker prevents safe progress.
+Begin by reconciling the recorded GTK baseline against the checkout and the
+preserved Electron behavior handoff. Then resolve terminal lifecycle and
+reliability, integrate `amx` persistence, integrate real agent state, and
+validate daily use on Omarchy/Hyprland. Continue toward the full parity matrix after
+those foundations. Read `swift-gtk/AGENT_PROMPT.md` before implementation and
+keep verification evidence current. Do not claim desktop work completed from
+source inspection alone.

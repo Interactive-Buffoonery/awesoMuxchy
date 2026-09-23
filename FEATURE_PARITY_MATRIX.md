@@ -1,6 +1,29 @@
 # Feature parity matrix
 
+2026-09-23 acceptance update: SwiftGtk4 is the sole application implementation;
+the unused fallback scaffolding has been removed. Omarchy/Hyprland is the
+required Linux baseline. Acceptance remains pending until real Omarchy desktop
+and daily-use checks pass; historical runs on other desktops and build-only
+checks do not satisfy this gate. This cleanup changes no runtime behavior.
+
+The 2026-09-23 [awesoMuxchy decision](docs/adr/0005-awesomuxchy-omarchy-edition.md)
+adds a planned Omarchy edition of the shared app and records the public
+repository rename. The [Linear project](https://linear.app/interactive-buffoonery/project/awesomuxchy-190ce1959bdf)
+tracks 11 source-review findings and the edition work. No feature status is
+upgraded by this decision. Historical lifecycle/recovery evidence does not
+close the newly identified process-survival, permission, or recovery gaps.
+
 Baseline: macOS `fed33ff47c559344fc6db6fa53f16e75fcc4a116`.
+The 2026-09-22 [consolidation](docs/linux-consolidation.md) changes project
+direction and preserves Electron evidence; it does not upgrade any runtime
+status in this matrix. Historical verification applies to its recorded build.
+Recheck close/teardown, continuous-update persistence, and clipboard confirmation
+before daily use. The [Electron handoff](docs/electron-behavior-handoff.md) adds
+acceptance scenarios without claiming that GTK already passes them.
+
+The subsequent pinguchy development build and terminal-startup smoke check are
+recorded in `docs/development.md`; they do not change parity statuses here.
+
 Statuses describe working Linux behavior, not documentation completeness.
 “Catalog baseline” means the exact entry in
 `shared/resources/text-baseline.json`; paraphrases in this matrix are never a

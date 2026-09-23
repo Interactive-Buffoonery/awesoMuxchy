@@ -1,0 +1,43 @@
+From 4f3d7c19c77ad5a281f6ea72f4dd66bc7e9d0014 Mon Sep 17 00:00:00 2001
+From: awesoMux Linux <noreply@awesomux.local>
+Date: Tue, 22 Sep 2026 00:00:00 -0500
+Subject: [PATCH] build: allow LLVM and LLD for the host build-data tool
+
+Purpose: Zig 0.16's default Linux linker rejects R_X86_64_PC64 relocations
+in Arch glibc 2.44/GCC 16 crt1.o .sframe. LLD alone crashes with Zig's
+default backend; LLVM plus LLD links and runs the host helper. Keep this
+opt-in so Ubuntu's established build path is unchanged.
+
+Upstream Ghostty pin: f2d5758f6305867dc36b36293c6165d8152b853e.
+Affected file: src/build/GhosttyResources.zig. A wrapper cannot select the
+linker for one b.addExecutable artifact inside Ghostty's build graph.
+Verification: isolated Zig 0.16 libc link probe reproduced the failure and
+passed with -fllvm -flld; the full staged Ghostty and GTK shim build passed
+on Arch with this option. Rebase risk: low, confined to host build-data
+executable creation.
+---
+ src/build/GhosttyResources.zig | 8 ++++++++
+ 1 file changed, 8 insertions(+)
+
+diff --git a/src/build/GhosttyResources.zig b/src/build/GhosttyResources.zig
+index 673c7e56a..8fdb6c941 100644
+--- a/src/build/GhosttyResources.zig
++++ b/src/build/GhosttyResources.zig
+@@ -12,9 +12,17 @@ pub fn init(b: *std.Build, cfg: *const Config, deps: *const SharedDeps) !Ghostty
+     var steps: std.ArrayList(*std.Build.Step) = .empty;
+     errdefer steps.deinit(b.allocator);
+
++    const host_llvm_lld = b.option(
++        bool,
++        "awesomux-host-llvm-lld",
++        "Use LLVM and LLD for the host build-data tool",
++    ) orelse false;
++
+     // This is the exe used to generate some build data.
+     const build_data_exe = b.addExecutable(.{
+         .name = "ghostty-build-data",
++        .use_llvm = if (host_llvm_lld) true else null,
++        .use_lld = if (host_llvm_lld) true else null,
+         .root_module = b.createModule(.{
+             .root_source_file = b.path("src/main_build_data.zig"),
+             .target = b.graph.host,

@@ -4,9 +4,9 @@ Read the repository-root `AGENT_PROMPT.md` completely before following this
 track-specific prompt. All root source, safety, GitHub, screenshot, parity, and
 macOS read-only boundaries apply here.
 
-You are implementing the active first track in:
-
-`/home/sarah/Development/awesomux-linux-gtk/swift-gtk`
+You are implementing the active Linux application in `swift-gtk/` of this
+repository. The current development workspace is on pinguchy. Omarchy/Hyprland
+is the required target for desktop, visual, and daily-use acceptance.
 
 ## Goal
 
@@ -44,7 +44,7 @@ Make the build reproducible:
 - do not float on `main`, `gtk4`, or another moving branch after evaluation
 - do not suppress warnings repository-wide
 - do not add CI or GitHub Actions; all Swift and GTK verification runs locally
-  on i5GamingPC
+  and desktop verification runs on Omarchy/Hyprland
 - treat a missing generated binding as a real integration gap
 - prefer a small local C bridge for a missing GTK function over a broad fork
 - if a SwiftGtk fork becomes necessary, document every carried change and why
@@ -71,9 +71,11 @@ Do not install Swift, GTK development packages, or generator dependencies with
 - Do not imitate SwiftUI architecture mechanically. Use GTK patterns where
   they are required while preserving awesoMux's product model.
 
-## First vertical slice
+## Vertical-slice baseline
 
-Build this before broad product work:
+Reconcile the existing implementation and evidence against this baseline
+before continuing broad product work. Do not assume an item is complete from
+a screenshot or source inspection alone:
 
 1. A SwiftPM executable opens a real GTK4 application window.
 2. It links to the shared Ghostty shim through a stable C module.
@@ -88,8 +90,10 @@ Build this before broad product work:
    that focus.
 10. The window and terminal have useful AT-SPI names, roles, and focus state.
 11. The executable launches outside `swift run` with all resources found.
-12. A real screenshot and comparison note are uploaded to the private GitHub
-    repository under `artifacts/visual-qa/swift-gtk/`.
+12. A real screenshot and comparison note are recorded under
+    `artifacts/visual-qa/swift-gtk/` and uploaded to the verified public
+    `Interactive-Buffoonery/awesoMuxchy` repository under the existing visual-QA
+    authorization, after inspecting the evidence for private information.
 
 Add a repeatable lifecycle stress test. Exercise at least 100 create/use/close
 cycles and multiple busy surfaces. Check for crashes, hangs, callbacks after
@@ -115,13 +119,15 @@ SwiftGtk passes when the lifecycle code is understandable, repeatably stable,
 and does not require widespread unsafe escape hatches or permanent suppression
 of compiler warnings.
 
-If it passes, continue immediately through the root implementation order and
-build the complete product. Do not stop at the checkpoint.
+If it passes, continue through terminal reliability, `amx` persistent
+sessions, real agent integration, and daily-use validation before extending
+the remaining full-parity work. Do not stop at the checkpoint. See
+`../docs/adr/0004-consolidate-linux-development.md`.
 
 If it appears unsuitable, do not delete or hide the Swift work and do not
 silently switch languages. Capture the failing evidence, update the root and
-track status documents, upload the latest screenshots, and ask Sarah whether
-to activate `rust-gtk/`.
+application status documents, upload the latest screenshots, and discuss the
+architecture blockers with Sarah.
 
 ## Porting from macOS Swift
 
@@ -153,12 +159,16 @@ package checks. The root preflight must call them. At minimum run:
 - GTK/Ghostty lifecycle integration tests
 - a clean-build test with dependency pins resolved
 - the root source-license and submodule checks
-- real Wayland and X11 UI runs on i5GamingPC
+- real Omarchy/Hyprland UI and daily-use runs; X11 runs are supplementary
 
 Do not create a workflow to run these commands remotely. Record the local
 command and result in the implementation status instead.
 
 Keep `swift-gtk/IMPLEMENTATION_STATUS.md` current throughout the work.
 
-Begin by checking the installed Swift and GTK versions without modifying the
-machine, reading the root product contract, and building the vertical slice.
+Begin by checking installed Swift and GTK versions without modifying the
+machine, reading the root product contract, and reconciling the vertical-slice
+evidence with the current checkout. Build and source checks can run on
+pinguchy. Record Omarchy acceptance as pending until a real Omarchy/Hyprland
+run verifies the required behavior. If it does not run well on Omarchy, it
+does not pass.

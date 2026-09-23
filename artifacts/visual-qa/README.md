@@ -235,7 +235,7 @@ The older `fed33ff` images below remain historical evidence.
   generic branch/status data, and product chrome. It contains no terminal
   contents, typed commands, clipboard data, credentials, or private paths.
 - Upload status: published to the verified private origin under Sarah's explicit
-  full-branch authorization. [Open the uploaded PNG on GitHub](https://github.com/Interactive-Buffoonery/awesomux-linux-gtk/blob/main/artifacts/visual-qa/swift-gtk/progress/47-focused-footer-targets/interactive-chip-targets-x11.png).
+  full-branch authorization. [Open the uploaded PNG on GitHub](https://github.com/Interactive-Buffoonery/awesoMuxchy/blob/main/artifacts/visual-qa/swift-gtk/progress/47-focused-footer-targets/interactive-chip-targets-x11.png).
 
 ## 2026-08-29 — SwiftGtk4 command availability boundaries
 
