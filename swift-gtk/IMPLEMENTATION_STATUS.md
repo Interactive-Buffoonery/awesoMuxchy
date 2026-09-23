@@ -11,13 +11,15 @@ that rejection preserves both saved files and successful saves reload.
 Core warnings-as-errors typechecking passed. The focused test and all 131 core
 tests passed in a temporary core-only SwiftPM package linked to the repository
 sources. With a signed Xvfb binary staged privately and an isolated Ghostty
-config on X11 `:1`, `./script/preflight.sh` passed Swift tests, the release
-build, single-window activation, dynamic command enablement,
-forced-termination persistence, terminal integration, and 100-cycle lifecycle
-stress. The earlier missing-`:1` result was a host setup failure. The native
-Wayland stage used an intentionally invalid display to avoid the live
-clipboard and could not open that display; full preflight is incomplete.
-Omarchy/Hyprland desktop and daily-use acceptance remain pending.
+config, private headless Weston Wayland socket, and private D-Bus,
+`./script/preflight.sh` passed end to end (exit 0): Swift tests, release build,
+X11 `:1` single-window activation, dynamic command enablement,
+forced-termination persistence, terminal integration and 100-cycle lifecycle
+stress, native Wayland terminal integration with a private clipboard, and
+100-cycle Wayland lifecycle stress. An earlier attempt crashed in repo-local
+`swift-package`/libdispatch during the release build; its cause is unproven
+and the retry passed. The earlier missing-`:1` result was a host setup failure.
+Live Omarchy/Hyprland desktop, visual, and daily-use acceptance remain pending.
 
 2026-09-23 acceptance update: SwiftGtk4 is the sole application implementation;
 the unused fallback scaffolding has been removed. Omarchy/Hyprland is the
@@ -36,8 +38,10 @@ The review's open runtime, clipboard, recovery, accessibility, and keyboard
 findings qualify historical completion claims below. No implementation fixes
 or new desktop verification accompany the rename. The existing 130-test binary,
 fresh core typecheck, and local text-baseline check passed; live reference
-comparison and full preflight remain pending. Private-origin statements below
-describe historical uploads.
+comparison and full preflight were pending at that checkpoint. The INT-1116
+update above records a later full private-display preflight pass; live Omarchy
+acceptance remains pending. Private-origin statements below describe
+historical uploads.
 
 Consolidation update: 2026-09-22. Runtime evidence below is historical and was
 not rerun during cleanup.

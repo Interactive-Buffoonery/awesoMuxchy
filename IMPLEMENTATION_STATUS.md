@@ -10,15 +10,16 @@ boundaries, multibyte paths, preservation of both prior files, retry, and
 reload after successful saves. Core warnings-as-errors typechecking passed,
 and the focused test plus all 131 core tests passed in a temporary core-only
 SwiftPM harness using the repository sources. With a signed Xvfb binary staged
-privately and an isolated Ghostty config on X11 `:1`, `./script/preflight.sh`
-passed Swift tests, the release build, single-window activation, dynamic
-command enablement, forced-termination persistence, terminal integration,
-and 100-cycle lifecycle stress. The earlier missing-`:1` result was a host
-setup failure, not an application failure. The native Wayland stage used an
-intentionally invalid display to avoid the live clipboard and could not open
-that display, so full preflight is incomplete. This source-level fix has no
-new Omarchy/Hyprland desktop or visual acceptance claim; daily-use evidence
-remains pending.
+privately, a private headless Weston Wayland socket and D-Bus, and an isolated
+Ghostty config, `./script/preflight.sh` passed end to end (exit 0). Its Swift
+tests and release build, X11 `:1` single-window activation, dynamic command
+enablement, forced-termination persistence, terminal integration and 100-cycle
+lifecycle stress, plus native Wayland terminal integration with a private
+clipboard and 100-cycle lifecycle stress, all passed. An earlier attempt
+crashed in repo-local `swift-package`/libdispatch during the release build;
+the cause remains unproven, and the retry passed. The earlier missing-`:1`
+result was a host setup failure. Private-display verification does not establish
+live Omarchy/Hyprland daily-use or visual acceptance, which remains pending.
 
 2026-09-23 acceptance update: SwiftGtk4 is the sole application implementation;
 the unused fallback scaffolding has been removed. Omarchy/Hyprland is the
@@ -38,7 +39,9 @@ persistence, accessibility, and keyboard findings. These qualify the historical
 completion claims below; none was fixed by the repository rename. The existing
 130-test binary passed, current core warnings-as-errors typechecking passed,
 and local text-baseline validation passed with live reference comparison
-unavailable. Full preflight and new target-desktop evidence remain pending.
+unavailable. At the rename checkpoint, full preflight and new target-desktop
+evidence were pending. The INT-1116 update above records a later full
+private-display preflight pass; live Omarchy acceptance remains pending.
 Historical references to a private origin describe uploads before publication.
 
 Consolidation update: 2026-09-22. Runtime evidence below was recorded during
