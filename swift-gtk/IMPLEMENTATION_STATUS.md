@@ -5,18 +5,19 @@ app-owned approval through `TerminalSurface.resolvePermission`. A bounded
 pending value stays inside the shim; the Swift callback sees request identity
 and counts only. Cancellation, replacement, unrealize, and surface destruction
 invalidate old IDs. The synthetic GTK test passed on an isolated Broadway
-display; real-app Omarchy Wayland modal interaction and visual acceptance remain
+display; live Omarchy/Hyprland modal interaction and visual acceptance remain
 pending. The generic permission callback is ready for unsafe-paste integration.
 The shim rejects confirmation-required writes over 1 MiB before copying or
 scanning them so one OSC52 request cannot tie up the GTK callback with a large
 payload. The synthetic test covers the exact accepted and rejected boundary.
-The latest preflight used a signed, user-staged private Xvfb display `:1` and
-isolated Ghostty configuration. Swift tests, release build, single-window
+Full `./script/preflight.sh` passed with signed, user-staged private Xvfb `:1`,
+headless Weston `wayland-awesomux-qa`, private D-Bus, and isolated Ghostty
+configuration. Swift tests, release build, single-window
 activation, dynamic command enablement, forced-termination persistence, X11
-terminal clipboard integration, and 100-cycle lifecycle stress passed. The
-native Wayland stage deliberately used an invalid display to protect the live
-clipboard and failed to open it. Full preflight and real-app Omarchy approval
-and cancellation remain pending; the earlier missing-`:1` blocker is superseded.
+terminal clipboard integration, and 100-cycle lifecycle stress passed. Native
+Wayland terminal integration, lifecycle stress, and the synthetic permission
+test passed inside private Weston. Live Omarchy/Hyprland modal approval,
+cancellation, visual comparison, and daily-use acceptance remain pending.
 
 2026-09-23 acceptance update: SwiftGtk4 is the sole application implementation;
 the unused fallback scaffolding has been removed. Omarchy/Hyprland is the
@@ -35,7 +36,8 @@ The review's open runtime, clipboard, recovery, accessibility, and keyboard
 findings qualify historical completion claims below. No implementation fixes
 or new desktop verification accompany the rename. The existing 130-test binary,
 fresh core typecheck, and local text-baseline check passed; live reference
-comparison and full preflight remain pending. Private-origin statements below
+comparison and full preflight were pending at that checkpoint; the latest
+isolated full preflight result is above. Private-origin statements below
 describe historical uploads.
 
 Consolidation update: 2026-09-22. Runtime evidence below is historical and was
@@ -62,8 +64,8 @@ The development application opens on native Wayland, exports its workspace
 action, and creates a real terminal workspace; its window capture was inspected.
 This does not replace i5GamingPC desktop, visual-parity, or daily-use evidence.
 All 130 Swift package tests pass on this host. See
-[development instructions](../docs/development.md). Full preflight remains
-pending.
+[development instructions](../docs/development.md). Full preflight was pending
+at this setup checkpoint; the latest isolated full preflight result is above.
 
 ## Current phase
 
