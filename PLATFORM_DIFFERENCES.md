@@ -1,5 +1,10 @@
 # Platform differences
 
+INT-1116 (2026-09-23) introduces no platform difference. The Linux session
+writer now enforces its existing reader's 4 MiB encoded snapshot limit; no
+wording or desktop behavior changes. Omarchy/Hyprland runtime acceptance is
+still pending.
+
 ## Keyboard modifiers
 
 Linux uses Control for the macOS Command shortcut layer and Alt for Option.

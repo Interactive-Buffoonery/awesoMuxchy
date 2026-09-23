@@ -1,5 +1,24 @@
 # SwiftGtk4 implementation status
 
+## INT-1116 snapshot size safety — 2026-09-23
+
+The session writer compares the fully encoded JSON byte count with its 4 MiB
+read limit before any current/previous snapshot rotation or write. Oversized
+saves raise `snapshotTooLarge`, and the coordinator's existing failed outcome
+retains the pending snapshot for retry. A focused test exercises 4 MiB − 1,
+4 MiB, and 4 MiB + 1 encoded bytes, including multibyte path text; it checks
+that rejection preserves both saved files and successful saves reload.
+Core warnings-as-errors typechecking passed. The focused test and all 131 core
+tests passed in a temporary core-only SwiftPM package linked to the repository
+sources. With a signed Xvfb binary staged privately and an isolated Ghostty
+config on X11 `:1`, `./script/preflight.sh` passed Swift tests, the release
+build, single-window activation, dynamic command enablement,
+forced-termination persistence, terminal integration, and 100-cycle lifecycle
+stress. The earlier missing-`:1` result was a host setup failure. The native
+Wayland stage used an intentionally invalid display to avoid the live
+clipboard and could not open that display; full preflight is incomplete.
+Omarchy/Hyprland desktop and daily-use acceptance remain pending.
+
 2026-09-23 acceptance update: SwiftGtk4 is the sole application implementation;
 the unused fallback scaffolding has been removed. Omarchy/Hyprland is the
 required Linux baseline. Acceptance remains pending until real Omarchy desktop

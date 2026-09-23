@@ -1,5 +1,25 @@
 # Implementation status
 
+## INT-1116 snapshot size safety — 2026-09-23
+
+`SessionStore.save` now rejects encoded JSON above the 4 MiB loader limit
+before creating the state directory or rotating/replacing current and previous
+snapshots. The existing persistence coordinator reports a failed write and
+keeps the pending value for retry. Focused tests cover exact encoded byte
+boundaries, multibyte paths, preservation of both prior files, retry, and
+reload after successful saves. Core warnings-as-errors typechecking passed,
+and the focused test plus all 131 core tests passed in a temporary core-only
+SwiftPM harness using the repository sources. With a signed Xvfb binary staged
+privately and an isolated Ghostty config on X11 `:1`, `./script/preflight.sh`
+passed Swift tests, the release build, single-window activation, dynamic
+command enablement, forced-termination persistence, terminal integration,
+and 100-cycle lifecycle stress. The earlier missing-`:1` result was a host
+setup failure, not an application failure. The native Wayland stage used an
+intentionally invalid display to avoid the live clipboard and could not open
+that display, so full preflight is incomplete. This source-level fix has no
+new Omarchy/Hyprland desktop or visual acceptance claim; daily-use evidence
+remains pending.
+
 2026-09-23 acceptance update: SwiftGtk4 is the sole application implementation;
 the unused fallback scaffolding has been removed. Omarchy/Hyprland is the
 required Linux baseline. Acceptance remains pending until real Omarchy desktop

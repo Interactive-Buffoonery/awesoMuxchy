@@ -19,6 +19,35 @@ private func snapshot(_ workspaces: [WorkspaceSnapshot]) -> SessionSnapshot {
     )
 }
 
+private func snapshotWithEncodedSize(_ targetBytes: Int, multibyte: Bool = false) throws -> SessionSnapshot {
+    func makeSnapshot(pathExtraBytes: Int, pathsWithExtraByte: Int) -> SessionSnapshot {
+        let workspaces = (0..<512).map { workspaceIndex in
+            let firstPath = "/" + (multibyte ? "é" : "")
+                + String(repeating: "a", count: pathExtraBytes + (workspaceIndex * 2 < pathsWithExtraByte ? 1 : 0))
+            let secondPath = "/" + String(repeating: "a", count: pathExtraBytes + (workspaceIndex * 2 + 1 < pathsWithExtraByte ? 1 : 0))
+            let first = PaneSnapshot(title: "shell", workingDirectory: firstPath)
+            let second = PaneSnapshot(title: "shell", workingDirectory: secondPath)
+            return WorkspaceSnapshot(
+                name: "Workspace",
+                focusedPaneID: first.id,
+                layout: .split(axis: .horizontal, fraction: 0.5, first: .pane(first), second: .pane(second))
+            )
+        }
+        return snapshot(workspaces)
+    }
+
+    let encoder = JSONEncoder()
+    encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+    let base = makeSnapshot(pathExtraBytes: 0, pathsWithExtraByte: 0)
+    let baseBytes = try encoder.encode(base).count
+    let needed = targetBytes - baseBytes
+    #expect(needed >= 0)
+    let result = makeSnapshot(pathExtraBytes: needed / 1_024, pathsWithExtraByte: needed % 1_024)
+    #expect(try encoder.encode(result).count == targetBytes)
+    _ = try result.validated()
+    return result
+}
+
 @Test func primaryCloseClosesFocusedPaneWhenSplit() {
     let value = workspace(panes: 2)
     #expect(ClosePolicy.primaryClose(workspace: value, visibleWorkspaceCount: 1) == .closePane(value.focusedPaneID))
@@ -486,6 +515,56 @@ private func snapshot(_ workspaces: [WorkspaceSnapshot]) -> SessionSnapshot {
         at: store.quarantineDirectoryURL,
         includingPropertiesForKeys: nil
     ).count == 1)
+}
+
+@Test func snapshotSaveEnforcesEncodedByteLimitBeforeReplacingSafeFiles() throws {
+    let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    defer { try? FileManager.default.removeItem(at: root) }
+    let store = SessionStore(
+        snapshotURL: root.appendingPathComponent("session.json"),
+        quarantineDirectoryURL: root.appendingPathComponent("quarantine")
+    )
+    let prior = snapshot([workspace(panes: 1)])
+    let current = snapshot([workspace(panes: 2)])
+    try store.save(prior)
+    try store.save(current)
+    let currentBytes = try Data(contentsOf: store.snapshotURL)
+    let previousBytes = try Data(contentsOf: store.previousSnapshotURL)
+
+    let limit = SessionStore.maximumSnapshotBytes
+    let below = try snapshotWithEncodedSize(limit - 1)
+    let atLimit = try snapshotWithEncodedSize(limit, multibyte: true)
+    let above = try snapshotWithEncodedSize(limit + 1, multibyte: true)
+    let coordinator = SessionPersistenceCoordinator(store: store)
+
+    let emptyStore = SessionStore(
+        snapshotURL: root.appendingPathComponent("unwritten/session.json"),
+        quarantineDirectoryURL: root.appendingPathComponent("unwritten/quarantine")
+    )
+    #expect(throws: SessionStoreError.snapshotTooLarge) {
+        try emptyStore.save(above)
+    }
+    #expect(!FileManager.default.fileExists(atPath: emptyStore.snapshotURL.deletingLastPathComponent().path))
+
+    #expect(throws: SessionStoreError.snapshotTooLarge) {
+        try store.save(above)
+    }
+    #expect(coordinator.flush(above) == .failed)
+    #expect(try Data(contentsOf: store.snapshotURL) == currentBytes)
+    #expect(try Data(contentsOf: store.previousSnapshotURL) == previousBytes)
+    #expect(try store.load() == current)
+    #expect(try store.loadRecovering() == .restored(current))
+    #expect(coordinator.flush() == .failed)
+
+    #expect(coordinator.flush(below) == .saved)
+    #expect(try Data(contentsOf: store.snapshotURL).count == limit - 1)
+    #expect(try store.load() == below)
+    #expect(try store.loadRecovering() == .restored(below))
+
+    #expect(coordinator.flush(atLimit) == .saved)
+    #expect(try Data(contentsOf: store.snapshotURL).count == limit)
+    #expect(try store.load() == atLimit)
+    #expect(try store.loadRecovering() == .restored(atLimit))
 }
 
 @Test func rejectsUnsafeSplitFractionAndSelectedClosedWorkspace() {
