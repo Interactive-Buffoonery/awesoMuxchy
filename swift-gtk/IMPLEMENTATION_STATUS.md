@@ -1,5 +1,23 @@
 # SwiftGtk4 implementation status
 
+2026-09-23 INT-1115: OSC52 writes marked `confirm` now require an explicit
+app-owned approval through `TerminalSurface.resolvePermission`. A bounded
+pending value stays inside the shim; the Swift callback sees request identity
+and counts only. Cancellation, replacement, unrealize, and surface destruction
+invalidate old IDs. The synthetic GTK test passed on an isolated Broadway
+display; real-app Omarchy Wayland modal interaction and visual acceptance remain
+pending. The generic permission callback is ready for unsafe-paste integration.
+The shim rejects confirmation-required writes over 1 MiB before copying or
+scanning them so one OSC52 request cannot tie up the GTK callback with a large
+payload. The synthetic test covers the exact accepted and rejected boundary.
+The latest preflight used a signed, user-staged private Xvfb display `:1` and
+isolated Ghostty configuration. Swift tests, release build, single-window
+activation, dynamic command enablement, forced-termination persistence, X11
+terminal clipboard integration, and 100-cycle lifecycle stress passed. The
+native Wayland stage deliberately used an invalid display to protect the live
+clipboard and failed to open it. Full preflight and real-app Omarchy approval
+and cancellation remain pending; the earlier missing-`:1` blocker is superseded.
+
 2026-09-23 acceptance update: SwiftGtk4 is the sole application implementation;
 the unused fallback scaffolding has been removed. Omarchy/Hyprland is the
 required Linux baseline. Acceptance remains pending until real Omarchy desktop

@@ -1,5 +1,31 @@
 # Implementation status
 
+2026-09-23 INT-1115: The Ghostty shim now retains confirmation-required OSC52
+clipboard writes behind an explicit opaque request ID. The GTK app presents an
+awesoMux-owned cancel-default approval sheet. Confirmation-required writes
+larger than 1 MiB are denied to bound synchronous GTK callback work; requests
+within that limit are cancelled on rejection, replacement, unrealize, or pane
+teardown. The limit bounds the pending copy to 1 MiB and the validation,
+copying, and character-count passes to at most 1 MiB each. The request callback
+exposes only counts, never clipboard bytes. A synthetic GTK test passed inside
+an isolated Broadway display on the Omarchy host for ask, approval, denial,
+replacement, and teardown; real-app Wayland sheet interaction and visual
+acceptance are pending. The permission callback and resolver are shared ABI
+seams for unsafe-paste work.
+Local `cc -fsyntax-only -Wall -Wextra -Werror`, shim link, isolated Broadway
+permission test, text-baseline check, `git diff --check`, and release Swift
+build passed. The latest preflight used a signed, user-staged private Xvfb
+display `:1` and isolated Ghostty configuration. Swift tests, release build,
+single-window activation, dynamic command enablement, forced-termination
+persistence, X11 terminal clipboard integration, and 100-cycle lifecycle stress
+passed. Its native Wayland stage deliberately used an invalid display to avoid
+mutating the live clipboard and failed to open that display. Full preflight and
+real-app Omarchy confirmation interaction and visual acceptance remain pending.
+The earlier missing-`:1` blocker was superseded by the private Xvfb run.
+The focused C build and isolated test also passed with both the 1 MiB accepted
+boundary and the first rejected byte covered. No implementation commit or push
+was made.
+
 2026-09-23 acceptance update: SwiftGtk4 is the sole application implementation;
 the unused fallback scaffolding has been removed. Omarchy/Hyprland is the
 required Linux baseline. Acceptance remains pending until real Omarchy desktop

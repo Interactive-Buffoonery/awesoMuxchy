@@ -10,16 +10,44 @@ private final class TerminalCallbackBox {
     let onFocusChanged: ((Bool) -> Void)?
     let onTitleChanged: ((String) -> Void)?
     let onWorkingDirectoryChanged: ((String) -> Void)?
+    let onPermissionRequested: ((UInt64, TerminalPermissionKind, Int, Int) -> Void)?
+    let onPermissionCancelled: ((UInt64) -> Void)?
 
     init(
         onFocusChanged: ((Bool) -> Void)?,
         onTitleChanged: ((String) -> Void)?,
-        onWorkingDirectoryChanged: ((String) -> Void)?
+        onWorkingDirectoryChanged: ((String) -> Void)?,
+        onPermissionRequested: ((UInt64, TerminalPermissionKind, Int, Int) -> Void)?,
+        onPermissionCancelled: ((UInt64) -> Void)?
     ) {
         self.onFocusChanged = onFocusChanged
         self.onTitleChanged = onTitleChanged
         self.onWorkingDirectoryChanged = onWorkingDirectoryChanged
+        self.onPermissionRequested = onPermissionRequested
+        self.onPermissionCancelled = onPermissionCancelled
     }
+}
+
+public enum TerminalPermissionKind {
+    case clipboardWrite
+    case unsafePaste
+}
+
+private func terminalPermissionRequested(
+    userdata: UnsafeMutableRawPointer?, requestID: UInt64,
+    kind: amx_ghostty_permission_kind, characterCount: Int, byteCount: Int
+) {
+    guard let userdata else { return }
+    let callbacks = Unmanaged<TerminalCallbackBox>.fromOpaque(userdata).takeUnretainedValue()
+    let permission: TerminalPermissionKind = kind == AMX_GHOSTTY_PERMISSION_CLIPBOARD_WRITE
+        ? .clipboardWrite : .unsafePaste
+    callbacks.onPermissionRequested?(requestID, permission, characterCount, byteCount)
+}
+
+private func terminalPermissionCancelled(userdata: UnsafeMutableRawPointer?, requestID: UInt64) {
+    guard let userdata else { return }
+    let callbacks = Unmanaged<TerminalCallbackBox>.fromOpaque(userdata).takeUnretainedValue()
+    callbacks.onPermissionCancelled?(requestID)
 }
 
 private func terminalTitleChanged(userdata: UnsafeMutableRawPointer?, title: UnsafePointer<CChar>?) {
@@ -71,7 +99,9 @@ public final class TerminalRuntime {
         accessibleDescription: String,
         onFocusChanged: ((Bool) -> Void)? = nil,
         onTitleChanged: ((String) -> Void)? = nil,
-        onWorkingDirectoryChanged: ((String) -> Void)? = nil
+        onWorkingDirectoryChanged: ((String) -> Void)? = nil,
+        onPermissionRequested: ((UInt64, TerminalPermissionKind, Int, Int) -> Void)? = nil,
+        onPermissionCancelled: ((UInt64) -> Void)? = nil
     ) -> TerminalSurface? {
         TerminalSurface(
             runtime: self,
@@ -82,7 +112,9 @@ public final class TerminalRuntime {
             accessibleDescription: accessibleDescription,
             onFocusChanged: onFocusChanged,
             onTitleChanged: onTitleChanged,
-            onWorkingDirectoryChanged: onWorkingDirectoryChanged
+            onWorkingDirectoryChanged: onWorkingDirectoryChanged,
+            onPermissionRequested: onPermissionRequested,
+            onPermissionCancelled: onPermissionCancelled
         )
     }
 }
@@ -102,19 +134,25 @@ public final class TerminalSurface {
         accessibleDescription: String,
         onFocusChanged: ((Bool) -> Void)?,
         onTitleChanged: ((String) -> Void)?,
-        onWorkingDirectoryChanged: ((String) -> Void)?
+        onWorkingDirectoryChanged: ((String) -> Void)?,
+        onPermissionRequested: ((UInt64, TerminalPermissionKind, Int, Int) -> Void)?,
+        onPermissionCancelled: ((UInt64) -> Void)?
     ) {
         let callbackBox = TerminalCallbackBox(
             onFocusChanged: onFocusChanged,
             onTitleChanged: onTitleChanged,
-            onWorkingDirectoryChanged: onWorkingDirectoryChanged
+            onWorkingDirectoryChanged: onWorkingDirectoryChanged,
+            onPermissionRequested: onPermissionRequested,
+            onPermissionCancelled: onPermissionCancelled
         )
         let callbacks = amx_ghostty_callbacks(
             userdata: Unmanaged.passUnretained(callbackBox).toOpaque(),
             title_changed: terminalTitleChanged,
             working_directory_changed: terminalWorkingDirectoryChanged,
             close_requested: nil,
-            focus_changed: terminalFocusChanged
+            focus_changed: terminalFocusChanged,
+            permission_requested: terminalPermissionRequested,
+            permission_cancelled: terminalPermissionCancelled
         )
         let entries = environment.sorted { $0.key < $1.key }
         let keys: [UnsafeMutablePointer<CChar>?] = entries.map { strdup($0.key) }
@@ -155,6 +193,8 @@ public final class TerminalSurface {
     }
 
     deinit {
+        // The shim may cancel a pending request synchronously here. callbackBox
+        // remains alive until this deinitializer returns.
         amx_ghostty_surface_destroy(handle)
     }
 
@@ -196,6 +236,11 @@ public final class TerminalSurface {
 
     public func requestClose() {
         amx_ghostty_surface_request_close(handle)
+    }
+
+    @discardableResult
+    public func resolvePermission(_ requestID: UInt64, allow: Bool) -> Bool {
+        amx_ghostty_surface_resolve_permission(handle, requestID, allow)
     }
 
     public func sendEnter() {
