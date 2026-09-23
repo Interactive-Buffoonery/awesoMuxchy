@@ -23,15 +23,14 @@ and process survival. AT-SPI confirmed the search's actual FOCUSED state,
 selected rows, and return to the exact widget focused before Escape. The same
 flow passed three consecutive native runs, two with `G_DEBUG=fatal-criticals`.
 Audible screen-reader announcements remain to be checked.
-`./script/preflight.sh` ran against private Xvfb `:2`: Swift tests and the
-release build passed (cold build 713.66 seconds), followed by single-window
-activation, dynamic command enablement, forced-termination persistence, X11
-terminal integration including private clipboard, and 100-cycle lifecycle
-stress. The final native Wayland stage could not open its display because
-`WAYLAND_DISPLAY` was intentionally set invalid to protect the live session's
-clipboard. Full preflight therefore remains incomplete; this is no evidence
-of a Wayland app failure. The separate Omarchy palette regression above ran
-on the real Wayland session.
+Full `./script/preflight.sh` passed with exit 0 using private Xvfb `:1` and
+headless Weston `wayland-awesomux-qa`, with isolated D-Bus, configuration, and
+clipboard. Swift tests/release, single-window activation, dynamic command
+enablement, forced-termination persistence, X11 terminal integration, native
+Wayland terminal integration, and 100 two-surface lifecycle cycles passed.
+The separate palette regression above ran on the real Omarchy/Hyprland
+session. Live Omarchy daily-use/visual acceptance and audible Orca output
+remain pending.
 
 2026-09-23 acceptance update: SwiftGtk4 is the sole application implementation;
 the unused fallback scaffolding has been removed. Omarchy/Hyprland is the

@@ -19,14 +19,14 @@ are not focusable, search is actually FOCUSED, and selected states follow arrows
 Click routed exact workspace identities; Escape followed immediately by
 Control-K reopened a fresh palette that remained open. The exact widget
 focused before opening regained focus after Escape. All seven focused Swift
-palette tests passed. A private Xvfb `:2` preflight passed Swift tests and the
-cold release build (713.66 seconds), single-window activation, dynamic command
-enablement, forced-termination persistence, X11 terminal integration including
-private clipboard, and 100-cycle lifecycle stress. Its final native Wayland
-stage could not open the display because `WAYLAND_DISPLAY` was intentionally
-invalid to protect the live session's clipboard; full preflight remains
-incomplete. The separate palette regression above used real Omarchy Wayland.
-Audible screen-reader announcements were not measured.
+palette tests passed. Full `../script/preflight.sh` passed with exit 0 on
+private Xvfb `:1` and headless Weston `wayland-awesomux-qa`, with isolated
+D-Bus, configuration, and clipboard. Its Swift tests/release, single-window
+activation, dynamic enablement, forced-termination persistence, X11 and native
+Wayland terminal integration, and 100 two-surface lifecycle cycles passed.
+The separate palette regression above used real Omarchy/Hyprland Wayland.
+Live Omarchy daily-use/visual acceptance and audible Orca announcements remain
+pending.
 
 2026-09-23 acceptance update: SwiftGtk4 is the sole application implementation;
 the unused fallback scaffolding has been removed. Omarchy/Hyprland is the
