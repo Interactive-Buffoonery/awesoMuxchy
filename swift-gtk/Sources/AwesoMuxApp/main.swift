@@ -216,7 +216,6 @@ private final class ApplicationState: @unchecked Sendable {
     private(set) var focusedPaneID: UUID?
     private var surfacesByPane: [UUID: TerminalSurface] = [:]
     private var paneChromeByPane: [UUID: BoxRef] = [:]
-    private var retiringSurfaces: [TerminalSurface] = []
     private var workspaceByPane: [UUID: UUID] = [:]
     private var surfaceGenerationByPane: [UUID: Int] = [:]
     private var lastAgentStateChangeAt: [UUID: Foundation.Date] = [:]
@@ -1122,13 +1121,13 @@ private final class ApplicationState: @unchecked Sendable {
         agentEventWatchers.removeValue(forKey: paneID)?.stop()
         guard let surface else { return }
         surfaces.removeAll { $0 === surface }
-        surface.requestClose()
-        retiringSurfaces.append(surface)
-        timeout(add: 50) { [weak self, weak surface] in
-            guard let self, let surface else { return false }
-            guard surface.processExited else { return true }
-            self.retiringSurfaces.removeAll { $0 === surface }
-            return false
+        // The pane has been removed from the mounted layout. Ghostty's
+        // requestClose asks the host to close it; the embedded close callback
+        // cannot release this host's Swift-owned surface. Drop the final
+        // strong reference on the next GTK turn, outside the current action
+        // and focus callback stack, so TerminalSurface.deinit frees its core.
+        performOnGTKMain {
+            withExtendedLifetime(surface) {}
         }
     }
 
@@ -3816,9 +3815,11 @@ private final class ApplicationState: @unchecked Sendable {
               let runtime = runtimes[workspaceID]
         else { return }
 
-        discardPaneRuntime(closingPaneID)
         runtime.focusedPaneID = updated.focusedPaneID
         runtime.focusedSurface = nextSurface
+        focusedPaneID = updated.focusedPaneID
+        focusedSurface = nextSurface
+        discardPaneRuntime(closingPaneID)
         refreshWorkspaceAgentTile(workspaceID)
         refreshWorkspaceRowPresentation(workspaceID)
         refreshLiftedRows()

@@ -10,11 +10,24 @@ struct amx_ghostty_app {
   ghostty_config_t config;
 };
 
+typedef enum {
+  AMX_DISPLAY_ACTIVE,
+  AMX_DISPLAY_UNREALIZED,
+  AMX_DISPLAY_CLEANUP_PENDING,
+  AMX_DISPLAY_QUARANTINED,
+} amx_display_state;
+
 struct amx_ghostty_surface {
   amx_ghostty_app *app;
   GtkWidget *area;
   GtkIMContext *ime;
+  GtkEventController *focus_controller;
+  GtkEventController *key_controller;
+  GtkEventController *motion_controller;
+  GtkEventController *click_controller;
+  GtkEventController *scroll_controller;
   ghostty_surface_t core;
+  GdkGLContext *display_context;
   amx_ghostty_callbacks callbacks;
   char *working_directory;
   char *command;
@@ -22,6 +35,9 @@ struct amx_ghostty_surface {
   size_t environment_count;
   size_t pending_clipboard_reads;
   bool destroying;
+  bool injected_unrealize_failure;
+  uint32_t display_recovery_count;
+  amx_display_state display_state;
 };
 
 typedef struct {
@@ -86,7 +102,10 @@ static bool runtime_action(ghostty_app_t app,
 
   switch (action.tag) {
     case GHOSTTY_ACTION_RENDER:
-      gtk_gl_area_queue_render(GTK_GL_AREA(surface->area));
+      if (surface->display_state == AMX_DISPLAY_ACTIVE &&
+          gtk_widget_get_realized(surface->area)) {
+        gtk_gl_area_queue_render(GTK_GL_AREA(surface->area));
+      }
       return true;
     case GHOSTTY_ACTION_SET_TITLE:
     case GHOSTTY_ACTION_SET_TAB_TITLE:
@@ -129,6 +148,7 @@ static ghostty_clipboard_read_result_e read_clipboard(
   }
 
   GdkDisplay *display = gtk_widget_get_display(surface->area);
+  if (display == NULL) return GHOSTTY_CLIPBOARD_READ_UNAVAILABLE;
   GdkClipboard *source = clipboard == GHOSTTY_CLIPBOARD_SELECTION ||
                                  clipboard == GHOSTTY_CLIPBOARD_PRIMARY
       ? gdk_display_get_primary_clipboard(display)
@@ -221,6 +241,7 @@ static void write_clipboard(void *userdata,
   if (surface == NULL || contents_len == 0) return;
 
   GdkDisplay *display = gtk_widget_get_display(surface->area);
+  if (display == NULL) return;
   GdkClipboard *destination = clipboard == GHOSTTY_CLIPBOARD_SELECTION ||
                                       clipboard == GHOSTTY_CLIPBOARD_PRIMARY
       ? gdk_display_get_primary_clipboard(display)
@@ -280,11 +301,70 @@ void amx_ghostty_app_destroy(amx_ghostty_app *app) {
   free(app);
 }
 
-static void on_realize(GtkGLArea *area, amx_ghostty_surface *surface) {
+static bool bind_display_context(amx_ghostty_surface *surface) {
+  if (surface->display_context == NULL) return false;
+  gdk_gl_context_make_current(surface->display_context);
+  return gdk_gl_context_get_current() == surface->display_context;
+}
+
+static bool bind_area_context(GtkGLArea *area) {
   gtk_gl_area_make_current(area);
-  const GError *error = gtk_gl_area_get_error(area);
-  if (error != NULL) {
-    g_printerr("awesomux ghostty: GL context unavailable: %s\n", error->message);
+  GdkGLContext *context = gtk_gl_area_get_context(area);
+  return gtk_gl_area_get_error(area) == NULL && context != NULL &&
+         gdk_gl_context_get_current() == context;
+}
+
+static bool cleanup_display(amx_ghostty_surface *surface) {
+  if (surface->display_state == AMX_DISPLAY_UNREALIZED) return true;
+  if (!bind_display_context(surface)) return false;
+  ghostty_surface_display_unrealized(surface->core);
+  surface->display_state = AMX_DISPLAY_UNREALIZED;
+  g_clear_object(&surface->display_context);
+  return true;
+}
+
+static void show_display_failure(GtkGLArea *area) {
+  GError *error = g_error_new_literal(
+      G_IO_ERROR, G_IO_ERROR_FAILED,
+      "Terminal display could not recover. Close this pane and open a new one.");
+  gtk_gl_area_set_error(area, error);
+  g_error_free(error);
+}
+
+static void on_realize(GtkGLArea *area, amx_ghostty_surface *surface) {
+  if (surface->destroying) return;
+  if (surface->display_state == AMX_DISPLAY_QUARANTINED) {
+    show_display_failure(area);
+    return;
+  }
+  if (surface->core != NULL &&
+      surface->display_state == AMX_DISPLAY_CLEANUP_PENDING) {
+    if (!cleanup_display(surface)) {
+      surface->display_state = AMX_DISPLAY_QUARANTINED;
+      show_display_failure(area);
+      return;
+    }
+    surface->display_recovery_count++;
+  }
+  if (!bind_area_context(area)) {
+    const GError *error = gtk_gl_area_get_error(area);
+    g_printerr("awesomux ghostty: GL context unavailable: %s\n",
+               error != NULL ? error->message : "context mismatch");
+    return;
+  }
+  GdkGLContext *context = gtk_gl_area_get_context(area);
+
+  if (surface->core != NULL) {
+    if (surface->display_state != AMX_DISPLAY_UNREALIZED) return;
+    if (ghostty_surface_display_realized(surface->core)) {
+      surface->display_context = g_object_ref(context);
+      surface->display_state = AMX_DISPLAY_ACTIVE;
+      gtk_im_context_set_client_widget(surface->ime, surface->area);
+      gtk_gl_area_queue_render(area);
+    } else {
+      surface->display_state = AMX_DISPLAY_QUARANTINED;
+      show_display_failure(area);
+    }
     return;
   }
 
@@ -298,13 +378,29 @@ static void on_realize(GtkGLArea *area, amx_ghostty_surface *surface) {
   config.env_vars = surface->environment;
   config.env_var_count = surface->environment_count;
   surface->core = ghostty_surface_new(surface->app->core, &config);
+  if (surface->core != NULL) {
+    surface->display_context = g_object_ref(context);
+    surface->display_state = AMX_DISPLAY_ACTIVE;
+  }
 }
 
 static void on_unrealize(GtkGLArea *area, amx_ghostty_surface *surface) {
-  if (surface->core == NULL) return;
-  gtk_gl_area_make_current(area);
-  ghostty_surface_free(surface->core);
-  surface->core = NULL;
+  if (surface->destroying) return;
+  gtk_im_context_set_client_widget(surface->ime, NULL);
+  if (surface->core == NULL || surface->display_state != AMX_DISPLAY_ACTIVE)
+    return;
+  if (!surface->injected_unrealize_failure &&
+      g_strcmp0(g_getenv("AWESOMUX_GHOSTTY_TEST_GL_UNREALIZE_FAIL_ONCE"), "1") == 0) {
+    surface->injected_unrealize_failure = true;
+    surface->display_state = AMX_DISPLAY_CLEANUP_PENDING;
+    return;
+  }
+  if (!bind_area_context(area) ||
+      gdk_gl_context_get_current() != surface->display_context ||
+      !cleanup_display(surface)) {
+    surface->display_state = AMX_DISPLAY_CLEANUP_PENDING;
+    g_printerr("awesomux ghostty: GL cleanup deferred until original context is current\n");
+  }
 }
 
 static gboolean on_render(GtkGLArea *area,
@@ -312,7 +408,11 @@ static gboolean on_render(GtkGLArea *area,
                           amx_ghostty_surface *surface) {
   (void)area;
   (void)context;
-  if (surface->core != NULL) ghostty_surface_draw(surface->core);
+  if (!surface->destroying && surface->core != NULL &&
+      surface->display_state == AMX_DISPLAY_ACTIVE &&
+      context == surface->display_context) {
+    ghostty_surface_draw(surface->core);
+  }
   return TRUE;
 }
 
@@ -321,7 +421,7 @@ static void on_resize(GtkGLArea *area,
                       int height,
                       amx_ghostty_surface *surface) {
   (void)area;
-  if (surface->core != NULL && width > 0 && height > 0) {
+  if (!surface->destroying && surface->core != NULL && width > 0 && height > 0) {
     ghostty_surface_set_size(surface->core, (uint32_t)width, (uint32_t)height);
   }
 }
@@ -329,6 +429,7 @@ static void on_resize(GtkGLArea *area,
 static void on_focus_enter(GtkEventControllerFocus *controller,
                            amx_ghostty_surface *surface) {
   (void)controller;
+  if (surface->destroying) return;
   if (surface->core != NULL) ghostty_surface_set_focus(surface->core, true);
   gtk_im_context_focus_in(surface->ime);
   if (surface->callbacks.focus_changed != NULL) {
@@ -339,6 +440,7 @@ static void on_focus_enter(GtkEventControllerFocus *controller,
 static void on_focus_leave(GtkEventControllerFocus *controller,
                            amx_ghostty_surface *surface) {
   (void)controller;
+  if (surface->destroying) return;
   if (surface->core != NULL) ghostty_surface_set_focus(surface->core, false);
   gtk_im_context_focus_out(surface->ime);
   if (surface->callbacks.focus_changed != NULL) {
@@ -350,6 +452,7 @@ static void on_ime_commit(GtkIMContext *ime,
                           const char *text,
                           amx_ghostty_surface *surface) {
   (void)ime;
+  if (surface->destroying) return;
   if (surface->core != NULL && text != NULL) {
     ghostty_surface_text(surface->core, text, strlen(text));
   }
@@ -357,6 +460,7 @@ static void on_ime_commit(GtkIMContext *ime,
 
 static void on_ime_preedit(GtkIMContext *ime,
                            amx_ghostty_surface *surface) {
+  if (surface->destroying) return;
   char *text = NULL;
   gtk_im_context_get_preedit_string(ime, &text, NULL, NULL);
   if (surface->core != NULL) {
@@ -381,6 +485,7 @@ static gboolean process_key(GtkEventControllerKey *controller,
                             guint keycode,
                             GdkModifierType state,
                             amx_ghostty_surface *surface) {
+  if (surface->destroying) return FALSE;
   GdkEvent *event = gtk_event_controller_get_current_event(GTK_EVENT_CONTROLLER(controller));
   if (event != NULL && gtk_im_context_filter_keypress(surface->ime, event)) return TRUE;
   if (surface->core == NULL || event == NULL) return FALSE;
@@ -419,6 +524,7 @@ static void on_motion(GtkEventControllerMotion *controller,
                       double x,
                       double y,
                       amx_ghostty_surface *surface) {
+  if (surface->destroying) return;
   GdkModifierType state = gtk_event_controller_get_current_event_state(GTK_EVENT_CONTROLLER(controller));
   if (surface->core != NULL) {
     ghostty_surface_mouse_pos(surface->core, x, y, ghostty_modifiers(state));
@@ -439,6 +545,7 @@ static void on_pressed(GtkGestureClick *gesture,
                        double x,
                        double y,
                        amx_ghostty_surface *surface) {
+  if (surface->destroying) return;
   (void)count;
   if (surface->core != NULL) {
     ghostty_surface_mouse_pos(surface->core, x, y, GHOSTTY_MODS_NONE);
@@ -455,6 +562,7 @@ static void on_released(GtkGestureClick *gesture,
                         double x,
                         double y,
                         amx_ghostty_surface *surface) {
+  if (surface->destroying) return;
   (void)count;
   if (surface->core != NULL) {
     ghostty_surface_mouse_pos(surface->core, x, y, GHOSTTY_MODS_NONE);
@@ -470,6 +578,7 @@ static gboolean on_scroll(GtkEventControllerScroll *controller,
                           double dx,
                           double dy,
                           amx_ghostty_surface *surface) {
+  if (surface->destroying) return FALSE;
   (void)controller;
   if (surface->core != NULL) ghostty_surface_mouse_scroll(surface->core, dx, dy, 0);
   return TRUE;
@@ -531,20 +640,24 @@ amx_ghostty_surface *amx_ghostty_surface_create_with_environment(
   g_signal_connect(surface->ime, "preedit-changed", G_CALLBACK(on_ime_preedit), surface);
 
   GtkEventController *focus = gtk_event_controller_focus_new();
+  surface->focus_controller = focus;
   g_signal_connect(focus, "enter", G_CALLBACK(on_focus_enter), surface);
   g_signal_connect(focus, "leave", G_CALLBACK(on_focus_leave), surface);
   gtk_widget_add_controller(surface->area, focus);
 
   GtkEventController *key = gtk_event_controller_key_new();
+  surface->key_controller = key;
   g_signal_connect(key, "key-pressed", G_CALLBACK(on_key_pressed), surface);
   g_signal_connect(key, "key-released", G_CALLBACK(on_key_released), surface);
   gtk_widget_add_controller(surface->area, key);
 
   GtkEventController *motion = gtk_event_controller_motion_new();
+  surface->motion_controller = motion;
   g_signal_connect(motion, "motion", G_CALLBACK(on_motion), surface);
   gtk_widget_add_controller(surface->area, motion);
 
   GtkGesture *click = gtk_gesture_click_new();
+  surface->click_controller = GTK_EVENT_CONTROLLER(click);
   gtk_gesture_single_set_button(GTK_GESTURE_SINGLE(click), 0);
   g_signal_connect(click, "pressed", G_CALLBACK(on_pressed), surface);
   g_signal_connect(click, "released", G_CALLBACK(on_released), surface);
@@ -553,6 +666,7 @@ amx_ghostty_surface *amx_ghostty_surface_create_with_environment(
   GtkEventController *scroll = gtk_event_controller_scroll_new(
       GTK_EVENT_CONTROLLER_SCROLL_BOTH_AXES |
       GTK_EVENT_CONTROLLER_SCROLL_KINETIC);
+  surface->scroll_controller = scroll;
   g_signal_connect(scroll, "scroll", G_CALLBACK(on_scroll), surface);
   gtk_widget_add_controller(surface->area, scroll);
 
@@ -567,11 +681,34 @@ void amx_ghostty_surface_destroy(amx_ghostty_surface *surface) {
   if (surface == NULL) return;
   surface->destroying = true;
   if (surface->core != NULL) {
-    gtk_gl_area_make_current(GTK_GL_AREA(surface->area));
-    ghostty_surface_free(surface->core);
+    // A previously detached pane may still own image textures even after
+    // displayUnrealized released shaders and framebuffers. It has no usable
+    // original context, so its final close also uses the no-GL path.
+    GdkGLContext *owned_context = surface->display_context == NULL
+                                   ? NULL : g_object_ref(surface->display_context);
+    bool context_current = surface->display_state != AMX_DISPLAY_UNREALIZED &&
+                           cleanup_display(surface) &&
+                           gdk_gl_context_get_current() == owned_context;
+    if (!context_current) {
+      ghostty_surface_free_display_lost(surface->core);
+    } else {
+      ghostty_surface_free(surface->core);
+    }
     surface->core = NULL;
+    g_clear_object(&owned_context);
   }
   g_signal_handlers_disconnect_by_data(surface->area, surface);
+  g_signal_handlers_disconnect_by_data(surface->ime, surface);
+  if (surface->focus_controller != NULL)
+    g_signal_handlers_disconnect_by_data(surface->focus_controller, surface);
+  if (surface->key_controller != NULL)
+    g_signal_handlers_disconnect_by_data(surface->key_controller, surface);
+  if (surface->motion_controller != NULL)
+    g_signal_handlers_disconnect_by_data(surface->motion_controller, surface);
+  if (surface->click_controller != NULL)
+    g_signal_handlers_disconnect_by_data(surface->click_controller, surface);
+  if (surface->scroll_controller != NULL)
+    g_signal_handlers_disconnect_by_data(surface->scroll_controller, surface);
   gtk_im_context_set_client_widget(surface->ime, NULL);
   GtkWidget *parent = gtk_widget_get_parent(surface->area);
   if (parent != NULL) gtk_widget_unparent(surface->area);
@@ -581,6 +718,7 @@ void amx_ghostty_surface_destroy(amx_ghostty_surface *surface) {
 }
 
 static void finalize_surface(amx_ghostty_surface *surface) {
+  g_clear_object(&surface->display_context);
   g_clear_pointer(&surface->working_directory, g_free);
   g_clear_pointer(&surface->command, g_free);
   for (size_t index = 0; index < surface->environment_count; index++) {
@@ -589,6 +727,11 @@ static void finalize_surface(amx_ghostty_surface *surface) {
   }
   g_clear_pointer(&surface->environment, free);
   free(surface);
+}
+
+uint32_t amx_ghostty_surface_display_recovery_count(
+    amx_ghostty_surface *surface) {
+  return surface == NULL ? 0 : surface->display_recovery_count;
 }
 
 void *amx_ghostty_surface_widget(amx_ghostty_surface *surface) {
@@ -634,6 +777,26 @@ uint64_t amx_ghostty_surface_foreground_process_id(
     amx_ghostty_surface *surface) {
   if (surface == NULL || surface->core == NULL) return 0;
   return ghostty_surface_foreground_pid(surface->core);
+}
+
+bool amx_ghostty_surface_contains_text(amx_ghostty_surface *surface,
+                                       const char *needle) {
+  if (surface == NULL || surface->core == NULL || needle == NULL) return false;
+  size_t needle_len = 0;
+  while (needle_len <= 1024 && needle[needle_len] != '\0') needle_len++;
+  if (needle_len == 0 || needle_len > 1024) return false;
+  const ghostty_selection_s selection = {
+      .top_left = {.tag = GHOSTTY_POINT_SCREEN,
+                   .coord = GHOSTTY_POINT_COORD_TOP_LEFT},
+      .bottom_right = {.tag = GHOSTTY_POINT_SCREEN,
+                       .coord = GHOSTTY_POINT_COORD_BOTTOM_RIGHT},
+  };
+  ghostty_text_s text = {0};
+  if (!ghostty_surface_read_text(surface->core, selection, &text)) return false;
+  const bool found = text.text != NULL && text.text_len <= G_MAXSSIZE &&
+      g_strstr_len(text.text, (gssize)text.text_len, needle) != NULL;
+  ghostty_surface_free_text(surface->core, &text);
+  return found;
 }
 
 bool amx_ghostty_surface_binding_action(amx_ghostty_surface *surface,

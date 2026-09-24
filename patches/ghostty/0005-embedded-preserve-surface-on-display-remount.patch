@@ -1,0 +1,210 @@
+From: awesoMux Linux <noreply@awesomux.local>
+Subject: [PATCH] embedded: retain terminal core across Linux GL remounts
+
+Purpose: Keep shell, job, and scrollback while GTK reparents a pane.
+Upstream pin: f2d5758f6305867dc36b36293c6165d8152b853e
+Files: include/ghostty.h, src/Surface.zig, src/apprt/embedded.zig, src/renderer/{OpenGL,generic,image}.zig, src/renderer/opengl/shaders.zig
+Wrapper limitation: renderer display lifecycle is not in the embedded C API.
+Coverage: live PID survival, output, focus, detached close, repeated remount, and one-shot GL fault integration.
+Rebase risk: renderer lifecycle, image/shader CPU ownership, or embedded Surface teardown changes.
+
+diff --git a/include/ghostty.h b/include/ghostty.h
+--- a/include/ghostty.h
++++ b/include/ghostty.h
+@@ -1185,6 +1185,13 @@
+ GHOSTTY_API bool ghostty_surface_process_exited(ghostty_surface_t);
+ GHOSTTY_API void ghostty_surface_refresh(ghostty_surface_t);
+ GHOSTTY_API void ghostty_surface_draw(ghostty_surface_t);
++#ifdef __linux__
++/* Release and restore display resources without ending the terminal process. */
++GHOSTTY_API void ghostty_surface_display_unrealized(ghostty_surface_t);
++GHOSTTY_API bool ghostty_surface_display_realized(ghostty_surface_t);
++/* Final teardown when the original GL context cannot be made current. */
++GHOSTTY_API void ghostty_surface_free_display_lost(ghostty_surface_t);
++#endif
+ GHOSTTY_API void ghostty_surface_set_content_scale(ghostty_surface_t, double, double);
+ GHOSTTY_API void ghostty_surface_set_focus(ghostty_surface_t, bool);
+ GHOSTTY_API void ghostty_surface_set_occlusion(ghostty_surface_t, bool);
+diff --git a/src/Surface.zig b/src/Surface.zig
+index 8eddc14c8..05f07d4a3 100644
+--- a/src/Surface.zig
++++ b/src/Surface.zig
+@@ -149,6 +149,8 @@ config_conditional_state: configpkg.ConditionalState,
+ /// This is set to true if our IO thread notifies us our child exited.
+ /// This is used to determine if we need to confirm, hold open, etc.
+ child_exited: bool = false,
++/// Embedded Linux final teardown may lose the original OpenGL context.
++display_lost: bool = false,
+-
++
+ /// We maintain our focus state and assume we're focused by default.
+ /// If we're not initially focused then apprts can call focusCallback
+@@ -821,6 +823,9 @@ pub fn deinit(self: *Surface) void {
+     // We need to deinit AFTER everything is stopped, since there are
+     // shared values between the two threads.
+     self.renderer_thread.deinit();
++    if (comptime builtin.target.os.tag == .linux) {
++        if (self.display_lost) self.renderer.abandonOpenGLResources();
++    }
+     self.renderer.deinit();
+     self.io_thread.deinit();
+     self.mouse.selection_gesture.deinit(&self.io.terminal);
+diff --git a/src/apprt/embedded.zig b/src/apprt/embedded.zig
+--- a/src/apprt/embedded.zig
++++ b/src/apprt/embedded.zig
+@@ -1841,6 +1841,33 @@
+         ptr.app.closeSurface(ptr);
+     }
+
++    export fn ghostty_surface_free_display_lost(ptr: *Surface) void {
++        if (comptime builtin.target.os.tag == .linux) {
++            ptr.core_surface.display_lost = true;
++            ptr.app.closeSurface(ptr);
++        }
++    }
++
++    /// Preserve terminal I/O and scrollback while a Linux host replaces the
++    /// GL context (for example, when GTK reparents a split pane).
++    export fn ghostty_surface_display_unrealized(surface: *Surface) void {
++        if (comptime builtin.target.os.tag == .linux) {
++            surface.core_surface.renderer.displayUnrealized();
++        }
++    }
++
++    /// Rebuild only GPU state after the host has made its new context current.
++    export fn ghostty_surface_display_realized(surface: *Surface) bool {
++        if (comptime builtin.target.os.tag == .linux) {
++            surface.core_surface.renderer.displayRealized() catch |err| {
++                log.err("error restoring surface display err={}", .{err});
++                return false;
++            };
++            return true;
++        }
++        return false;
++    }
++
+     /// Returns the userdata associated with the surface.
+     export fn ghostty_surface_userdata(surface: *Surface) ?*anyopaque {
+         return surface.userdata;
+diff --git a/src/renderer/OpenGL.zig b/src/renderer/OpenGL.zig
+--- a/src/renderer/OpenGL.zig
++++ b/src/renderer/OpenGL.zig
+@@ -241,13 +241,13 @@
+     _ = self;
+-
++
+     switch (apprt.runtime) {
+-        apprt.gtk => prepareContext(null) catch |err| {
++        apprt.gtk, apprt.embedded => prepareContext(null) catch |err| {
+             log.warn(
+                 "Error preparing GL context in displayRealized, err={}",
+                 .{err},
+             );
+         },
+-
++
+-        else => @compileError("only GTK should be calling displayRealized"),
++        else => @compileError("only GTK and Linux embedders should be calling displayRealized"),
+     }
+ }
+diff --git a/src/renderer/generic.zig b/src/renderer/generic.zig
+--- a/src/renderer/generic.zig
++++ b/src/renderer/generic.zig
+@@ -834,6 +834,24 @@ pub fn Renderer(comptime GraphicsAPI: type) type {
+             self.* = undefined;
+         }
+-
++
++        /// Final teardown only, after both worker threads have joined and
++        /// the OpenGL context has become unusable. Retain no CPU allocations,
++        /// and allow normal deinit to release terminal/font/PTY state.
++        pub fn abandonOpenGLResources(self: *Self) void {
++            comptime assert(GraphicsAPI == @import("OpenGL.zig"));
++            self.draw_mutex.lockUncancelable(global.io());
++            defer self.draw_mutex.unlock(global.io());
++            // SwapChain frames and postprocessing targets contain only GL
++            // handles. The context driver reclaims them; never call deinit.
++            self.swap_chain = null;
++            self.shaders.abandon(self.alloc);
++            self.images.abandonOpenGL(self.alloc);
++            if (self.bg_image) |img| img.abandonOpenGL(self.alloc);
++            self.bg_image = null;
++            self.api.last_target = null;
++            self.display_realized = false;
++        }
++
+         fn deinitShaders(self: *Self) void {
+             self.shaders.deinit(self.alloc);
+         }
+@@ -949,6 +949,9 @@
+-
++
+             // We reinitialize our shaders and our swap chain.
+             try self.initShaders();
++            // Swap-chain creation can still fail after shaders were allocated.
++            // Keep the renderer safely retryable and its later deinit idempotent.
++            errdefer self.shaders.deinit(self.alloc);
+             self.swap_chain = try SwapChain.init(
+                 self.api,
+                 self.has_custom_shaders,
+
+diff --git a/src/renderer/image.zig b/src/renderer/image.zig
+index ef0367bd1..e94411b0e 100644
+--- a/src/renderer/image.zig
++++ b/src/renderer/image.zig
+@@ -56,6 +56,17 @@ pub const State = struct {
+         self.overlay_placements.deinit(alloc);
+     }
+-
++
++    /// Drop CPU-owned image data after OpenGL loss; the driver owns the dead
++    /// texture handles and they must not be deleted under another context.
++    pub fn abandonOpenGL(self: *State, alloc: Allocator) void {
++        var it = self.images.iterator();
++        while (it.next()) |kv| kv.value_ptr.image.abandonOpenGL(alloc);
++        self.images.deinit(alloc);
++        self.kitty_placements.deinit(alloc);
++        self.overlay_placements.deinit(alloc);
++        self.* = .empty;
++    }
++
+     /// Upload any images to the GPU that need to be uploaded,
+     /// and remove any images that are no longer needed on the GPU.
+     ///
+@@ -1006,6 +1017,14 @@ pub const Image = union(enum) {
+         }
+     }
+-
++
++    pub fn abandonOpenGL(self: Image, alloc: Allocator) void {
++        switch (self) {
++            .pending, .unload_pending => |p| alloc.free(p.dataSlice()),
++            .replace, .unload_replace => |r| alloc.free(r.pending.dataSlice()),
++            .ready, .unload_ready => {},
++        }
++    }
++
+     /// Mark this image for unload whatever state it is in.
+     pub fn markForUnload(self: *Image) void {
+         self.* = switch (self.*) {
+
+diff --git a/src/renderer/opengl/shaders.zig b/src/renderer/opengl/shaders.zig
+index 68d2babf6..db7649543 100644
+--- a/src/renderer/opengl/shaders.zig
++++ b/src/renderer/opengl/shaders.zig
+@@ -151,6 +151,14 @@ pub const Shaders = struct {
+             alloc.free(self.post_pipelines);
+         }
+     }
++
++    /// The context is gone: free owned CPU slices without issuing GL calls.
++    pub fn abandon(self: *Shaders, alloc: Allocator) void {
++        if (self.defunct) return;
++        self.defunct = true;
++        if (self.post_pipelines.len > 0) alloc.free(self.post_pipelines);
++        self.post_pipelines = &.{};
++    }
+ };
+-
++
+ /// The uniforms that are passed to our shaders.

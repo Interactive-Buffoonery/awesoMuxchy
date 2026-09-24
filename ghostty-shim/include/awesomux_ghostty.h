@@ -72,6 +72,12 @@ AMX_GHOSTTY_API bool amx_ghostty_surface_needs_confirm_quit(
     amx_ghostty_surface *surface);
 AMX_GHOSTTY_API uint64_t amx_ghostty_surface_foreground_process_id(
     amx_ghostty_surface *surface);
+/* Bounded diagnostic query for lifecycle tests; never writes terminal text to logs. */
+AMX_GHOSTTY_API bool amx_ghostty_surface_contains_text(
+    amx_ghostty_surface *surface, const char *needle);
+/* Counts successful cleanup retries after a deferred GL unrealize. */
+AMX_GHOSTTY_API uint32_t amx_ghostty_surface_display_recovery_count(
+    amx_ghostty_surface *surface);
 AMX_GHOSTTY_API bool amx_ghostty_surface_binding_action(
     amx_ghostty_surface *surface,
     const char *action);
