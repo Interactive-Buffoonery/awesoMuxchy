@@ -19,8 +19,15 @@ live-session run. A separate app action probe kept the original shell PID
 through Split Right and Grow/Shrink. It then exposed a closed sibling retained
 indefinitely by the old exit-polling path; the source now releases that removed
 surface on the next GTK turn after focus ownership moves to the survivor.
-That close-path change builds but has not had a live retest after desktop QA was
-paused. A bounded one-shot release Wayland integration then stopped at a fresh
+A supervised native Omarchy/Hyprland real-app run now verifies that close path:
+under a private D-Bus session, fresh profile, and isolated Ghostty config,
+original shell PID 2129973 and harmless job PID 2129982 stayed alive through
+Split Right, Grow, Shrink, and sibling Close Pane actions. Sibling shell PID
+2130087 exited while the app and original processes remained alive; the
+persisted layout returned to the original pane ID. No global shortcuts or
+clipboard calls were used. After cleanup, the app and all three child PIDs
+were absent, with no test window or Not Responding dialog. A bounded one-shot
+release Wayland integration previously stopped at a fresh
 focus-callback assertion whose prerequisite (active window and successful
 sibling focus transfer) had not been checked, before reaching detached-close
 PID verification. Its runtime, children, and window all exited; the test guard
@@ -28,15 +35,17 @@ now checks that prerequisite. A subsequent one-shot Omarchy/Wayland integration
 injected an unrealize failure, recovered the original context exactly once,
 passed eight live-job remounts and detached shell PID exit, and left no test
 executable, process-group member, or window. Focus transfer was skipped in that
-Wayland run because the compositor focus prerequisite was unavailable. A later
-private Xvfb `:2` preflight with isolated Ghostty configuration passed Swift
-tests, release build, single-window and dynamic-enablement probes,
-forced-termination persistence, X11 terminal integration, and 100 lifecycle
-cycles. The X11 integration verified post-remount focus transfer, private
-clipboard, eight live-process remounts, and detached process release. Final
-native Wayland preflight was deliberately pointed at an invalid display to
-protect the live clipboard and could not open a display, so full preflight
-remains incomplete. Broader Omarchy daily-use acceptance remains pending.
+Wayland run because the compositor focus prerequisite was unavailable. The
+full `./script/preflight.sh` then passed exit 0 with isolated D-Bus, Ghostty
+configuration, and clipboard under private Xvfb `:1` plus headless Weston
+`wayland-awesomux-qa`. It passed Swift tests, release build, single-window and
+dynamic-enablement probes, forced-termination persistence, X11 and Wayland
+terminal integration, and 100 lifecycle cycles on each display. Both terminal
+integrations verified post-remount focus transfer, eight live-process remounts,
+and detached process release; X11 exercised the private clipboard. The Weston
+result does not establish focus behavior on the live Omarchy compositor.
+True lost-context quarantine and broader Omarchy daily-use acceptance remain
+pending.
 Canonical `vendor/ghostty` remains clean.
 
 Lifecycle review found a second failure path: if GTK cannot make the original
@@ -47,9 +56,9 @@ Ghostty patch adds a final no-GL teardown for an irrecoverable or detached
 display so closing the pane can still retire its terminal process without
 deleting GPU handles under a different context. A one-shot fault switch and
 recovery-count assertion cover the transient path in the integration harness;
-the native fault and detached final-close run passed. The private X11 preflight
-also verified focus transfer after remount, superseding the focus-skipped
-coverage in the later Wayland run. A true lost-context
+the native fault and detached final-close run passed. Private X11 and headless
+Weston Wayland preflight verified focus transfer after remount; live Omarchy
+compositor focus remains to verify. A true lost-context
 quarantine remains untested on live Omarchy. The failed pane displays
 a close-and-reopen message if its context cannot recover.
 
@@ -71,7 +80,9 @@ persistence, accessibility, and keyboard findings. These qualify the historical
 completion claims below; none was fixed by the repository rename. The existing
 130-test binary passed, current core warnings-as-errors typechecking passed,
 and local text-baseline validation passed with live reference comparison
-unavailable. Full preflight and new target-desktop evidence remain pending.
+unavailable. At this repository-rename checkpoint, full preflight and new
+target-desktop evidence were pending; the later INT-1112 private-display
+preflight result is recorded above.
 Historical references to a private origin describe uploads before publication.
 
 Consolidation update: 2026-09-22. Runtime evidence below was recorded during
@@ -100,8 +111,9 @@ The debug application builds and runs on pinguchy under native Wayland. Its
 development application ID exposes the workspace action, and creating a
 workspace renders a live Ghostty shell; an app-only capture was inspected.
 This is local startup evidence, not target-machine parity. All 130 Swift
-package tests pass on this host. Full preflight and target-machine desktop QA
-remain pending. See
+package tests pass on this host. At this 2026-09-22 checkpoint, full preflight
+and target-machine desktop QA were pending; later INT-1112 verification is
+recorded above. See
 [`docs/development.md`](docs/development.md) for the development wrapper and
 reproduction details.
 
